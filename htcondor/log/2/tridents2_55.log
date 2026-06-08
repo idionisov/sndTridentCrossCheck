@@ -1,0 +1,102 @@
+000 (7020619.055.000) 03/15 11:55:49 Job submitted from host: <188.185.125.71:9618?addrs=188.185.125.71-9618+[2001-1458-d00-4a--100-15e]-9618&alias=bigbird28.cern.ch&noUDP&sock=schedd_2603_051c>
+...
+040 (7020619.055.000) 03/15 11:59:25 Started transferring input files
+	Transferring to host: <188.185.195.165:9618?addrs=188.185.195.165-9618+[2001-1458-303-22--100-a1]-9618&alias=b9p17p6053.cern.ch&noUDP&sock=slot1_43_6921_3873_174780>
+...
+040 (7020619.055.000) 03/15 11:59:25 Finished transferring input files
+...
+001 (7020619.055.000) 03/15 11:59:26 Job executing on host: <188.185.195.165:9618?addrs=188.185.195.165-9618+[2001-1458-303-22--100-a1]-9618&alias=b9p17p6053.cern.ch&noUDP&sock=startd_5730_e1c2>
+	SlotName: slot1_43@b9p17p6053.cern.ch
+	CondorScratchDir = "/pool/condor/dir_1637012"
+	Cpus = 1
+	Disk = 3881
+	GPUs = 0
+	Memory = 3000
+...
+006 (7020619.055.000) 03/15 11:59:40 Image size of job updated: 888
+	1  -  MemoryUsage of job (MB)
+	888  -  ResidentSetSize of job (KB)
+...
+006 (7020619.055.000) 03/15 12:04:41 Image size of job updated: 205376
+	201  -  MemoryUsage of job (MB)
+	205376  -  ResidentSetSize of job (KB)
+...
+006 (7020619.055.000) 03/15 12:09:42 Image size of job updated: 657576
+	643  -  MemoryUsage of job (MB)
+	657576  -  ResidentSetSize of job (KB)
+...
+006 (7020619.055.000) 03/15 12:14:42 Image size of job updated: 657912
+	643  -  MemoryUsage of job (MB)
+	657912  -  ResidentSetSize of job (KB)
+...
+006 (7020619.055.000) 03/15 12:19:43 Image size of job updated: 705264
+	689  -  MemoryUsage of job (MB)
+	705264  -  ResidentSetSize of job (KB)
+...
+006 (7020619.055.000) 03/15 12:24:44 Image size of job updated: 711060
+	695  -  MemoryUsage of job (MB)
+	711060  -  ResidentSetSize of job (KB)
+...
+006 (7020619.055.000) 03/15 12:34:45 Image size of job updated: 711912
+	696  -  MemoryUsage of job (MB)
+	711912  -  ResidentSetSize of job (KB)
+...
+006 (7020619.055.000) 03/15 12:39:46 Image size of job updated: 715072
+	699  -  MemoryUsage of job (MB)
+	715072  -  ResidentSetSize of job (KB)
+...
+006 (7020619.055.000) 03/15 12:59:48 Image size of job updated: 715076
+	699  -  MemoryUsage of job (MB)
+	715076  -  ResidentSetSize of job (KB)
+...
+006 (7020619.055.000) 03/15 13:04:49 Image size of job updated: 716252
+	700  -  MemoryUsage of job (MB)
+	716252  -  ResidentSetSize of job (KB)
+...
+006 (7020619.055.000) 03/15 13:09:49 Image size of job updated: 716464
+	700  -  MemoryUsage of job (MB)
+	716464  -  ResidentSetSize of job (KB)
+...
+006 (7020619.055.000) 03/15 13:14:49 Image size of job updated: 716556
+	700  -  MemoryUsage of job (MB)
+	716556  -  ResidentSetSize of job (KB)
+...
+006 (7020619.055.000) 03/15 13:24:51 Image size of job updated: 716612
+	700  -  MemoryUsage of job (MB)
+	716612  -  ResidentSetSize of job (KB)
+...
+006 (7020619.055.000) 03/15 13:34:52 Image size of job updated: 717732
+	701  -  MemoryUsage of job (MB)
+	717732  -  ResidentSetSize of job (KB)
+...
+006 (7020619.055.000) 03/15 14:44:59 Image size of job updated: 727664
+	711  -  MemoryUsage of job (MB)
+	727664  -  ResidentSetSize of job (KB)
+...
+006 (7020619.055.000) 03/15 16:05:07 Image size of job updated: 727760
+	711  -  MemoryUsage of job (MB)
+	727760  -  ResidentSetSize of job (KB)
+...
+006 (7020619.055.000) 03/15 16:25:08 Image size of job updated: 727772
+	711  -  MemoryUsage of job (MB)
+	727772  -  ResidentSetSize of job (KB)
+...
+006 (7020619.055.000) 03/15 17:20:13 Image size of job updated: 727840
+	711  -  MemoryUsage of job (MB)
+	727840  -  ResidentSetSize of job (KB)
+...
+006 (7020619.055.000) 03/15 18:35:20 Image size of job updated: 727900
+	711  -  MemoryUsage of job (MB)
+	727900  -  ResidentSetSize of job (KB)
+...
+006 (7020619.055.000) 03/15 18:45:21 Image size of job updated: 727968
+	711  -  MemoryUsage of job (MB)
+	727968  -  ResidentSetSize of job (KB)
+...
+040 (7020619.055.000) 03/16 12:00:10 Started transferring output files
+...
+040 (7020619.055.000) 03/16 12:00:10 Finished transferring output files
+...
+009 (7020619.055.000) 03/16 12:00:10 Job was aborted.
+	Job removed by SYSTEM_PERIODIC_REMOVE due to wall time exceeded allowed max.
+...

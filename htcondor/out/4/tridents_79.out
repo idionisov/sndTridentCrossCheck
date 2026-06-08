@@ -1,0 +1,83 @@
+search libraries in slc9_x86-64
+ ~ 1) Base stack loaded.
+ ~ Sleeping for 1102 seconds to avoid AFS DDOS...
+ ~ 2) Loading sndsw environment...
+ ~ 3) SNDSW_ROOT is set to: /afs/cern.ch/user/i/idioniso/snd_master/sw-root6.28/rhel9_x86-64/sndsw/master-local1
+ ~ 4) Executing tracking script...
+[FATAL] No Branch list in input file
+[INFO] The input consists out of the following trees and files: 
+[INFO]  - rawConv
+[INFO]     - root://eoshome-i.cern.ch//eos/user/i/idioniso/tridents/run_006640/recoTri_6640_f0147.1.root
+[WARN] No time based branch list in input file
+[INFO] FairRootFileSink initialized.
+[INFO]  - cbmout
+[INFO]     - dummy
+[INFO] Parameter and input file are available, Assure that basic info is there for the run!
+[INFO] ---FairRootManager::SpecifyRunId --- 
+[INFO] --- Initialize with RunId  --- 0
+
+************************************************************* 
+     initialisation for run id 0
+************************************************************* 
+-I- FairRunTimeDB::InitContainer() FairBaseParSet
+-I- FairRunTimeDB::InitContainer() FairGeoParSet
+
+************************************************************* 
+     initialisation for run id 0
+************************************************************* 
+-I- FairRunTimeDB::InitContainer() FairBaseParSet
+-I- FairRunTimeDB::InitContainer() FairGeoParSet
+[INFO]  Branch: Reco_MuonTracks not found in Tree.
+using geofile: root://eospublic.cern.ch//eos/experiment/sndlhc/convertedData/physics/2023/geofile_sndlhc_TI18_V3_2023.root
+[0%] 	 0/25 	 00:00:20
+Match: Event 147266332, Lines 3, DAngle 0.0639
+[1%] 	 1/25 	 00:01:06
+Match: Event 147277743, Lines 3, DAngle 0.1004
+[2%] 	 2/25 	 00:01:25
+Match: Event 147282790, Lines 8, DAngle 0.1631
+[3%] 	 3/25 	 00:06:30
+Match: Event 147287463, Lines 3, DAngle 0.0552
+[4%] 	 4/25 	 00:07:27
+Match: Event 147301503, Lines 3, DAngle 0.0238
+[5%] 	 5/25 	 00:08:27
+Match: Event 147308073, Lines 3, DAngle 0.0747
+[6%] 	 6/25 	 00:10:47
+Match: Event 147318652, Lines 3, DAngle 0.0757
+[7%] 	 7/25 	 00:12:23
+Match: Event 147331366, Lines 3, DAngle 0.0249
+[8%] 	 8/25 	 00:14:00
+Match: Event 147349400, Lines 3, DAngle 0.0401
+[9%] 	 9/25 	 00:15:01
+Match: Event 147365535, Lines 17, DAngle 0.1851
+[10%] 	 10/25 	 00:30:02
+Match: Event 147369695, Lines 11, DAngle 0.6940
+[11%] 	 11/25 	 00:39:31
+Match: Event 147378434, Lines 4, DAngle 0.1540
+[12%] 	 12/25 	 00:40:36
+Match: Event 147389574, Lines 3, DAngle 0.1696
+[13%] 	 13/25 	 00:42:51
+Match: Event 147404877, Lines 3, DAngle 0.2658
+[14%] 	 14/25 	 00:48:13
+Match: Event 147407352, Lines 3, DAngle 0.0585
+[15%] 	 15/25 	 00:48:56
+Match: Event 147408126, Lines 3, DAngle 0.0844
+[16%] 	 16/25 	 00:50:04
+Match: Event 147416771, Lines 3, DAngle 0.1277
+[17%] 	 17/25 	 00:50:22
+Match: Event 147421382, Lines 6, DAngle 0.2050
+[18%] 	 18/25 	 01:03:10
+Match: Event 147431636, Lines 4, DAngle 0.1581
+[19%] 	 19/25 	 01:04:44
+Match: Event 147432894, Lines 3, DAngle 0.0693
+[20%] 	 20/25 	 01:05:12
+Match: Event 147444484, Lines 14, DAngle 0.5700
+[21%] 	 21/25 	 01:18:06
+Match: Event 147477467, Lines 3, DAngle 0.0411
+[22%] 	 22/25 	 01:20:04
+Match: Event 147477650, Lines 3, DAngle 0.0520
+[23%] 	 23/25 	 01:23:22
+Match: Event 147489678, Lines 6, DAngle 0.1567
+[24%] 	 24/25 	 01:28:54
+Match: Event 147498347, Lines 3, DAngle 0.0119
+Finished in 5356.69s.
+ ~ 5) DONE !

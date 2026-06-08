@@ -1,0 +1,50 @@
+#!/bin/bash
+
+# Assign the argument values
+INPUT_FILE="$1"
+START_EVENT="$2"
+N_EVENTS="$3"
+OUTPUT_ROOT="$4"
+OUTPUT_CSV="$5"
+FRACTION="$6"
+
+# 1. Clean the environment thoroughly
+unset PYTHONPATH
+unset LD_LIBRARY_PATH
+unset ROOTSYS
+
+# 2. Source the base CVMFS stack
+export snd_stack=/cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30
+source ${snd_stack}/setUp.sh
+echo " ~ 1) Base stack loaded."
+
+SLEEP_TIME=$((RANDOM % 90))
+echo " ~ Sleeping for $SLEEP_TIME seconds to avoid AFS DDOS..."
+sleep $SLEEP_TIME
+
+# 3. Load your local SNDSW build
+# We use 'master-local1' instead of 'latest-master-release'
+echo " ~ 2) Loading sndsw environment..."
+eval $(alienv load -w /afs/cern.ch/user/i/idioniso/snd_master/sw-root6.28 sndsw/latest-master-release --no-refresh)
+echo " ~ 3) SNDSW_ROOT is set to: $SNDSW_ROOT"
+
+# 4. Set custom paths AFTER loading the environment
+export SND_HOME=/afs/cern.ch/user/i/idioniso/snd_master
+export SHIPLHC=${SND_HOME}/sndsw/shipLHC
+export DDF_UTILS=/afs/cern.ch/user/i/idioniso/ddfUtils
+export PYTHONPATH=${PYTHONPATH}:${DDF_UTILS}:${SNDSW_ROOT}/python
+
+SCRIPT_PATH=${SND_HOME}/sndsw/shipLHC/scripts/tridentTracking.py
+
+echo " ~ 4) Executing tracking script..."
+
+# 5. Run the python script
+python "$SCRIPT_PATH" \
+    -i ${INPUT_FILE} \
+    -s ${START_EVENT} \
+    -n ${N_EVENTS} \
+    -or ${OUTPUT_ROOT} \
+    -o ${OUTPUT_CSV} \
+    -f ${FRACTION}
+
+echo " ~ 5) DONE !"

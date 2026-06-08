@@ -1,0 +1,188 @@
+search libraries in slc9_x86-64
+ ~ 1) Base stack loaded.
+ ~ Sleeping for 2 seconds to avoid AFS DDOS...
+ ~ 2) Loading sndsw environment...
+ ~ 3) SNDSW_ROOT is set to: /afs/cern.ch/user/i/idioniso/snd_master/sw-root6.28/rhel9_x86-64/sndsw/master-local1
+ ~ 4) Executing tracking script...
+[INFO] The input consists out of the following trees and files: 
+[INFO]  - rawConv
+[INFO]     - root://eoshome-i.cern.ch//eos/user/i/idioniso/tridents/initial_cuts/tridents_sndsw_raw-0214.root
+[INFO] FairRootFileSink initialized.
+[INFO]  - cbmout
+[INFO]     - dummy
+[INFO] Parameter and input file are available, Assure that basic info is there for the run!
+[INFO] ---FairRootManager::SpecifyRunId --- 
+[INFO] --- Initialize with RunId  --- 0
+
+************************************************************* 
+     initialisation for run id 0
+************************************************************* 
+-I- FairRunTimeDB::InitContainer() FairBaseParSet
+-I- FairRunTimeDB::InitContainer() FairGeoParSet
+
+************************************************************* 
+     initialisation for run id 0
+************************************************************* 
+-I- FairRunTimeDB::InitContainer() FairBaseParSet
+-I- FairRunTimeDB::InitContainer() FairGeoParSet
+[INFO]  Branch: Reco_MuonTracks not found in Tree.
+using geofile: root://eospublic.cern.ch//eos/experiment/sndlhc/convertedData/physics/2023/geofile_sndlhc_TI18_V3_2023.root
+[0%] 	 0/31,763 	 00:01:14
+Match: Event 214002738, Lines 2
+[1%] 	 318/31,763 	 00:07:16
+[2%] 	 636/31,763 	 00:13:22
+Match: Event 214022079, Lines 2
+[3%] 	 953/31,763 	 00:19:40
+Match: Event 214040634, Lines 2
+[4%] 	 1,271/31,763 	 00:25:30
+[5%] 	 1,589/31,763 	 00:31:26
+Match: Event 214051246, Lines 2
+Match: Event 214055525, Lines 3
+[6%] 	 1,906/31,763 	 00:37:22
+[7%] 	 2,224/31,763 	 00:43:24
+[8%] 	 2,542/31,763 	 00:49:37
+[9%] 	 2,859/31,763 	 00:55:50
+Match: Event 214098098, Lines 2
+[10%] 	 3,177/31,763 	 01:02:12
+[11%] 	 3,494/31,763 	 01:08:22
+Match: Event 214111290, Lines 2
+[12%] 	 3,812/31,763 	 01:14:45
+Match: Event 214124901, Lines 2
+[13%] 	 4,130/31,763 	 01:20:52
+[14%] 	 4,447/31,763 	 01:27:02
+[15%] 	 4,765/31,763 	 01:33:14
+[16%] 	 5,083/31,763 	 01:39:41
+[17%] 	 5,400/31,763 	 01:46:27
+Match: Event 214169058, Lines 2
+Match: Event 214176402, Lines 2
+[18%] 	 5,718/31,763 	 01:53:28
+[19%] 	 6,035/31,763 	 02:00:22
+Match: Event 214199260, Lines 2
+[20%] 	 6,353/31,763 	 02:06:59
+Match: Event 214202054, Lines 2
+[21%] 	 6,671/31,763 	 02:13:38
+Match: Event 214213714, Lines 2
+[22%] 	 6,988/31,763 	 02:19:55
+Match: Event 214224180, Lines 2
+Match: Event 214224625, Lines 2
+Match: Event 214226688, Lines 2
+[23%] 	 7,306/31,763 	 02:25:47
+Match: Event 214235744, Lines 3
+[24%] 	 7,624/31,763 	 02:31:25
+Match: Event 214245824, Lines 2
+[25%] 	 7,941/31,763 	 02:37:30
+Match: Event 214249120, Lines 2
+Match: Event 214249705, Lines 2
+[26%] 	 8,259/31,763 	 02:44:14
+[27%] 	 8,577/31,763 	 02:50:30
+Match: Event 214274018, Lines 2
+[28%] 	 8,894/31,763 	 02:56:47
+[29%] 	 9,212/31,763 	 03:03:28
+[30%] 	 9,529/31,763 	 03:09:36
+Match: Event 214297803, Lines 2
+[31%] 	 9,847/31,763 	 03:16:17
+[32%] 	 10,165/31,763 	 03:22:19
+Match: Event 214320566, Lines 2
+[33%] 	 10,482/31,763 	 03:28:53
+[34%] 	 10,800/31,763 	 03:35:21
+[35%] 	 11,118/31,763 	 03:42:16
+[36%] 	 11,435/31,763 	 03:48:31
+Match: Event 214362903, Lines 2
+[37%] 	 11,753/31,763 	 03:55:06
+Match: Event 214371699, Lines 2
+Match: Event 214375955, Lines 2
+[38%] 	 12,070/31,763 	 04:01:47
+[39%] 	 12,388/31,763 	 04:08:18
+[40%] 	 12,706/31,763 	 04:14:36
+[41%] 	 13,023/31,763 	 04:20:58
+Match: Event 214410887, Lines 2
+Match: Event 214412219, Lines 2
+[42%] 	 13,341/31,763 	 04:27:48
+Match: Event 214421247, Lines 2
+Match: Event 214424986, Lines 3
+[43%] 	 13,659/31,763 	 04:34:36
+Match: Event 214432449, Lines 2
+Match: Event 214436184, Lines 2
+[44%] 	 13,976/31,763 	 04:41:18
+Match: Event 214440702, Lines 2
+Match: Event 214442437, Lines 2
+[45%] 	 14,294/31,763 	 04:47:47
+[46%] 	 14,611/31,763 	 04:54:27
+[47%] 	 14,929/31,763 	 05:01:22
+[48%] 	 15,247/31,763 	 05:07:53
+[49%] 	 15,564/31,763 	 05:13:39
+Match: Event 214489636, Lines 2
+[50%] 	 15,882/31,763 	 05:20:20
+[51%] 	 16,200/31,763 	 05:26:42
+[52%] 	 16,517/31,763 	 05:32:43
+Match: Event 214519899, Lines 2
+[53%] 	 16,835/31,763 	 05:38:44
+[54%] 	 17,153/31,763 	 05:44:10
+[55%] 	 17,470/31,763 	 05:49:42
+[56%] 	 17,788/31,763 	 05:56:16
+[57%] 	 18,105/31,763 	 06:02:16
+Match: Event 214567267, Lines 2
+[58%] 	 18,423/31,763 	 06:08:28
+Match: Event 214578762, Lines 2
+[59%] 	 18,741/31,763 	 06:14:10
+[60%] 	 19,058/31,763 	 06:19:53
+Match: Event 214601718, Lines 2
+[61%] 	 19,376/31,763 	 06:25:54
+[62%] 	 19,694/31,763 	 06:32:23
+[63%] 	 20,011/31,763 	 06:38:58
+[64%] 	 20,329/31,763 	 06:44:19
+Match: Event 214643858, Lines 2
+[65%] 	 20,646/31,763 	 06:50:57
+Match: Event 214652133, Lines 2
+[66%] 	 20,964/31,763 	 06:57:30
+[67%] 	 21,282/31,763 	 07:04:13
+[68%] 	 21,599/31,763 	 07:10:50
+[69%] 	 21,917/31,763 	 07:17:21
+Match: Event 214692249, Lines 2
+Match: Event 214696047, Lines 2
+[70%] 	 22,235/31,763 	 07:23:35
+Match: Event 214703892, Lines 2
+[71%] 	 22,552/31,763 	 07:28:50
+Match: Event 214709724, Lines 2
+[72%] 	 22,870/31,763 	 07:34:57
+[73%] 	 23,187/31,763 	 07:40:52
+Match: Event 214733833, Lines 2
+[74%] 	 23,505/31,763 	 07:47:50
+Match: Event 214740430, Lines 2
+[75%] 	 23,823/31,763 	 07:53:49
+Match: Event 214754666, Lines 2
+[76%] 	 24,140/31,763 	 07:59:42
+[77%] 	 24,458/31,763 	 08:05:23
+[78%] 	 24,776/31,763 	 08:11:09
+[79%] 	 25,093/31,763 	 08:17:13
+Match: Event 214798242, Lines 2
+[80%] 	 25,411/31,763 	 08:23:20
+[81%] 	 25,729/31,763 	 08:29:27
+[82%] 	 26,046/31,763 	 08:35:24
+Match: Event 214821956, Lines 2
+Match: Event 214826783, Lines 2
+[83%] 	 26,364/31,763 	 08:41:34
+[84%] 	 26,681/31,763 	 08:48:15
+[85%] 	 26,999/31,763 	 08:54:20
+Match: Event 214854267, Lines 2
+[86%] 	 27,317/31,763 	 09:00:25
+[87%] 	 27,634/31,763 	 09:07:00
+[88%] 	 27,952/31,763 	 09:13:30
+[89%] 	 28,270/31,763 	 09:20:24
+Match: Event 214892070, Lines 2
+Match: Event 214901676, Lines 2
+[90%] 	 28,587/31,763 	 09:26:55
+Match: Event 214909018, Lines 2
+[91%] 	 28,905/31,763 	 09:34:07
+[92%] 	 29,222/31,763 	 09:40:38
+[93%] 	 29,540/31,763 	 09:46:40
+[94%] 	 29,858/31,763 	 09:52:45
+Match: Event 214949600, Lines 2
+[95%] 	 30,175/31,763 	 09:58:40
+[96%] 	 30,493/31,763 	 10:04:05
+[97%] 	 30,811/31,763 	 10:10:22
+[98%] 	 31,128/31,763 	 10:15:58
+[99%] 	 31,446/31,763 	 10:21:38
+Match: Event 214999863, Lines 2
+Finished in 37639.01s.
+ ~ 5) DONE !

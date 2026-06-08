@@ -1,0 +1,37 @@
+search libraries in slc9_x86-64
+ ~ 1) Base stack loaded.
+ ~ Sleeping for 5 seconds to avoid AFS DDOS...
+ ~ 2) Loading sndsw environment...
+ ~ 3) SNDSW_ROOT is set to: /afs/cern.ch/user/i/idioniso/snd_master/sw-root6.28/rhel9_x86-64/sndsw/master-local1
+ ~ 4) Executing tracking script...
+[INFO] The input consists out of the following trees and files: 
+[INFO]  - rawConv
+[INFO]     - root://eospublic.cern.ch//eos/experiment/sndlhc/convertedData/physics/2023/run_006577/sndsw_raw-0030.root
+[INFO] FairRootFileSink initialized.
+[INFO]  - cbmout
+[INFO]     - dummy
+[INFO] Parameter and input file are available, Assure that basic info is there for the run!
+[INFO] ---FairRootManager::SpecifyRunId --- 
+[INFO] --- Initialize with RunId  --- 6577
+
+************************************************************* 
+     initialisation for run id 6577
+************************************************************* 
+-I- FairRunTimeDB::InitContainer() FairBaseParSet
+-I- FairRunTimeDB::InitContainer() FairGeoParSet
+
+************************************************************* 
+     initialisation for run id 6577
+************************************************************* 
+-I- FairRunTimeDB::InitContainer() FairBaseParSet
+-I- FairRunTimeDB::InitContainer() FairGeoParSet
+[INFO]  Branch: Reco_MuonTracks not found in Tree.
+using geofile: root://eospublic.cern.ch//eos/experiment/sndlhc/convertedData/physics/2023/geofile_sndlhc_TI18_V3_2023.root
+[0%] 	 192,442/1,000,000 	 00:00:14
+Match: Event 30192442, Lines 3, DAngle 0.0130
+[1%] 	 371,740/1,000,000 	 00:00:36
+Match: Event 30371740, Lines 3, DAngle 0.0260
+[2%] 	 518,141/1,000,000 	 00:00:53
+Match: Event 30518141, Lines 3, DAngle 0.0104
+Finished in 84.77s.
+ ~ 5) DONE !

@@ -1,0 +1,168 @@
+search libraries in slc9_x86-64
+ ~ 1) Base stack loaded.
+ ~ Sleeping for 46 seconds to avoid AFS DDOS...
+ ~ 2) Loading sndsw environment...
+ ~ 3) SNDSW_ROOT is set to: /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30//sw//slc9_x86-64/sndsw/master-local1
+ ~ 4) Executing tracking script...
+[FATAL] CAVE: geometry file caveWithAir.geo not found in standard path 
+[INFO] The input consists out of the following trees and files: 
+[INFO]  - rawConv
+[INFO]     - root://eoshome-i.cern.ch//eos/user/i/idioniso/tridents/initial_cuts/tridents_sndsw_raw-0089.root
+[INFO] FairRootFileSink initialized.
+[INFO]  - cbmout
+[INFO]     - dummy
+[INFO] Parameter and input file are available, Assure that basic info is there for the run!
+[INFO] ---FairRootManager::SpecifyRunId --- 
+[INFO] --- Initialize with RunId  --- 0
+
+************************************************************* 
+     initialisation for run id 0
+************************************************************* 
+-I- FairRunTimeDB::InitContainer() FairBaseParSet
+-I- FairRunTimeDB::InitContainer() FairGeoParSet
+
+************************************************************* 
+     initialisation for run id 0
+************************************************************* 
+-I- FairRunTimeDB::InitContainer() FairBaseParSet
+-I- FairRunTimeDB::InitContainer() FairGeoParSet
+[INFO]  Branch: Digi_MuFilterHits not found in Tree.
+[INFO]  Branch: Digi_ScifiHits not found in Tree.
+[INFO]  Branch: EventHeader not found in Tree.
+[INFO]  Branch: Reco_MuonTracks not found in Tree.
+using geofile: root://eospublic.cern.ch//eos/experiment/sndlhc/convertedData/physics/2023/geofile_sndlhc_TI18_V3_2023.root
+Initializing muon reconstruction task!
+Digi_MuFilterHits not in branch list
+Digi_ScifiHits not in branch list
+EventHeader not in branch list
+[0%] 	 0/32,067 	 00:00:07
+[1%] 	 321/32,067 	 00:07:02
+[2%] 	 642/32,067 	 00:13:48
+[3%] 	 963/32,067 	 00:20:46
+Match: Event 89036096, Lines 2
+Match: Event 89036808, Lines 2
+[4%] 	 1,283/32,067 	 00:27:40
+[5%] 	 1,604/32,067 	 00:34:14
+[6%] 	 1,925/32,067 	 00:40:53
+[7%] 	 2,245/32,067 	 00:47:44
+[8%] 	 2,566/32,067 	 00:54:38
+Match: Event 89082311, Lines 2
+[9%] 	 2,887/32,067 	 01:01:28
+[10%] 	 3,207/32,067 	 01:08:15
+[11%] 	 3,528/32,067 	 01:14:57
+Match: Event 89118205, Lines 2
+[12%] 	 3,849/32,067 	 01:21:45
+[13%] 	 4,169/32,067 	 01:28:37
+[14%] 	 4,490/32,067 	 01:35:43
+[15%] 	 4,811/32,067 	 01:42:38
+Match: Event 89154035, Lines 2
+[16%] 	 5,131/32,067 	 01:49:14
+[17%] 	 5,452/32,067 	 01:56:43
+[18%] 	 5,773/32,067 	 02:04:00
+[19%] 	 6,093/32,067 	 02:11:35
+[20%] 	 6,414/32,067 	 02:19:05
+Match: Event 89204781, Lines 2
+[21%] 	 6,735/32,067 	 02:26:47
+[22%] 	 7,055/32,067 	 02:34:08
+[23%] 	 7,376/32,067 	 02:41:41
+[24%] 	 7,697/32,067 	 02:49:08
+[25%] 	 8,017/32,067 	 02:56:23
+[26%] 	 8,338/32,067 	 03:03:27
+[27%] 	 8,659/32,067 	 03:10:42
+[28%] 	 8,979/32,067 	 03:18:08
+Match: Event 89283231, Lines 2
+[29%] 	 9,300/32,067 	 03:25:22
+[30%] 	 9,621/32,067 	 03:32:21
+Match: Event 89308578, Lines 2
+[31%] 	 9,941/32,067 	 03:39:12
+[32%] 	 10,262/32,067 	 03:46:18
+Match: Event 89321942, Lines 2
+[33%] 	 10,583/32,067 	 03:53:41
+Match: Event 89335124, Lines 2
+[34%] 	 10,903/32,067 	 04:01:11
+[35%] 	 11,224/32,067 	 04:08:37
+[36%] 	 11,545/32,067 	 04:15:37
+[37%] 	 11,865/32,067 	 04:22:50
+[38%] 	 12,186/32,067 	 04:30:03
+[39%] 	 12,507/32,067 	 04:36:55
+Match: Event 89395511, Lines 2
+[40%] 	 12,827/32,067 	 04:44:00
+Match: Event 89405595, Lines 2
+[41%] 	 13,148/32,067 	 04:51:11
+[42%] 	 13,469/32,067 	 04:58:27
+Match: Event 89423909, Lines 2
+[43%] 	 13,789/32,067 	 05:05:37
+[44%] 	 14,110/32,067 	 05:12:50
+Match: Event 89443691, Lines 2
+Match: Event 89446189, Lines 2
+[45%] 	 14,431/32,067 	 05:20:08
+[46%] 	 14,751/32,067 	 05:27:25
+Match: Event 89466713, Lines 2
+[47%] 	 15,072/32,067 	 05:34:38
+[48%] 	 15,393/32,067 	 05:41:50
+[49%] 	 15,713/32,067 	 05:49:09
+[50%] 	 16,034/32,067 	 05:56:24
+[51%] 	 16,355/32,067 	 06:03:22
+Match: Event 89509283, Lines 2
+[52%] 	 16,675/32,067 	 06:10:23
+[53%] 	 16,996/32,067 	 06:17:25
+[54%] 	 17,317/32,067 	 06:24:29
+[55%] 	 17,637/32,067 	 06:31:35
+[56%] 	 17,958/32,067 	 06:38:29
+Match: Event 89565700, Lines 2
+Match: Event 89569954, Lines 2
+[57%] 	 18,279/32,067 	 06:45:46
+[58%] 	 18,599/32,067 	 06:52:40
+[59%] 	 18,920/32,067 	 06:59:39
+[60%] 	 19,241/32,067 	 07:06:48
+Match: Event 89604793, Lines 2
+[61%] 	 19,561/32,067 	 07:13:58
+Match: Event 89614282, Lines 2
+[62%] 	 19,882/32,067 	 07:21:13
+[63%] 	 20,203/32,067 	 07:28:42
+[64%] 	 20,523/32,067 	 07:36:07
+Match: Event 89648369, Lines 2
+[65%] 	 20,844/32,067 	 07:43:50
+[66%] 	 21,165/32,067 	 07:51:27
+[67%] 	 21,485/32,067 	 07:59:01
+[68%] 	 21,806/32,067 	 08:06:32
+[69%] 	 22,127/32,067 	 08:14:03
+[70%] 	 22,447/32,067 	 08:21:59
+[71%] 	 22,768/32,067 	 08:29:23
+[72%] 	 23,089/32,067 	 08:37:03
+[73%] 	 23,409/32,067 	 08:47:03
+Match: Event 89733011, Lines 2
+[74%] 	 23,730/32,067 	 08:58:06
+[75%] 	 24,051/32,067 	 09:07:41
+Match: Event 89753358, Lines 2
+[76%] 	 24,371/32,067 	 09:15:18
+[77%] 	 24,692/32,067 	 09:23:24
+[78%] 	 25,013/32,067 	 09:31:05
+[79%] 	 25,333/32,067 	 09:39:13
+[80%] 	 25,654/32,067 	 09:47:25
+Match: Event 89799447, Lines 2
+[81%] 	 25,975/32,067 	 09:55:41
+[82%] 	 26,295/32,067 	 10:04:15
+[83%] 	 26,616/32,067 	 10:12:36
+[84%] 	 26,937/32,067 	 10:20:38
+[85%] 	 27,257/32,067 	 10:29:47
+[86%] 	 27,578/32,067 	 10:37:53
+[87%] 	 27,899/32,067 	 10:46:26
+[88%] 	 28,219/32,067 	 10:54:42
+[89%] 	 28,540/32,067 	 11:02:40
+[90%] 	 28,861/32,067 	 11:10:49
+Match: Event 89903972, Lines 2
+Match: Event 89910509, Lines 2
+[91%] 	 29,181/32,067 	 11:19:13
+[92%] 	 29,502/32,067 	 11:27:51
+[93%] 	 29,823/32,067 	 11:36:05
+[94%] 	 30,143/32,067 	 11:43:57
+[95%] 	 30,464/32,067 	 11:52:11
+[96%] 	 30,785/32,067 	 12:00:43
+[97%] 	 31,105/32,067 	 12:08:50
+Match: Event 89978654, Lines 2
+[98%] 	 31,426/32,067 	 12:16:45
+[99%] 	 31,747/32,067 	 12:24:47
+Match: Event 89997192, Lines 2
+Finished in 45149.85s.
+ ~ 5) DONE !

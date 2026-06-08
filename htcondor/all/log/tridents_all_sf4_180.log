@@ -1,0 +1,95 @@
+000 (7760828.180.000) 05/04 16:37:25 Job submitted from host: <188.185.125.71:9618?addrs=188.185.125.71-9618+[2001-1458-d00-4a--100-15e]-9618&alias=bigbird28.cern.ch&noUDP&sock=schedd_2497_5012>
+...
+040 (7760828.180.000) 05/05 04:27:11 Started transferring input files
+	Transferring to host: <128.142.192.174:9618?addrs=128.142.192.174-9618+[2001-1458-301-56--100-2a]-9618&alias=b9g18p7459.cern.ch&noUDP&sock=slot1_31_4234_fc65_239488>
+...
+040 (7760828.180.000) 05/05 04:27:11 Finished transferring input files
+...
+001 (7760828.180.000) 05/05 04:27:12 Job executing on host: <128.142.192.174:9618?addrs=128.142.192.174-9618+[2001-1458-301-56--100-2a]-9618&alias=b9g18p7459.cern.ch&noUDP&sock=startd_3303_2968>
+	SlotName: slot1_31@b9g18p7459.cern.ch
+	CondorScratchDir = "/pool/condor/dir_2260191"
+	Cpus = 1
+	Disk = 3756
+	GPUs = 0
+	Memory = 3000
+...
+006 (7760828.180.000) 05/05 04:27:25 Image size of job updated: 138620
+	136  -  MemoryUsage of job (MB)
+	138620  -  ResidentSetSize of job (KB)
+...
+006 (7760828.180.000) 05/05 04:32:25 Image size of job updated: 938096
+	847  -  MemoryUsage of job (MB)
+	866892  -  ResidentSetSize of job (KB)
+...
+006 (7760828.180.000) 05/05 04:37:26 Image size of job updated: 959664
+	919  -  MemoryUsage of job (MB)
+	940208  -  ResidentSetSize of job (KB)
+...
+006 (7760828.180.000) 05/05 04:42:26 Image size of job updated: 986764
+	919  -  MemoryUsage of job (MB)
+	940208  -  ResidentSetSize of job (KB)
+...
+006 (7760828.180.000) 05/05 05:02:28 Image size of job updated: 996808
+	919  -  MemoryUsage of job (MB)
+	940208  -  ResidentSetSize of job (KB)
+...
+006 (7760828.180.000) 05/05 05:22:31 Image size of job updated: 996808
+	929  -  MemoryUsage of job (MB)
+	950404  -  ResidentSetSize of job (KB)
+...
+006 (7760828.180.000) 05/05 05:42:33 Image size of job updated: 996808
+	946  -  MemoryUsage of job (MB)
+	967708  -  ResidentSetSize of job (KB)
+...
+006 (7760828.180.000) 05/05 08:02:49 Image size of job updated: 1001492
+	950  -  MemoryUsage of job (MB)
+	972616  -  ResidentSetSize of job (KB)
+...
+006 (7760828.180.000) 05/05 08:07:49 Image size of job updated: 1001492
+	953  -  MemoryUsage of job (MB)
+	975168  -  ResidentSetSize of job (KB)
+...
+006 (7760828.180.000) 05/05 09:02:54 Image size of job updated: 1009416
+	953  -  MemoryUsage of job (MB)
+	975168  -  ResidentSetSize of job (KB)
+...
+006 (7760828.180.000) 05/05 09:47:59 Image size of job updated: 1009416
+	954  -  MemoryUsage of job (MB)
+	976500  -  ResidentSetSize of job (KB)
+...
+006 (7760828.180.000) 05/05 09:53:00 Image size of job updated: 1034828
+	962  -  MemoryUsage of job (MB)
+	984260  -  ResidentSetSize of job (KB)
+...
+006 (7760828.180.000) 05/05 11:08:07 Image size of job updated: 1034828
+	977  -  MemoryUsage of job (MB)
+	999536  -  ResidentSetSize of job (KB)
+...
+006 (7760828.180.000) 05/05 11:13:08 Image size of job updated: 1034828
+	979  -  MemoryUsage of job (MB)
+	1001584  -  ResidentSetSize of job (KB)
+...
+040 (7760828.180.000) 05/05 13:45:21 Started transferring output files
+...
+040 (7760828.180.000) 05/05 13:45:21 Finished transferring output files
+...
+005 (7760828.180.000) 05/05 13:45:21 Job terminated.
+	(1) Normal termination (return value 0)
+		Usr 0 07:37:58, Sys 0 01:32:26  -  Run Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage
+		Usr 0 07:37:58, Sys 0 01:32:26  -  Total Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Total Local Usage
+	13472  -  Run Bytes Sent By Job
+	1445  -  Run Bytes Received By Job
+	13472  -  Total Bytes Sent By Job
+	1445  -  Total Bytes Received By Job
+	Partitionable Resources :    Usage  Request Allocated 
+	   Cpus                 :     0.97        1         1 
+	   Disk (KB)            :    41           2      3756 
+	   GPUs                 :                           0 
+	   Memory (MB)          :   979        3000      3000 
+	   TimeExecute (s)      : 33489                       
+	   TimeSlotBusy (s)     : 33490                       
+
+	Job terminated of its own accord at 2026-05-05T11:45:21Z with exit-code 0.
+...

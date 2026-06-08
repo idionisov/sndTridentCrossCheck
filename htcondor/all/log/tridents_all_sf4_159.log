@@ -1,0 +1,95 @@
+000 (7760828.159.000) 05/04 16:37:25 Job submitted from host: <188.185.125.71:9618?addrs=188.185.125.71-9618+[2001-1458-d00-4a--100-15e]-9618&alias=bigbird28.cern.ch&noUDP&sock=schedd_2497_5012>
+...
+040 (7760828.159.000) 05/05 04:27:04 Started transferring input files
+	Transferring to host: <188.185.213.106:9618?addrs=188.185.213.106-9618+[2001-1458-303-1a--100-66]-9618&alias=b9p27p2958.cern.ch&noUDP&sock=slot1_32_5434_7e96_244621>
+...
+040 (7760828.159.000) 05/05 04:27:04 Finished transferring input files
+...
+001 (7760828.159.000) 05/05 04:27:05 Job executing on host: <188.185.213.106:9618?addrs=188.185.213.106-9618+[2001-1458-303-1a--100-66]-9618&alias=b9p27p2958.cern.ch&noUDP&sock=startd_4413_8787>
+	SlotName: slot1_32@b9p27p2958.cern.ch
+	CondorScratchDir = "/pool/condor/dir_848989"
+	Cpus = 1
+	Disk = 3696
+	GPUs = 0
+	Memory = 3000
+...
+006 (7760828.159.000) 05/05 04:27:19 Image size of job updated: 140580
+	138  -  MemoryUsage of job (MB)
+	140580  -  ResidentSetSize of job (KB)
+...
+006 (7760828.159.000) 05/05 04:32:20 Image size of job updated: 929952
+	904  -  MemoryUsage of job (MB)
+	925260  -  ResidentSetSize of job (KB)
+...
+006 (7760828.159.000) 05/05 04:37:20 Image size of job updated: 952188
+	904  -  MemoryUsage of job (MB)
+	925260  -  ResidentSetSize of job (KB)
+...
+006 (7760828.159.000) 05/05 04:42:21 Image size of job updated: 952188
+	908  -  MemoryUsage of job (MB)
+	929776  -  ResidentSetSize of job (KB)
+...
+006 (7760828.159.000) 05/05 04:47:22 Image size of job updated: 975828
+	908  -  MemoryUsage of job (MB)
+	929776  -  ResidentSetSize of job (KB)
+...
+006 (7760828.159.000) 05/05 05:12:24 Image size of job updated: 975828
+	926  -  MemoryUsage of job (MB)
+	947544  -  ResidentSetSize of job (KB)
+...
+006 (7760828.159.000) 05/05 06:07:29 Image size of job updated: 975828
+	934  -  MemoryUsage of job (MB)
+	956348  -  ResidentSetSize of job (KB)
+...
+006 (7760828.159.000) 05/05 06:47:33 Image size of job updated: 975828
+	941  -  MemoryUsage of job (MB)
+	963012  -  ResidentSetSize of job (KB)
+...
+006 (7760828.159.000) 05/05 07:07:36 Image size of job updated: 980968
+	941  -  MemoryUsage of job (MB)
+	963012  -  ResidentSetSize of job (KB)
+...
+006 (7760828.159.000) 05/05 07:47:40 Image size of job updated: 983268
+	941  -  MemoryUsage of job (MB)
+	963012  -  ResidentSetSize of job (KB)
+...
+006 (7760828.159.000) 05/05 09:37:50 Image size of job updated: 994812
+	941  -  MemoryUsage of job (MB)
+	963012  -  ResidentSetSize of job (KB)
+...
+006 (7760828.159.000) 05/05 10:27:53 Image size of job updated: 994812
+	958  -  MemoryUsage of job (MB)
+	980068  -  ResidentSetSize of job (KB)
+...
+006 (7760828.159.000) 05/05 10:37:54 Image size of job updated: 994812
+	964  -  MemoryUsage of job (MB)
+	986172  -  ResidentSetSize of job (KB)
+...
+006 (7760828.159.000) 05/05 11:48:01 Image size of job updated: 1007232
+	964  -  MemoryUsage of job (MB)
+	986172  -  ResidentSetSize of job (KB)
+...
+040 (7760828.159.000) 05/05 11:55:03 Started transferring output files
+...
+040 (7760828.159.000) 05/05 11:55:03 Finished transferring output files
+...
+005 (7760828.159.000) 05/05 11:55:03 Job terminated.
+	(1) Normal termination (return value 0)
+		Usr 0 05:12:19, Sys 0 02:08:35  -  Run Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage
+		Usr 0 05:12:19, Sys 0 02:08:35  -  Total Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Total Local Usage
+	12824  -  Run Bytes Sent By Job
+	1445  -  Run Bytes Received By Job
+	12824  -  Total Bytes Sent By Job
+	1445  -  Total Bytes Received By Job
+	Partitionable Resources :    Usage  Request Allocated 
+	   Cpus                 :     0.99        1         1 
+	   Disk (KB)            :    41           2      3696 
+	   GPUs                 :                           0 
+	   Memory (MB)          :   964        3000      3000 
+	   TimeExecute (s)      : 26878                       
+	   TimeSlotBusy (s)     : 26879                       
+
+	Job terminated of its own accord at 2026-05-05T09:55:03Z with exit-code 0.
+...

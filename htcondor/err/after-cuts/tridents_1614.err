@@ -1,0 +1,10 @@
+WARNING: not updating modulefiles
+Use alienv list to list loaded modules.
+Loading sndsw/latest-master-release
+  Loading requirement: BASE/1.0
+Traceback (most recent call last):
+  File "/afs/cern.ch/user/i/idioniso/snd_master/sndsw/shipLHC/scripts/tridentTracking.py", line 323, in <module>
+    if __name__ == "__main__": main()
+  File "/afs/cern.ch/user/i/idioniso/snd_master/sndsw/shipLHC/scripts/tridentTracking.py", line 263, in main
+    year = datetime.datetime.fromtimestamp(tree_in.EventHeader.GetUTCtimestamp()).year
+AttributeError: 'TTree' object has no attribute 'EventHeader'

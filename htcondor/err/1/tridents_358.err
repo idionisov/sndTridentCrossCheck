@@ -1,0 +1,372 @@
+WARNING: not updating modulefiles
+ERROR: sndsw/latest-master-release was not found
+Info in <TGeoManager::CloseGeometry>: Geometry loaded from file...
+Info in <TGeoManager::SetTopVolume>: Top volume is cave. Master volume is cave
+Info in <TGeoNavigator::BuildCache>: --- Maximum geometry depth set to 100
+Info in <TGeoManager::Voxelize>: Voxelizing...
+Info in <TGeoManager::CountLevels>: max level = 7, max placements = 2829
+Info in <TGeoManager::CloseGeometry>: 342601 nodes/ 94 volume UID's in FAIR geometry
+Info in <TGeoManager::CloseGeometry>: ----------------modeler ready----------------
+Info in <TBranchElement::InitializeOffsets>: TTree created with an older schema, some data might not be copied in 'slow-cloning' mode; fast-cloning should have the correct result. 'ly_loss_params[4]' is missing when constructing the branch 'Digi_ScifiHits'. 
+ *** Break *** segmentation violation
+
+
+
+===========================================================
+There was a crash.
+This is the entire stack trace of all threads:
+===========================================================
+
+Thread 15 (Thread 0x1536471f5640 (LWP 174) "python"):
+#0  0x0000153675f0fa0e in epoll_wait () from /lib64/libc.so.6
+#1  0x000015364769f9b2 in XrdSys::IOEvents::PollE::Begin (this=0x56251349cfe0, syncsem=<optimized out>, retcode=<optimized out>, eTxt=<optimized out>) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEventsPollE.icc:211
+#2  0x000015364769c3ed in XrdSys::IOEvents::BootStrap::Start (parg=0x7ffc24a80f20) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEvents.cc:149
+#3  0x00001536476a49e8 in XrdSysThread_Xeq (myargs=0x562512b7a740) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysPthread.cc:86
+#4  0x0000153675e8b2ea in start_thread () from /lib64/libc.so.6
+#5  0x0000153675f103d0 in clone3 () from /lib64/libc.so.6
+
+Thread 14 (Thread 0x153646ff4640 (LWP 175) "python"):
+#0  0x0000153675f0fa0e in epoll_wait () from /lib64/libc.so.6
+#1  0x000015364769f9b2 in XrdSys::IOEvents::PollE::Begin (this=0x5625134931e0, syncsem=<optimized out>, retcode=<optimized out>, eTxt=<optimized out>) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEventsPollE.icc:211
+#2  0x000015364769c3ed in XrdSys::IOEvents::BootStrap::Start (parg=0x7ffc24a80f20) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEvents.cc:149
+#3  0x00001536476a49e8 in XrdSysThread_Xeq (myargs=0x5625133dbc40) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysPthread.cc:86
+#4  0x0000153675e8b2ea in start_thread () from /lib64/libc.so.6
+#5  0x0000153675f103d0 in clone3 () from /lib64/libc.so.6
+
+Thread 13 (Thread 0x153646df3640 (LWP 176) "python"):
+#0  0x0000153675f0fa0e in epoll_wait () from /lib64/libc.so.6
+#1  0x000015364769f9b2 in XrdSys::IOEvents::PollE::Begin (this=0x5625135b3da0, syncsem=<optimized out>, retcode=<optimized out>, eTxt=<optimized out>) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEventsPollE.icc:211
+#2  0x000015364769c3ed in XrdSys::IOEvents::BootStrap::Start (parg=0x7ffc24a80f20) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEvents.cc:149
+#3  0x00001536476a49e8 in XrdSysThread_Xeq (myargs=0x5625134a64d0) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysPthread.cc:86
+#4  0x0000153675e8b2ea in start_thread () from /lib64/libc.so.6
+#5  0x0000153675f103d0 in clone3 () from /lib64/libc.so.6
+
+Thread 12 (Thread 0x153646bf2640 (LWP 177) "python"):
+#0  0x0000153675f0fa0e in epoll_wait () from /lib64/libc.so.6
+#1  0x000015364769f9b2 in XrdSys::IOEvents::PollE::Begin (this=0x562513498ae0, syncsem=<optimized out>, retcode=<optimized out>, eTxt=<optimized out>) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEventsPollE.icc:211
+#2  0x000015364769c3ed in XrdSys::IOEvents::BootStrap::Start (parg=0x7ffc24a80f20) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEvents.cc:149
+#3  0x00001536476a49e8 in XrdSysThread_Xeq (myargs=0x562512f083f0) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysPthread.cc:86
+#4  0x0000153675e8b2ea in start_thread () from /lib64/libc.so.6
+#5  0x0000153675f103d0 in clone3 () from /lib64/libc.so.6
+
+Thread 11 (Thread 0x1536469f1640 (LWP 178) "python"):
+#0  0x0000153675f0fa0e in epoll_wait () from /lib64/libc.so.6
+#1  0x000015364769f9b2 in XrdSys::IOEvents::PollE::Begin (this=0x56251347a740, syncsem=<optimized out>, retcode=<optimized out>, eTxt=<optimized out>) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEventsPollE.icc:211
+#2  0x000015364769c3ed in XrdSys::IOEvents::BootStrap::Start (parg=0x7ffc24a80f20) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEvents.cc:149
+#3  0x00001536476a49e8 in XrdSysThread_Xeq (myargs=0x562512f08450) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysPthread.cc:86
+#4  0x0000153675e8b2ea in start_thread () from /lib64/libc.so.6
+#5  0x0000153675f103d0 in clone3 () from /lib64/libc.so.6
+
+Thread 10 (Thread 0x1536467f0640 (LWP 179) "python"):
+#0  0x0000153675f0fa0e in epoll_wait () from /lib64/libc.so.6
+#1  0x000015364769f9b2 in XrdSys::IOEvents::PollE::Begin (this=0x562513442ff0, syncsem=<optimized out>, retcode=<optimized out>, eTxt=<optimized out>) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEventsPollE.icc:211
+#2  0x000015364769c3ed in XrdSys::IOEvents::BootStrap::Start (parg=0x7ffc24a80f20) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEvents.cc:149
+#3  0x00001536476a49e8 in XrdSysThread_Xeq (myargs=0x562512f08480) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysPthread.cc:86
+#4  0x0000153675e8b2ea in start_thread () from /lib64/libc.so.6
+#5  0x0000153675f103d0 in clone3 () from /lib64/libc.so.6
+
+Thread 9 (Thread 0x1536465ef640 (LWP 180) "python"):
+#0  0x0000153675f0fa0e in epoll_wait () from /lib64/libc.so.6
+#1  0x000015364769f9b2 in XrdSys::IOEvents::PollE::Begin (this=0x562513476570, syncsem=<optimized out>, retcode=<optimized out>, eTxt=<optimized out>) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEventsPollE.icc:211
+#2  0x000015364769c3ed in XrdSys::IOEvents::BootStrap::Start (parg=0x7ffc24a80f20) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEvents.cc:149
+#3  0x00001536476a49e8 in XrdSysThread_Xeq (myargs=0x562513476640) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysPthread.cc:86
+#4  0x0000153675e8b2ea in start_thread () from /lib64/libc.so.6
+#5  0x0000153675f103d0 in clone3 () from /lib64/libc.so.6
+
+Thread 8 (Thread 0x1536463ee640 (LWP 181) "python"):
+#0  0x0000153675f0fa0e in epoll_wait () from /lib64/libc.so.6
+#1  0x000015364769f9b2 in XrdSys::IOEvents::PollE::Begin (this=0x5625134c2ed0, syncsem=<optimized out>, retcode=<optimized out>, eTxt=<optimized out>) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEventsPollE.icc:211
+#2  0x000015364769c3ed in XrdSys::IOEvents::BootStrap::Start (parg=0x7ffc24a80f20) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEvents.cc:149
+#3  0x00001536476a49e8 in XrdSysThread_Xeq (myargs=0x5625134c2fa0) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysPthread.cc:86
+#4  0x0000153675e8b2ea in start_thread () from /lib64/libc.so.6
+#5  0x0000153675f103d0 in clone3 () from /lib64/libc.so.6
+
+Thread 7 (Thread 0x1536461ed640 (LWP 182) "python"):
+#0  0x0000153675f0fa0e in epoll_wait () from /lib64/libc.so.6
+#1  0x000015364769f9b2 in XrdSys::IOEvents::PollE::Begin (this=0x562513479f80, syncsem=<optimized out>, retcode=<optimized out>, eTxt=<optimized out>) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEventsPollE.icc:211
+#2  0x000015364769c3ed in XrdSys::IOEvents::BootStrap::Start (parg=0x7ffc24a80f20) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEvents.cc:149
+#3  0x00001536476a49e8 in XrdSysThread_Xeq (myargs=0x56251349c860) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysPthread.cc:86
+#4  0x0000153675e8b2ea in start_thread () from /lib64/libc.so.6
+#5  0x0000153675f103d0 in clone3 () from /lib64/libc.so.6
+
+Thread 6 (Thread 0x153645fec640 (LWP 183) "python"):
+#0  0x0000153675f0fa0e in epoll_wait () from /lib64/libc.so.6
+#1  0x000015364769f9b2 in XrdSys::IOEvents::PollE::Begin (this=0x5625127b9b80, syncsem=<optimized out>, retcode=<optimized out>, eTxt=<optimized out>) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEventsPollE.icc:211
+#2  0x000015364769c3ed in XrdSys::IOEvents::BootStrap::Start (parg=0x7ffc24a80f20) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEvents.cc:149
+#3  0x00001536476a49e8 in XrdSysThread_Xeq (myargs=0x562513593360) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysPthread.cc:86
+#4  0x0000153675e8b2ea in start_thread () from /lib64/libc.so.6
+#5  0x0000153675f103d0 in clone3 () from /lib64/libc.so.6
+
+Thread 5 (Thread 0x153645deb640 (LWP 184) "python"):
+#0  0x0000153675ed5795 in clock_nanosleep
+GLIBC_2.2.5 () from /lib64/libc.so.6
+#1  0x0000153675eda247 in nanosleep () from /lib64/libc.so.6
+#2  0x00001536476a52e8 in XrdSysTimer::Wait (mills=<optimized out>) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysTimer.cc:239
+#3  0x0000153647522280 in XrdCl::TaskManager::RunTasks (this=0x5625134a8ba0) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdCl/XrdClTaskManager.cc:246
+#4  0x0000153647522369 in RunRunnerThread (arg=<optimized out>) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdCl/XrdClTaskManager.cc:38
+#5  0x0000153675e8b2ea in start_thread () from /lib64/libc.so.6
+#6  0x0000153675f103d0 in clone3 () from /lib64/libc.so.6
+
+Thread 4 (Thread 0x153645bea640 (LWP 185) "python"):
+#0  0x0000153675e8837a in __futex_abstimed_wait_common () from /lib64/libc.so.6
+#1  0x0000153675e93328 in __new_sem_wait_slow64.constprop.0 () from /lib64/libc.so.6
+#2  0x00001536475a34b6 in XrdSysSemaphore::Wait (this=0x5625133ff9e0) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysPthread.hh:509
+#3  XrdCl::SyncQueue<XrdCl::JobManager::JobHelper>::Get (this=0x562513497e98) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdCl/XrdClSyncQueue.hh:66
+#4  XrdCl::JobManager::RunJobs (this=0x562513497e80) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdCl/XrdClJobManager.cc:151
+#5  0x00001536475a3559 in RunRunnerThread (arg=<optimized out>) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdCl/XrdClJobManager.cc:34
+#6  0x0000153675e8b2ea in start_thread () from /lib64/libc.so.6
+#7  0x0000153675f103d0 in clone3 () from /lib64/libc.so.6
+
+Thread 3 (Thread 0x1536459e9640 (LWP 186) "python"):
+#0  0x0000153675e8837a in __futex_abstimed_wait_common () from /lib64/libc.so.6
+#1  0x0000153675e93328 in __new_sem_wait_slow64.constprop.0 () from /lib64/libc.so.6
+#2  0x00001536475a34b6 in XrdSysSemaphore::Wait (this=0x5625133ff9e0) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysPthread.hh:509
+#3  XrdCl::SyncQueue<XrdCl::JobManager::JobHelper>::Get (this=0x562513497e98) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdCl/XrdClSyncQueue.hh:66
+#4  XrdCl::JobManager::RunJobs (this=0x562513497e80) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdCl/XrdClJobManager.cc:151
+#5  0x00001536475a3559 in RunRunnerThread (arg=<optimized out>) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdCl/XrdClJobManager.cc:34
+#6  0x0000153675e8b2ea in start_thread () from /lib64/libc.so.6
+#7  0x0000153675f103d0 in clone3 () from /lib64/libc.so.6
+
+Thread 2 (Thread 0x1536457e8640 (LWP 187) "python"):
+#0  0x0000153675e8837a in __futex_abstimed_wait_common () from /lib64/libc.so.6
+#1  0x0000153675e93328 in __new_sem_wait_slow64.constprop.0 () from /lib64/libc.so.6
+#2  0x00001536475a34b6 in XrdSysSemaphore::Wait (this=0x5625133ff9e0) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysPthread.hh:509
+#3  XrdCl::SyncQueue<XrdCl::JobManager::JobHelper>::Get (this=0x562513497e98) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdCl/XrdClSyncQueue.hh:66
+#4  XrdCl::JobManager::RunJobs (this=0x562513497e80) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdCl/XrdClJobManager.cc:151
+#5  0x00001536475a3559 in RunRunnerThread (arg=<optimized out>) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdCl/XrdClJobManager.cc:34
+#6  0x0000153675e8b2ea in start_thread () from /lib64/libc.so.6
+#7  0x0000153675f103d0 in clone3 () from /lib64/libc.so.6
+
+Thread 1 (Thread 0x1536765cc740 (LWP 158) "python"):
+#0  0x0000153675ed9fff in wait4 () from /lib64/libc.so.6
+#1  0x0000153675e4f483 in do_system () from /lib64/libc.so.6
+#2  0x00001536750fbafc in TUnixSystem::StackTrace() () from /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/slc9_x86-64/ROOT/v6-28-12-local1/lib/libCore.so.6.28
+#3  0x0000153675a55ec3 in (anonymous namespace)::TExceptionHandlerImp::HandleException(int) () from /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/slc9_x86-64/ROOT/v6-28-12-local1/lib/libcppyy_backend3_9.so.6.28
+#4  0x00001536750f9091 in TUnixSystem::DispatchSignals(ESignals) () from /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/slc9_x86-64/ROOT/v6-28-12-local1/lib/libCore.so.6.28
+#5  <signal handler called>
+#6  0x0000000000000001 in ?? ()
+#7  0x00001536448a21c2 in ?? ()
+#8  0x000056251b94be48 in ?? ()
+#9  0x0000562508b665d8 in ?? ()
+#10 0x0000000000000010 in ?? ()
+#11 0x0000000124a821c0 in ?? ()
+#12 0x00007ffc24a82150 in ?? ()
+#13 0x00001536448a2170 in ?? ()
+#14 0x00007ffc24a821c0 in ?? ()
+#15 0x00001536448a2070 in ?? ()
+#16 0x000056250c944fb0 in ?? ()
+#17 0x00007ffc24a821e0 in ?? ()
+#18 0x0000562508b665d8 in ?? ()
+#19 0x00007ffc24a82268 in ?? ()
+#20 0x0000000000000000 in ?? ()
+===========================================================
+
+
+The lines below might hint at the cause of the crash. If you see question
+marks as part of the stack trace, try to recompile with debugging information
+enabled and export CLING_DEBUG=1 environment variable before running.
+You may get help by asking at the ROOT forum https://root.cern/forum
+Only if you are really convinced it is a bug in ROOT then please submit a
+report at https://root.cern/bugs Please post the ENTIRE stack trace
+from above as an attachment in addition to anything else
+that might help us fixing this issue.
+===========================================================
+#6  0x0000000000000001 in ?? ()
+#7  0x00001536448a21c2 in ?? ()
+#8  0x000056251b94be48 in ?? ()
+#9  0x0000562508b665d8 in ?? ()
+#10 0x0000000000000010 in ?? ()
+#11 0x0000000124a821c0 in ?? ()
+#12 0x00007ffc24a82150 in ?? ()
+#13 0x00001536448a2170 in ?? ()
+#14 0x00007ffc24a821c0 in ?? ()
+#15 0x00001536448a2070 in ?? ()
+#16 0x000056250c944fb0 in ?? ()
+#17 0x00007ffc24a821e0 in ?? ()
+#18 0x0000562508b665d8 in ?? ()
+#19 0x00007ffc24a82268 in ?? ()
+#20 0x0000000000000000 in ?? ()
+===========================================================
+
+
+ *** Break *** segmentation violation
+
+
+
+===========================================================
+There was a crash.
+This is the entire stack trace of all threads:
+===========================================================
+
+Thread 15 (Thread 0x1536471f5640 (LWP 174) "python"):
+#0  0x0000153675f0fa0e in epoll_wait () from /lib64/libc.so.6
+#1  0x000015364769f9b2 in XrdSys::IOEvents::PollE::Begin (this=0x56251349cfe0, syncsem=<optimized out>, retcode=<optimized out>, eTxt=<optimized out>) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEventsPollE.icc:211
+#2  0x000015364769c3ed in XrdSys::IOEvents::BootStrap::Start (parg=0x7ffc24a80f20) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEvents.cc:149
+#3  0x00001536476a49e8 in XrdSysThread_Xeq (myargs=0x562512b7a740) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysPthread.cc:86
+#4  0x0000153675e8b2ea in start_thread () from /lib64/libc.so.6
+#5  0x0000153675f103d0 in clone3 () from /lib64/libc.so.6
+
+Thread 14 (Thread 0x153646ff4640 (LWP 175) "python"):
+#0  0x0000153675f0fa0e in epoll_wait () from /lib64/libc.so.6
+#1  0x000015364769f9b2 in XrdSys::IOEvents::PollE::Begin (this=0x5625134931e0, syncsem=<optimized out>, retcode=<optimized out>, eTxt=<optimized out>) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEventsPollE.icc:211
+#2  0x000015364769c3ed in XrdSys::IOEvents::BootStrap::Start (parg=0x7ffc24a80f20) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEvents.cc:149
+#3  0x00001536476a49e8 in XrdSysThread_Xeq (myargs=0x5625133dbc40) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysPthread.cc:86
+#4  0x0000153675e8b2ea in start_thread () from /lib64/libc.so.6
+#5  0x0000153675f103d0 in clone3 () from /lib64/libc.so.6
+
+Thread 13 (Thread 0x153646df3640 (LWP 176) "python"):
+#0  0x0000153675f0fa0e in epoll_wait () from /lib64/libc.so.6
+#1  0x000015364769f9b2 in XrdSys::IOEvents::PollE::Begin (this=0x5625135b3da0, syncsem=<optimized out>, retcode=<optimized out>, eTxt=<optimized out>) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEventsPollE.icc:211
+#2  0x000015364769c3ed in XrdSys::IOEvents::BootStrap::Start (parg=0x7ffc24a80f20) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEvents.cc:149
+#3  0x00001536476a49e8 in XrdSysThread_Xeq (myargs=0x5625134a64d0) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysPthread.cc:86
+#4  0x0000153675e8b2ea in start_thread () from /lib64/libc.so.6
+#5  0x0000153675f103d0 in clone3 () from /lib64/libc.so.6
+
+Thread 12 (Thread 0x153646bf2640 (LWP 177) "python"):
+#0  0x0000153675f0fa0e in epoll_wait () from /lib64/libc.so.6
+#1  0x000015364769f9b2 in XrdSys::IOEvents::PollE::Begin (this=0x562513498ae0, syncsem=<optimized out>, retcode=<optimized out>, eTxt=<optimized out>) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEventsPollE.icc:211
+#2  0x000015364769c3ed in XrdSys::IOEvents::BootStrap::Start (parg=0x7ffc24a80f20) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEvents.cc:149
+#3  0x00001536476a49e8 in XrdSysThread_Xeq (myargs=0x562512f083f0) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysPthread.cc:86
+#4  0x0000153675e8b2ea in start_thread () from /lib64/libc.so.6
+#5  0x0000153675f103d0 in clone3 () from /lib64/libc.so.6
+
+Thread 11 (Thread 0x1536469f1640 (LWP 178) "python"):
+#0  0x0000153675f0fa0e in epoll_wait () from /lib64/libc.so.6
+#1  0x000015364769f9b2 in XrdSys::IOEvents::PollE::Begin (this=0x56251347a740, syncsem=<optimized out>, retcode=<optimized out>, eTxt=<optimized out>) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEventsPollE.icc:211
+#2  0x000015364769c3ed in XrdSys::IOEvents::BootStrap::Start (parg=0x7ffc24a80f20) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEvents.cc:149
+#3  0x00001536476a49e8 in XrdSysThread_Xeq (myargs=0x562512f08450) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysPthread.cc:86
+#4  0x0000153675e8b2ea in start_thread () from /lib64/libc.so.6
+#5  0x0000153675f103d0 in clone3 () from /lib64/libc.so.6
+
+Thread 10 (Thread 0x1536467f0640 (LWP 179) "python"):
+#0  0x0000153675f0fa0e in epoll_wait () from /lib64/libc.so.6
+#1  0x000015364769f9b2 in XrdSys::IOEvents::PollE::Begin (this=0x562513442ff0, syncsem=<optimized out>, retcode=<optimized out>, eTxt=<optimized out>) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEventsPollE.icc:211
+#2  0x000015364769c3ed in XrdSys::IOEvents::BootStrap::Start (parg=0x7ffc24a80f20) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEvents.cc:149
+#3  0x00001536476a49e8 in XrdSysThread_Xeq (myargs=0x562512f08480) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysPthread.cc:86
+#4  0x0000153675e8b2ea in start_thread () from /lib64/libc.so.6
+#5  0x0000153675f103d0 in clone3 () from /lib64/libc.so.6
+
+Thread 9 (Thread 0x1536465ef640 (LWP 180) "python"):
+#0  0x0000153675f0fa0e in epoll_wait () from /lib64/libc.so.6
+#1  0x000015364769f9b2 in XrdSys::IOEvents::PollE::Begin (this=0x562513476570, syncsem=<optimized out>, retcode=<optimized out>, eTxt=<optimized out>) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEventsPollE.icc:211
+#2  0x000015364769c3ed in XrdSys::IOEvents::BootStrap::Start (parg=0x7ffc24a80f20) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEvents.cc:149
+#3  0x00001536476a49e8 in XrdSysThread_Xeq (myargs=0x562513476640) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysPthread.cc:86
+#4  0x0000153675e8b2ea in start_thread () from /lib64/libc.so.6
+#5  0x0000153675f103d0 in clone3 () from /lib64/libc.so.6
+
+Thread 8 (Thread 0x1536463ee640 (LWP 181) "python"):
+#0  0x0000153675f0fa0e in epoll_wait () from /lib64/libc.so.6
+#1  0x000015364769f9b2 in XrdSys::IOEvents::PollE::Begin (this=0x5625134c2ed0, syncsem=<optimized out>, retcode=<optimized out>, eTxt=<optimized out>) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEventsPollE.icc:211
+#2  0x000015364769c3ed in XrdSys::IOEvents::BootStrap::Start (parg=0x7ffc24a80f20) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEvents.cc:149
+#3  0x00001536476a49e8 in XrdSysThread_Xeq (myargs=0x5625134c2fa0) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysPthread.cc:86
+#4  0x0000153675e8b2ea in start_thread () from /lib64/libc.so.6
+#5  0x0000153675f103d0 in clone3 () from /lib64/libc.so.6
+
+Thread 7 (Thread 0x1536461ed640 (LWP 182) "python"):
+#0  0x0000153675f0fa0e in epoll_wait () from /lib64/libc.so.6
+#1  0x000015364769f9b2 in XrdSys::IOEvents::PollE::Begin (this=0x562513479f80, syncsem=<optimized out>, retcode=<optimized out>, eTxt=<optimized out>) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEventsPollE.icc:211
+#2  0x000015364769c3ed in XrdSys::IOEvents::BootStrap::Start (parg=0x7ffc24a80f20) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEvents.cc:149
+#3  0x00001536476a49e8 in XrdSysThread_Xeq (myargs=0x56251349c860) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysPthread.cc:86
+#4  0x0000153675e8b2ea in start_thread () from /lib64/libc.so.6
+#5  0x0000153675f103d0 in clone3 () from /lib64/libc.so.6
+
+Thread 6 (Thread 0x153645fec640 (LWP 183) "python"):
+#0  0x0000153675f0fa0e in epoll_wait () from /lib64/libc.so.6
+#1  0x000015364769f9b2 in XrdSys::IOEvents::PollE::Begin (this=0x5625127b9b80, syncsem=<optimized out>, retcode=<optimized out>, eTxt=<optimized out>) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEventsPollE.icc:211
+#2  0x000015364769c3ed in XrdSys::IOEvents::BootStrap::Start (parg=0x7ffc24a80f20) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysIOEvents.cc:149
+#3  0x00001536476a49e8 in XrdSysThread_Xeq (myargs=0x562513593360) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysPthread.cc:86
+#4  0x0000153675e8b2ea in start_thread () from /lib64/libc.so.6
+#5  0x0000153675f103d0 in clone3 () from /lib64/libc.so.6
+
+Thread 5 (Thread 0x153645deb640 (LWP 184) "python"):
+#0  0x0000153675ed5795 in clock_nanosleep
+GLIBC_2.2.5 () from /lib64/libc.so.6
+#1  0x0000153675eda247 in nanosleep () from /lib64/libc.so.6
+#2  0x00001536476a52e8 in XrdSysTimer::Wait (mills=<optimized out>) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysTimer.cc:239
+#3  0x0000153647522280 in XrdCl::TaskManager::RunTasks (this=0x5625134a8ba0) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdCl/XrdClTaskManager.cc:246
+#4  0x0000153647522369 in RunRunnerThread (arg=<optimized out>) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdCl/XrdClTaskManager.cc:38
+#5  0x0000153675e8b2ea in start_thread () from /lib64/libc.so.6
+#6  0x0000153675f103d0 in clone3 () from /lib64/libc.so.6
+
+Thread 4 (Thread 0x153645bea640 (LWP 185) "python"):
+#0  0x0000153675e8837a in __futex_abstimed_wait_common () from /lib64/libc.so.6
+#1  0x0000153675e93328 in __new_sem_wait_slow64.constprop.0 () from /lib64/libc.so.6
+#2  0x00001536475a34b6 in XrdSysSemaphore::Wait (this=0x5625133ff9e0) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysPthread.hh:509
+#3  XrdCl::SyncQueue<XrdCl::JobManager::JobHelper>::Get (this=0x562513497e98) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdCl/XrdClSyncQueue.hh:66
+#4  XrdCl::JobManager::RunJobs (this=0x562513497e80) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdCl/XrdClJobManager.cc:151
+#5  0x00001536475a3559 in RunRunnerThread (arg=<optimized out>) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdCl/XrdClJobManager.cc:34
+#6  0x0000153675e8b2ea in start_thread () from /lib64/libc.so.6
+#7  0x0000153675f103d0 in clone3 () from /lib64/libc.so.6
+
+Thread 3 (Thread 0x1536459e9640 (LWP 186) "python"):
+#0  0x0000153675e8837a in __futex_abstimed_wait_common () from /lib64/libc.so.6
+#1  0x0000153675e93328 in __new_sem_wait_slow64.constprop.0 () from /lib64/libc.so.6
+#2  0x00001536475a34b6 in XrdSysSemaphore::Wait (this=0x5625133ff9e0) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysPthread.hh:509
+#3  XrdCl::SyncQueue<XrdCl::JobManager::JobHelper>::Get (this=0x562513497e98) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdCl/XrdClSyncQueue.hh:66
+#4  XrdCl::JobManager::RunJobs (this=0x562513497e80) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdCl/XrdClJobManager.cc:151
+#5  0x00001536475a3559 in RunRunnerThread (arg=<optimized out>) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdCl/XrdClJobManager.cc:34
+#6  0x0000153675e8b2ea in start_thread () from /lib64/libc.so.6
+#7  0x0000153675f103d0 in clone3 () from /lib64/libc.so.6
+
+Thread 2 (Thread 0x1536457e8640 (LWP 187) "python"):
+#0  0x0000153675e8837a in __futex_abstimed_wait_common () from /lib64/libc.so.6
+#1  0x0000153675e93328 in __new_sem_wait_slow64.constprop.0 () from /lib64/libc.so.6
+#2  0x00001536475a34b6 in XrdSysSemaphore::Wait (this=0x5625133ff9e0) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdSys/XrdSysPthread.hh:509
+#3  XrdCl::SyncQueue<XrdCl::JobManager::JobHelper>::Get (this=0x562513497e98) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdCl/XrdClSyncQueue.hh:66
+#4  XrdCl::JobManager::RunJobs (this=0x562513497e80) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdCl/XrdClJobManager.cc:151
+#5  0x00001536475a3559 in RunRunnerThread (arg=<optimized out>) at /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/BUILD/e179b57eae254945ec18e84d8e0cc5e2d14bafa1/XRootD/src/XrdCl/XrdClJobManager.cc:34
+#6  0x0000153675e8b2ea in start_thread () from /lib64/libc.so.6
+#7  0x0000153675f103d0 in clone3 () from /lib64/libc.so.6
+
+Thread 1 (Thread 0x1536765cc740 (LWP 158) "python"):
+#0  0x0000153675ed9fff in wait4 () from /lib64/libc.so.6
+#1  0x0000153675e4f483 in do_system () from /lib64/libc.so.6
+#2  0x00001536750fbafc in TUnixSystem::StackTrace() () from /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/slc9_x86-64/ROOT/v6-28-12-local1/lib/libCore.so.6.28
+#3  0x0000153675a55d43 in (anonymous namespace)::TExceptionHandlerImp::HandleException(int) () from /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/slc9_x86-64/ROOT/v6-28-12-local1/lib/libcppyy_backend3_9.so.6.28
+#4  0x00001536750f9091 in TUnixSystem::DispatchSignals(ESignals) () from /cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30/sw/slc9_x86-64/ROOT/v6-28-12-local1/lib/libCore.so.6.28
+#5  <signal handler called>
+#6  0x0000000000000001 in ?? ()
+#7  0x00001536448a21c2 in ?? ()
+#8  0x000056251b94be48 in ?? ()
+#9  0x0000562508b665d8 in ?? ()
+#10 0x0000000000000010 in ?? ()
+#11 0x0000000124a821c0 in ?? ()
+#12 0x00007ffc24a82150 in ?? ()
+#13 0x00001536448a2170 in ?? ()
+#14 0x00007ffc24a821c0 in ?? ()
+#15 0x00001536448a2070 in ?? ()
+#16 0x000056250c944fb0 in ?? ()
+#17 0x00007ffc24a821e0 in ?? ()
+#18 0x0000562508b665d8 in ?? ()
+#19 0x00007ffc24a82268 in ?? ()
+#20 0x0000000000000000 in ?? ()
+===========================================================
+
+
+The lines below might hint at the cause of the crash. If you see question
+marks as part of the stack trace, try to recompile with debugging information
+enabled and export CLING_DEBUG=1 environment variable before running.
+You may get help by asking at the ROOT forum https://root.cern/forum
+Only if you are really convinced it is a bug in ROOT then please submit a
+report at https://root.cern/bugs Please post the ENTIRE stack trace
+from above as an attachment in addition to anything else
+that might help us fixing this issue.
+===========================================================
+#6  0x0000000000000001 in ?? ()
+#7  0x00001536448a21c2 in ?? ()
+#8  0x000056251b94be48 in ?? ()
+#9  0x0000562508b665d8 in ?? ()
+#10 0x0000000000000010 in ?? ()
+#11 0x0000000124a821c0 in ?? ()
+#12 0x00007ffc24a82150 in ?? ()
+#13 0x00001536448a2170 in ?? ()
+#14 0x00007ffc24a821c0 in ?? ()
+#15 0x00001536448a2070 in ?? ()
+#16 0x000056250c944fb0 in ?? ()
+#17 0x00007ffc24a821e0 in ?? ()
+#18 0x0000562508b665d8 in ?? ()
+#19 0x00007ffc24a82268 in ?? ()
+#20 0x0000000000000000 in ?? ()
+===========================================================
+
+

@@ -1,0 +1,123 @@
+000 (7760827.187.000) 05/04 16:34:52 Job submitted from host: <188.185.125.71:9618?addrs=188.185.125.71-9618+[2001-1458-d00-4a--100-15e]-9618&alias=bigbird28.cern.ch&noUDP&sock=schedd_2497_5012>
+...
+040 (7760827.187.000) 05/04 20:49:34 Started transferring input files
+	Transferring to host: <188.185.194.31:9618?addrs=188.185.194.31-9618+[2001-1458-303-21--100-1b]-9618&alias=b9p20p7018.cern.ch&noUDP&sock=slot1_23_1111425_34e5_40269>
+...
+040 (7760827.187.000) 05/04 20:49:34 Finished transferring input files
+...
+001 (7760827.187.000) 05/04 20:49:35 Job executing on host: <188.185.194.31:9618?addrs=188.185.194.31-9618+[2001-1458-303-21--100-1b]-9618&alias=b9p20p7018.cern.ch&noUDP&sock=startd_3334193_a673>
+	SlotName: slot1_23@b9p20p7018.cern.ch
+	CondorScratchDir = "/pool/condor/dir_403196"
+	Cpus = 1
+	Disk = 3862
+	GPUs = 0
+	Memory = 3000
+...
+006 (7760827.187.000) 05/04 20:49:49 Image size of job updated: 162876
+	160  -  MemoryUsage of job (MB)
+	162876  -  ResidentSetSize of job (KB)
+...
+006 (7760827.187.000) 05/04 20:54:50 Image size of job updated: 971208
+	913  -  MemoryUsage of job (MB)
+	934624  -  ResidentSetSize of job (KB)
+...
+006 (7760827.187.000) 05/04 21:04:51 Image size of job updated: 981872
+	913  -  MemoryUsage of job (MB)
+	934624  -  ResidentSetSize of job (KB)
+...
+006 (7760827.187.000) 05/04 21:34:55 Image size of job updated: 981872
+	932  -  MemoryUsage of job (MB)
+	954016  -  ResidentSetSize of job (KB)
+...
+006 (7760827.187.000) 05/04 21:54:58 Image size of job updated: 982132
+	932  -  MemoryUsage of job (MB)
+	954016  -  ResidentSetSize of job (KB)
+...
+006 (7760827.187.000) 05/04 22:04:58 Image size of job updated: 987636
+	932  -  MemoryUsage of job (MB)
+	954016  -  ResidentSetSize of job (KB)
+...
+006 (7760827.187.000) 05/04 22:19:59 Image size of job updated: 1014548
+	932  -  MemoryUsage of job (MB)
+	954016  -  ResidentSetSize of job (KB)
+...
+006 (7760827.187.000) 05/04 22:40:01 Image size of job updated: 1014548
+	933  -  MemoryUsage of job (MB)
+	954784  -  ResidentSetSize of job (KB)
+...
+006 (7760827.187.000) 05/04 23:15:03 Image size of job updated: 1014548
+	936  -  MemoryUsage of job (MB)
+	958152  -  ResidentSetSize of job (KB)
+...
+006 (7760827.187.000) 05/04 23:25:04 Image size of job updated: 1014548
+	948  -  MemoryUsage of job (MB)
+	969976  -  ResidentSetSize of job (KB)
+...
+006 (7760827.187.000) 05/05 00:35:08 Image size of job updated: 1014548
+	952  -  MemoryUsage of job (MB)
+	973944  -  ResidentSetSize of job (KB)
+...
+006 (7760827.187.000) 05/05 00:40:09 Image size of job updated: 1017152
+	952  -  MemoryUsage of job (MB)
+	973944  -  ResidentSetSize of job (KB)
+...
+006 (7760827.187.000) 05/05 02:00:15 Image size of job updated: 1017152
+	968  -  MemoryUsage of job (MB)
+	990844  -  ResidentSetSize of job (KB)
+...
+006 (7760827.187.000) 05/05 02:30:19 Image size of job updated: 1022244
+	968  -  MemoryUsage of job (MB)
+	990844  -  ResidentSetSize of job (KB)
+...
+006 (7760827.187.000) 05/05 04:25:30 Image size of job updated: 1059344
+	968  -  MemoryUsage of job (MB)
+	990844  -  ResidentSetSize of job (KB)
+...
+006 (7760827.187.000) 05/05 06:40:42 Image size of job updated: 1059344
+	971  -  MemoryUsage of job (MB)
+	993748  -  ResidentSetSize of job (KB)
+...
+006 (7760827.187.000) 05/05 08:45:55 Image size of job updated: 1059344
+	971  -  MemoryUsage of job (MB)
+	993952  -  ResidentSetSize of job (KB)
+...
+006 (7760827.187.000) 05/05 09:15:59 Image size of job updated: 1059344
+	1002  -  MemoryUsage of job (MB)
+	1025404  -  ResidentSetSize of job (KB)
+...
+006 (7760827.187.000) 05/05 09:31:00 Image size of job updated: 1059344
+	1005  -  MemoryUsage of job (MB)
+	1028472  -  ResidentSetSize of job (KB)
+...
+006 (7760827.187.000) 05/05 10:11:03 Image size of job updated: 1064528
+	1005  -  MemoryUsage of job (MB)
+	1028472  -  ResidentSetSize of job (KB)
+...
+006 (7760827.187.000) 05/05 10:46:05 Image size of job updated: 1089824
+	1005  -  MemoryUsage of job (MB)
+	1028472  -  ResidentSetSize of job (KB)
+...
+040 (7760827.187.000) 05/05 11:03:49 Started transferring output files
+...
+040 (7760827.187.000) 05/05 11:03:49 Finished transferring output files
+...
+005 (7760827.187.000) 05/05 11:03:49 Job terminated.
+	(1) Normal termination (return value 0)
+		Usr 0 10:33:07, Sys 0 02:05:04  -  Run Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage
+		Usr 0 10:33:07, Sys 0 02:05:04  -  Total Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Total Local Usage
+	58040  -  Run Bytes Sent By Job
+	1445  -  Run Bytes Received By Job
+	58040  -  Total Bytes Sent By Job
+	1445  -  Total Bytes Received By Job
+	Partitionable Resources :    Usage  Request Allocated 
+	   Cpus                 :     0.86        1         1 
+	   Disk (KB)            :    81           2      3862 
+	   GPUs                 :                           0 
+	   Memory (MB)          :  1005        3000      3000 
+	   TimeExecute (s)      : 51254                       
+	   TimeSlotBusy (s)     : 51255                       
+
+	Job terminated of its own accord at 2026-05-05T09:03:49Z with exit-code 0.
+...

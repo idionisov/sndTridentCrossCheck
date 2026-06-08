@@ -1,0 +1,103 @@
+search libraries in slc9_x86-64
+ ~ 1) Base stack loaded.
+ ~ Sleeping for 32 seconds to avoid AFS DDOS...
+ ~ 2) Loading sndsw environment...
+ ~ 3) SNDSW_ROOT is set to: /afs/cern.ch/user/i/idioniso/snd_master/sw-root6.28/rhel9_x86-64/sndsw/master-local1
+ ~ 4) Executing tracking script...
+[FATAL] No Branch list in input file
+[INFO] The input consists out of the following trees and files: 
+[INFO]  - rawConv
+[INFO]     - root://eoshome-i.cern.ch//eos/user/i/idioniso/tridents/run_006640/recoTri_6640_f0072.3.root
+[WARN] No time based branch list in input file
+[INFO] FairRootFileSink initialized.
+[INFO]  - cbmout
+[INFO]     - dummy
+[INFO] Parameter and input file are available, Assure that basic info is there for the run!
+[INFO] ---FairRootManager::SpecifyRunId --- 
+[INFO] --- Initialize with RunId  --- 0
+
+************************************************************* 
+     initialisation for run id 0
+************************************************************* 
+-I- FairRunTimeDB::InitContainer() FairBaseParSet
+-I- FairRunTimeDB::InitContainer() FairGeoParSet
+
+************************************************************* 
+     initialisation for run id 0
+************************************************************* 
+-I- FairRunTimeDB::InitContainer() FairBaseParSet
+-I- FairRunTimeDB::InitContainer() FairGeoParSet
+[INFO]  Branch: Reco_MuonTracks not found in Tree.
+using geofile: root://eospublic.cern.ch//eos/experiment/sndlhc/convertedData/physics/2023/geofile_sndlhc_TI18_V3_2023.root
+[0%] 	 0/35 	 00:00:05
+Match: Event 72752705, Lines 5, DAngle 0.2880
+[1%] 	 1/35 	 00:02:55
+Match: Event 72757843, Lines 24, DAngle 0.1556
+[2%] 	 2/35 	 00:28:05
+Match: Event 72759553, Lines 3, DAngle 0.0476
+[3%] 	 3/35 	 00:29:09
+Match: Event 72774695, Lines 6, DAngle 0.0985
+[4%] 	 4/35 	 00:40:34
+Match: Event 72796048, Lines 3, DAngle 0.0455
+[5%] 	 5/35 	 00:48:36
+Match: Event 72801683, Lines 3, DAngle 0.0162
+[6%] 	 6/35 	 00:51:48
+Match: Event 72805780, Lines 3, DAngle 0.1790
+[7%] 	 7/35 	 00:54:31
+Match: Event 72810518, Lines 7, DAngle 0.2267
+[8%] 	 8/35 	 01:07:19
+Match: Event 72813580, Lines 3, DAngle 0.0282
+[9%] 	 9/35 	 01:10:47
+Match: Event 72824160, Lines 9, DAngle 0.1844
+[10%] 	 10/35 	 01:19:55
+Match: Event 72831292, Lines 17, DAngle 0.3365
+[11%] 	 11/35 	 01:42:04
+Match: Event 72843701, Lines 4, DAngle 0.0260
+[12%] 	 12/35 	 01:43:59
+Match: Event 72848916, Lines 4, DAngle 0.0552
+[13%] 	 13/35 	 01:45:04
+Match: Event 72856734, Lines 3, DAngle 0.0130
+[14%] 	 14/35 	 01:46:16
+Match: Event 72859497, Lines 3, DAngle 0.0411
+[15%] 	 15/35 	 01:46:53
+Match: Event 72862213, Lines 8, DAngle 0.0606
+[16%] 	 16/35 	 01:52:57
+Match: Event 72863105, Lines 3, DAngle 0.1292
+[17%] 	 17/35 	 01:57:03
+Match: Event 72877287, Lines 3, DAngle 0.0715
+[18%] 	 18/35 	 01:57:30
+Match: Event 72877912, Lines 5, DAngle 0.2487
+[19%] 	 19/35 	 02:06:54
+Match: Event 72889207, Lines 3, DAngle 0.0780
+[20%] 	 20/35 	 02:07:01
+Match: Event 72890819, Lines 4, DAngle 0.0855
+[21%] 	 21/35 	 02:12:36
+Match: Event 72896514, Lines 3, DAngle 0.0509
+[22%] 	 22/35 	 02:19:51
+Match: Event 72898619, Lines 3, DAngle 0.0336
+[23%] 	 23/35 	 02:20:18
+Match: Event 72911247, Lines 6, DAngle 0.0780
+[24%] 	 24/35 	 02:23:03
+Match: Event 72913068, Lines 5, DAngle 0.1965
+[25%] 	 25/35 	 02:26:34
+Match: Event 72917303, Lines 6, DAngle 0.9010
+[26%] 	 26/35 	 02:30:33
+Match: Event 72917497, Lines 3, DAngle 0.0920
+[27%] 	 27/35 	 02:33:35
+Match: Event 72948303, Lines 3, DAngle 0.0531
+[28%] 	 28/35 	 02:35:54
+Match: Event 72949364, Lines 15, DAngle 0.1965
+[29%] 	 29/35 	 02:49:05
+Match: Event 72956427, Lines 6, DAngle 0.1496
+[30%] 	 30/35 	 02:59:10
+Match: Event 72964060, Lines 3, DAngle 0.0671
+[31%] 	 31/35 	 03:00:10
+Match: Event 72972001, Lines 3, DAngle 0.0465
+[32%] 	 32/35 	 03:01:06
+Match: Event 72974557, Lines 4, DAngle 0.0141
+[33%] 	 33/35 	 03:02:00
+Match: Event 72989663, Lines 5, DAngle 0.3053
+[34%] 	 34/35 	 03:05:10
+Match: Event 72993732, Lines 3, DAngle 0.1156
+Finished in 11341.82s.
+ ~ 5) DONE !

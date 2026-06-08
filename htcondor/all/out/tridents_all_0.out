@@ -1,0 +1,357 @@
+search libraries in slc9_x86-64
+ ~ 1) Base stack loaded.
+ ~ Sleeping for 1 seconds to avoid AFS DDOS...
+ ~ 2) Loading sndsw environment...
+ ~ 3) SNDSW_ROOT is set to: /afs/cern.ch/user/i/idioniso/snd_master/sw-root6.28/rhel9_x86-64/sndsw/master-local1
+ ~ 4) Executing tracking script...
+[INFO] The input consists out of the following trees and files: 
+[INFO]  - rawConv
+[INFO]     - root://eoshome-i.cern.ch//eos/user/i/idioniso/tridents/initial_cuts/tridents_sndsw_raw-0000.root
+[INFO] FairRootFileSink initialized.
+[INFO]  - cbmout
+[INFO]     - dummy
+[INFO] Parameter and input file are available, Assure that basic info is there for the run!
+[INFO] ---FairRootManager::SpecifyRunId --- 
+[INFO] --- Initialize with RunId  --- 0
+
+************************************************************* 
+     initialisation for run id 0
+************************************************************* 
+-I- FairRunTimeDB::InitContainer() FairBaseParSet
+-I- FairRunTimeDB::InitContainer() FairGeoParSet
+
+************************************************************* 
+     initialisation for run id 0
+************************************************************* 
+-I- FairRunTimeDB::InitContainer() FairBaseParSet
+-I- FairRunTimeDB::InitContainer() FairGeoParSet
+[INFO]  Branch: Reco_MuonTracks not found in Tree.
+using geofile: root://eospublic.cern.ch//eos/experiment/sndlhc/convertedData/physics/2023/geofile_sndlhc_TI18_V3_2023.root
+[0%] 	 0/6,370 	 00:00:06
+[1%] 	 64/6,370 	 00:01:40
+Match: Event 10965, Lines 2
+Match: Event 16476, Lines 2
+Match: Event 17186, Lines 2
+Match: Event 18438, Lines 2
+Match: Event 18920, Lines 2
+Match: Event 21234, Lines 2
+Match: Event 23370, Lines 2
+[2%] 	 128/6,370 	 00:02:55
+Match: Event 27846, Lines 2
+Match: Event 33151, Lines 2
+[3%] 	 192/6,370 	 00:04:16
+Match: Event 40935, Lines 2
+Match: Event 41209, Lines 2
+Match: Event 41230, Lines 2
+Match: Event 42217, Lines 2
+Match: Event 44076, Lines 2
+[4%] 	 255/6,370 	 00:05:28
+Match: Event 51889, Lines 2
+[5%] 	 319/6,370 	 00:06:52
+Match: Event 59566, Lines 2
+Match: Event 62231, Lines 2
+Match: Event 65158, Lines 2
+[6%] 	 383/6,370 	 00:08:12
+Match: Event 76757, Lines 2
+[7%] 	 446/6,370 	 00:09:24
+Match: Event 84698, Lines 2
+[8%] 	 510/6,370 	 00:10:36
+Match: Event 96833, Lines 2
+Match: Event 98600, Lines 2
+Match: Event 98904, Lines 2
+Match: Event 107744, Lines 2
+[9%] 	 574/6,370 	 00:11:42
+Match: Event 112081, Lines 2
+Match: Event 116090, Lines 2
+Match: Event 117118, Lines 2
+[10%] 	 637/6,370 	 00:12:58
+[11%] 	 701/6,370 	 00:14:14
+Match: Event 130299, Lines 2
+Match: Event 137425, Lines 2
+Match: Event 138261, Lines 2
+Match: Event 138838, Lines 2
+[12%] 	 765/6,370 	 00:15:34
+Match: Event 140178, Lines 2
+Match: Event 141026, Lines 2
+Match: Event 141935, Lines 2
+Match: Event 143330, Lines 2
+Match: Event 150203, Lines 2
+[13%] 	 829/6,370 	 00:16:53
+Match: Event 159684, Lines 2
+[14%] 	 892/6,370 	 00:18:09
+Match: Event 170183, Lines 2
+Match: Event 171475, Lines 2
+Match: Event 173001, Lines 2
+[15%] 	 956/6,370 	 00:19:26
+Match: Event 174249, Lines 2
+[16%] 	 1,020/6,370 	 00:20:32
+Match: Event 190946, Lines 2
+Match: Event 193859, Lines 2
+[17%] 	 1,083/6,370 	 00:21:43
+Match: Event 207832, Lines 2
+Match: Event 209713, Lines 2
+Match: Event 210146, Lines 2
+[18%] 	 1,147/6,370 	 00:22:56
+Match: Event 211723, Lines 2
+Match: Event 213840, Lines 2
+[19%] 	 1,211/6,370 	 00:23:56
+Match: Event 228011, Lines 2
+Match: Event 229250, Lines 2
+Match: Event 230000, Lines 2
+[20%] 	 1,274/6,370 	 00:25:04
+Match: Event 234370, Lines 2
+Match: Event 237615, Lines 2
+[21%] 	 1,338/6,370 	 00:26:18
+Match: Event 246397, Lines 2
+Match: Event 247157, Lines 2
+Match: Event 247231, Lines 2
+[22%] 	 1,402/6,370 	 00:27:23
+Match: Event 252590, Lines 2
+Match: Event 255392, Lines 2
+[23%] 	 1,466/6,370 	 00:28:24
+Match: Event 268894, Lines 2
+Match: Event 269725, Lines 2
+[24%] 	 1,529/6,370 	 00:29:38
+Match: Event 273094, Lines 2
+Match: Event 275943, Lines 2
+[25%] 	 1,593/6,370 	 00:30:36
+[26%] 	 1,657/6,370 	 00:31:39
+Match: Event 301859, Lines 2
+[27%] 	 1,720/6,370 	 00:32:49
+Match: Event 305445, Lines 2
+Match: Event 314582, Lines 2
+[28%] 	 1,784/6,370 	 00:33:54
+Match: Event 319718, Lines 2
+Match: Event 326186, Lines 2
+Match: Event 327228, Lines 2
+[29%] 	 1,848/6,370 	 00:35:12
+Match: Event 338359, Lines 2
+Match: Event 339740, Lines 2
+[30%] 	 1,911/6,370 	 00:36:33
+Match: Event 348225, Lines 2
+Match: Event 348865, Lines 2
+[31%] 	 1,975/6,370 	 00:37:42
+Match: Event 355234, Lines 2
+Match: Event 355259, Lines 2
+Match: Event 355803, Lines 3
+Match: Event 363385, Lines 2
+Match: Event 366142, Lines 2
+[32%] 	 2,039/6,370 	 00:39:07
+Match: Event 372276, Lines 2
+Match: Event 374042, Lines 2
+Match: Event 377899, Lines 2
+[33%] 	 2,103/6,370 	 00:40:28
+Match: Event 386028, Lines 2
+[34%] 	 2,166/6,370 	 00:41:44
+Match: Event 404165, Lines 2
+[35%] 	 2,230/6,370 	 00:42:56
+Match: Event 407074, Lines 2
+Match: Event 415038, Lines 2
+Match: Event 416371, Lines 2
+[36%] 	 2,294/6,370 	 00:44:16
+Match: Event 420516, Lines 2
+Match: Event 423210, Lines 2
+Match: Event 424989, Lines 2
+Match: Event 426818, Lines 2
+[37%] 	 2,357/6,370 	 00:45:22
+Match: Event 427482, Lines 2
+Match: Event 429183, Lines 2
+Match: Event 433497, Lines 3
+[38%] 	 2,421/6,370 	 00:46:33
+Match: Event 441881, Lines 2
+Match: Event 447846, Lines 2
+[39%] 	 2,485/6,370 	 00:47:37
+Match: Event 452507, Lines 2
+Match: Event 454106, Lines 2
+Match: Event 454887, Lines 2
+Match: Event 458257, Lines 2
+[40%] 	 2,548/6,370 	 00:48:49
+Match: Event 461867, Lines 3
+Match: Event 462573, Lines 2
+Match: Event 463635, Lines 2
+Match: Event 463811, Lines 2
+[41%] 	 2,612/6,370 	 00:50:05
+Match: Event 475462, Lines 2
+[42%] 	 2,676/6,370 	 00:51:09
+Match: Event 485158, Lines 2
+Match: Event 488221, Lines 2
+Match: Event 488673, Lines 2
+[43%] 	 2,740/6,370 	 00:52:29
+[44%] 	 2,803/6,370 	 00:53:50
+Match: Event 507250, Lines 2
+[45%] 	 2,867/6,370 	 00:55:15
+Match: Event 522052, Lines 2
+[46%] 	 2,931/6,370 	 00:56:45
+Match: Event 527603, Lines 2
+Match: Event 527653, Lines 2
+Match: Event 529423, Lines 2
+Match: Event 530865, Lines 2
+[47%] 	 2,994/6,370 	 00:58:17
+Match: Event 535530, Lines 2
+Match: Event 541398, Lines 3
+[48%] 	 3,058/6,370 	 00:59:48
+[49%] 	 3,122/6,370 	 01:01:16
+Match: Event 558737, Lines 2
+Match: Event 560142, Lines 2
+Match: Event 560946, Lines 2
+Match: Event 561785, Lines 2
+Match: Event 563823, Lines 2
+[50%] 	 3,185/6,370 	 01:02:55
+Match: Event 572884, Lines 2
+[51%] 	 3,249/6,370 	 01:04:41
+Match: Event 580774, Lines 2
+Match: Event 581296, Lines 2
+[52%] 	 3,313/6,370 	 01:06:48
+Match: Event 587804, Lines 2
+[53%] 	 3,377/6,370 	 01:08:21
+Match: Event 596991, Lines 3
+Match: Event 597405, Lines 2
+Match: Event 602781, Lines 2
+[54%] 	 3,440/6,370 	 01:09:46
+Match: Event 610426, Lines 3
+Match: Event 618199, Lines 2
+[55%] 	 3,504/6,370 	 01:11:11
+Match: Event 618526, Lines 2
+[56%] 	 3,568/6,370 	 01:12:38
+Match: Event 636986, Lines 2
+Match: Event 639703, Lines 2
+Match: Event 641142, Lines 2
+[57%] 	 3,631/6,370 	 01:14:06
+Match: Event 644923, Lines 2
+Match: Event 648005, Lines 2
+[58%] 	 3,695/6,370 	 01:15:32
+[59%] 	 3,759/6,370 	 01:16:59
+Match: Event 666598, Lines 2
+[60%] 	 3,822/6,370 	 01:18:28
+Match: Event 684665, Lines 2
+[61%] 	 3,886/6,370 	 01:19:52
+Match: Event 690648, Lines 2
+Match: Event 696980, Lines 2
+Match: Event 697233, Lines 2
+[62%] 	 3,950/6,370 	 01:21:24
+Match: Event 704894, Lines 2
+[63%] 	 4,014/6,370 	 01:22:47
+[64%] 	 4,077/6,370 	 01:24:16
+[65%] 	 4,141/6,370 	 01:25:43
+Match: Event 730668, Lines 2
+Match: Event 733973, Lines 2
+Match: Event 741176, Lines 2
+Match: Event 742028, Lines 2
+Match: Event 743392, Lines 2
+[66%] 	 4,205/6,370 	 01:27:22
+Match: Event 752582, Lines 2
+[67%] 	 4,268/6,370 	 01:28:45
+Match: Event 757453, Lines 2
+Match: Event 762748, Lines 2
+Match: Event 763199, Lines 2
+[68%] 	 4,332/6,370 	 01:30:10
+Match: Event 770123, Lines 2
+[69%] 	 4,396/6,370 	 01:31:41
+Match: Event 782574, Lines 2
+[70%] 	 4,459/6,370 	 01:33:38
+Match: Event 790453, Lines 2
+[71%] 	 4,523/6,370 	 01:35:26
+Match: Event 794653, Lines 2
+Match: Event 795218, Lines 2
+[72%] 	 4,587/6,370 	 01:36:59
+Match: Event 802882, Lines 2
+Match: Event 803492, Lines 2
+Match: Event 808476, Lines 2
+[73%] 	 4,651/6,370 	 01:38:30
+Match: Event 818940, Lines 2
+Match: Event 819378, Lines 2
+[74%] 	 4,714/6,370 	 01:40:04
+Match: Event 823159, Lines 2
+Match: Event 823564, Lines 2
+Match: Event 824898, Lines 2
+Match: Event 828924, Lines 2
+[75%] 	 4,778/6,370 	 01:41:41
+Match: Event 833068, Lines 3
+[76%] 	 4,842/6,370 	 01:43:23
+Match: Event 841042, Lines 2
+Match: Event 854869, Lines 2
+[77%] 	 4,905/6,370 	 01:45:00
+Match: Event 860710, Lines 2
+Match: Event 861371, Lines 2
+Match: Event 862744, Lines 2
+Match: Event 867955, Lines 2
+[78%] 	 4,969/6,370 	 01:46:40
+Match: Event 872086, Lines 3
+Match: Event 872591, Lines 2
+Match: Event 875278, Lines 2
+[79%] 	 5,033/6,370 	 01:48:16
+[80%] 	 5,096/6,370 	 01:49:57
+Match: Event 892916, Lines 2
+Match: Event 893315, Lines 2
+Match: Event 900160, Lines 2
+[81%] 	 5,160/6,370 	 01:51:47
+Match: Event 909329, Lines 2
+[82%] 	 5,224/6,370 	 01:53:27
+Match: Event 912921, Lines 2
+Match: Event 916854, Lines 3
+Match: Event 919220, Lines 2
+Match: Event 919578, Lines 2
+[83%] 	 5,288/6,370 	 01:55:01
+Match: Event 922532, Lines 3
+Match: Event 922556, Lines 2
+Match: Event 922655, Lines 2
+Match: Event 928797, Lines 2
+Match: Event 933950, Lines 2
+[84%] 	 5,351/6,370 	 01:56:30
+Match: Event 934216, Lines 2
+Match: Event 937224, Lines 2
+Match: Event 945490, Lines 2
+Match: Event 946002, Lines 2
+[85%] 	 5,415/6,370 	 01:58:04
+Match: Event 949101, Lines 2
+Match: Event 952588, Lines 2
+[86%] 	 5,479/6,370 	 01:59:33
+Match: Event 970106, Lines 2
+Match: Event 972055, Lines 2
+[87%] 	 5,542/6,370 	 02:00:59
+Match: Event 975340, Lines 2
+[88%] 	 5,606/6,370 	 02:02:26
+Match: Event 976630, Lines 2
+Match: Event 976695, Lines 2
+Match: Event 977022, Lines 2
+Match: Event 977148, Lines 2
+[89%] 	 5,670/6,370 	 02:03:55
+Match: Event 977518, Lines 2
+[90%] 	 5,733/6,370 	 02:05:20
+Match: Event 980081, Lines 3
+Match: Event 980621, Lines 2
+[91%] 	 5,797/6,370 	 02:06:48
+Match: Event 981101, Lines 2
+Match: Event 981118, Lines 2
+Match: Event 981249, Lines 2
+Match: Event 982190, Lines 2
+[92%] 	 5,861/6,370 	 02:08:15
+Match: Event 983679, Lines 2
+[93%] 	 5,925/6,370 	 02:09:50
+Match: Event 985286, Lines 2
+Match: Event 985591, Lines 2
+Match: Event 986943, Lines 2
+Match: Event 987239, Lines 2
+[94%] 	 5,988/6,370 	 02:11:20
+Match: Event 987923, Lines 2
+Match: Event 988228, Lines 2
+[95%] 	 6,052/6,370 	 02:12:47
+Match: Event 989547, Lines 2
+Match: Event 990704, Lines 2
+[96%] 	 6,116/6,370 	 02:14:12
+Match: Event 992857, Lines 3
+[97%] 	 6,179/6,370 	 02:15:38
+Match: Event 993969, Lines 2
+Match: Event 994492, Lines 2
+Match: Event 994540, Lines 2
+Match: Event 995232, Lines 2
+Match: Event 995512, Lines 3
+[98%] 	 6,243/6,370 	 02:17:06
+Match: Event 996585, Lines 2
+Match: Event 997297, Lines 2
+[99%] 	 6,307/6,370 	 02:18:33
+Match: Event 998288, Lines 2
+Match: Event 998572, Lines 2
+Match: Event 998929, Lines 2
+Finished in 8399.48s.
+ ~ 5) DONE !

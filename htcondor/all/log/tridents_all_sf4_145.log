@@ -1,0 +1,95 @@
+000 (7760828.145.000) 05/04 16:37:25 Job submitted from host: <188.185.125.71:9618?addrs=188.185.125.71-9618+[2001-1458-d00-4a--100-15e]-9618&alias=bigbird28.cern.ch&noUDP&sock=schedd_2497_5012>
+...
+040 (7760828.145.000) 05/05 04:26:59 Started transferring input files
+	Transferring to host: <188.185.210.22:9618?addrs=188.185.210.22-9618+[2001-1458-303-1--100-12]-9618&alias=b9p21p4724.cern.ch&noUDP&sock=slot1_7_4773_c29b_248770>
+...
+040 (7760828.145.000) 05/05 04:26:59 Finished transferring input files
+...
+001 (7760828.145.000) 05/05 04:27:00 Job executing on host: <188.185.210.22:9618?addrs=188.185.210.22-9618+[2001-1458-303-1--100-12]-9618&alias=b9p21p4724.cern.ch&noUDP&sock=startd_3998_dfba>
+	SlotName: slot1_7@b9p21p4724.cern.ch
+	CondorScratchDir = "/pool/condor/dir_329305"
+	Cpus = 1
+	Disk = 3748
+	GPUs = 0
+	Memory = 3000
+...
+006 (7760828.145.000) 05/05 04:27:13 Image size of job updated: 17904
+	18  -  MemoryUsage of job (MB)
+	17904  -  ResidentSetSize of job (KB)
+...
+006 (7760828.145.000) 05/05 04:32:13 Image size of job updated: 951428
+	930  -  MemoryUsage of job (MB)
+	951428  -  ResidentSetSize of job (KB)
+...
+006 (7760828.145.000) 05/05 04:37:14 Image size of job updated: 966476
+	942  -  MemoryUsage of job (MB)
+	964560  -  ResidentSetSize of job (KB)
+...
+006 (7760828.145.000) 05/05 04:42:14 Image size of job updated: 967444
+	942  -  MemoryUsage of job (MB)
+	964560  -  ResidentSetSize of job (KB)
+...
+006 (7760828.145.000) 05/05 04:47:14 Image size of job updated: 996992
+	942  -  MemoryUsage of job (MB)
+	964560  -  ResidentSetSize of job (KB)
+...
+006 (7760828.145.000) 05/05 04:52:15 Image size of job updated: 1008100
+	942  -  MemoryUsage of job (MB)
+	964560  -  ResidentSetSize of job (KB)
+...
+006 (7760828.145.000) 05/05 05:47:18 Image size of job updated: 1008100
+	947  -  MemoryUsage of job (MB)
+	969016  -  ResidentSetSize of job (KB)
+...
+006 (7760828.145.000) 05/05 06:42:22 Image size of job updated: 1017528
+	947  -  MemoryUsage of job (MB)
+	969016  -  ResidentSetSize of job (KB)
+...
+006 (7760828.145.000) 05/05 07:02:24 Image size of job updated: 1017528
+	948  -  MemoryUsage of job (MB)
+	970136  -  ResidentSetSize of job (KB)
+...
+006 (7760828.145.000) 05/05 08:22:32 Image size of job updated: 1017528
+	958  -  MemoryUsage of job (MB)
+	980984  -  ResidentSetSize of job (KB)
+...
+006 (7760828.145.000) 05/05 08:37:34 Image size of job updated: 1017528
+	962  -  MemoryUsage of job (MB)
+	985076  -  ResidentSetSize of job (KB)
+...
+006 (7760828.145.000) 05/05 10:57:45 Image size of job updated: 1028936
+	962  -  MemoryUsage of job (MB)
+	985076  -  ResidentSetSize of job (KB)
+...
+006 (7760828.145.000) 05/05 11:07:46 Image size of job updated: 1067412
+	962  -  MemoryUsage of job (MB)
+	985076  -  ResidentSetSize of job (KB)
+...
+006 (7760828.145.000) 05/05 11:17:47 Image size of job updated: 1067412
+	994  -  MemoryUsage of job (MB)
+	1017532  -  ResidentSetSize of job (KB)
+...
+040 (7760828.145.000) 05/05 13:28:12 Started transferring output files
+...
+040 (7760828.145.000) 05/05 13:28:12 Finished transferring output files
+...
+005 (7760828.145.000) 05/05 13:28:12 Job terminated.
+	(1) Normal termination (return value 0)
+		Usr 0 06:36:08, Sys 0 01:25:42  -  Run Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Run Local Usage
+		Usr 0 06:36:08, Sys 0 01:25:42  -  Total Remote Usage
+		Usr 0 00:00:00, Sys 0 00:00:00  -  Total Local Usage
+	12824  -  Run Bytes Sent By Job
+	1445  -  Run Bytes Received By Job
+	12824  -  Total Bytes Sent By Job
+	1445  -  Total Bytes Received By Job
+	Partitionable Resources :    Usage  Request Allocated 
+	   Cpus                 :     0.95        1         1 
+	   Disk (KB)            :    41           2      3748 
+	   GPUs                 :                           0 
+	   Memory (MB)          :   994        3000      3000 
+	   TimeExecute (s)      : 32472                       
+	   TimeSlotBusy (s)     : 32473                       
+
+	Job terminated of its own accord at 2026-05-05T11:28:12Z with exit-code 0.
+...
