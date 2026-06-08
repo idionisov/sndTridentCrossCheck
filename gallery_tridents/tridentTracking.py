@@ -41,16 +41,13 @@ def get_args():
     return parser.parse_args()
 
 def get_geofile(year: int) -> str:
-    if year == 2022: return "/eos/experiment/sndlhc/convertedData/physics/2022/geofile_sndlhc_TI18_V4_2022.root"
+    if   year == 2022: return "/eos/experiment/sndlhc/convertedData/physics/2022/geofile_sndlhc_TI18_V4_2022.root"
     elif year == 2023: return "/eos/experiment/sndlhc/convertedData/physics/2023/geofile_sndlhc_TI18_V3_2023.root"
     elif year == 2024: return "/eos/experiment/sndlhc/convertedData/physics/2024/geofile_sndlhc_TI18_V12_2024.root"
-    elif year == 2025: return "/eos/experiment/sndlhc/convertedData/physics/2024/geofile_sndlhc_TI18_V8_2025.root"
+    elif year == 2025: return "/eos/experiment/sndlhc/convertedData/physics/2025/geofile_sndlhc_TI18_V8_2025.root"
+    elif year == 2026: return "/eos/experiment/sndlhc/convertedData/physics/2026/geofile_sndlhc_TI18_V4_2026.root"
     return None
 
-def veto_is_activated(mf_hits: ROOT.TClonesArray) -> bool:
-    for mf_hit in mf_hits:
-        if mf_hit.GetSystem() == 1: return True
-    return False
 
 def get_sum_hit_weight_density(sf_hits: ROOT.TClonesArray, radius: float = 40, min_check: bool = False, min_hit_density: int = 1000000):
     density = 0
@@ -61,97 +58,122 @@ def get_sum_hit_weight_density(sf_hits: ROOT.TClonesArray, radius: float = 40, m
 
 def get_sf_qdc(sf_hits: ROOT.TClonesArray) -> float:
     qdc = 0
-    for sf_hit in sf_hits: qdc += sf_hit.GetSignal()
+    for sf_hit in sf_hits:
+        qdc += sf_hit.GetSignal()
     return qdc
 
 def initialize_display(geo):
     """Setup the canvas and background histograms for event display."""
+
     ut.bookCanvas(h, key='simpleDisplay', title='simple event display', nx=1200, ny=1016, cx=1, cy=2)
     zStart, zEnd = 250., 600.
     xStart, yStart = -100., -30.
+
     h['xmin'], h['xmax'] = xStart, xStart + 110.
     h['ymin'], h['ymax'] = yStart, yStart + 110.
     h['zmin'], h['zmax'] = zStart, zEnd
+
     ut.bookHist(h, 'xz', '; z [cm]; x [cm]', 500, h['zmin'], h['zmax'], 100, h['xmin'], h['xmax'])
     ut.bookHist(h, 'yz', '; z [cm]; y [cm]', 500, h['zmin'], h['zmax'], 100, h['ymin'], h['ymax'])
     h['xz'].SetStats(0); h['yz'].SetStats(0)
 
 def drawDetectors(geo):
     """Ported from 2dEventDisplay.py to draw geometry boxes."""
+
     mi = geo.snd_geo.MuFilter
     si = geo.snd_geo.Scifi
     em = geo.snd_geo.EmulsionDet
     nav = ROOT.gGeoManager.GetCurrentNavigator()
 
-    nodes = {'volMuFilter_1/volFeBlockEnd_1':ROOT.kGreen-6}
+    nodes = {'volMuFilter_1/volFeBlockEnd_1': ROOT.kGreen-6}
+
     for i in range(mi.NVetoPlanes):
-       nodes['volVeto_1/volVetoPlane_{}_{}'.format(i, i)]=ROOT.kRed
-       for j in range(mi.NVetoBars):
-          if i<2: nodes['volVeto_1/volVetoPlane_{}_{}/volVetoBar_1{}{:0>3d}'.format(i, i, i, j)]=ROOT.kRed
-          if i==2: nodes['volVeto_1/volVetoPlane_{}_{}/volVetoBar_ver_1{}{:0>3d}'.format(i, i, i, j)]=ROOT.kRed
-       if i<2: nodes['volVeto_1/subVetoBox_{}'.format(i)]=ROOT.kGray+1
-       if i==2: nodes['volVeto_1/subVeto3Box_{}'.format(i)]=ROOT.kGray+1
+        nodes['volVeto_1/volVetoPlane_{}_{}'.format(i, i)]=ROOT.kRed
+
+        for j in range(mi.NVetoBars):
+            if i<2:
+                nodes['volVeto_1/volVetoPlane_{}_{}/volVetoBar_1{}{:0>3d}'.format(i, i, i, j)] = ROOT.kRed
+            if i==2:
+                nodes['volVeto_1/volVetoPlane_{}_{}/volVetoBar_ver_1{}{:0>3d}'.format(i, i, i, j)] = ROOT.kRed
+
+        if i<2:
+            nodes['volVeto_1/subVetoBox_{}'.format(i)]=ROOT.kGray+1
+        if i==2:
+            nodes['volVeto_1/subVeto3Box_{}'.format(i)]=ROOT.kGray+1
+
     for i in range(si.nscifi):
-       nodes['volTarget_1/ScifiVolume{}_{}000000'.format(i+1, i+1)]=ROOT.kBlue+1
-       nodes['volTarget_1/volFeTarget{}_1'.format(i+1)]=ROOT.kGreen-6
+        nodes['volTarget_1/ScifiVolume{}_{}000000'.format(i+1, i+1)] = ROOT.kBlue+1
+        nodes['volTarget_1/volFeTarget{}_1'.format(i+1)] = ROOT.kGreen-6
+    
     for i in range(em.wall):
-       nodes['volTarget_1/volWallborder_{}'.format(i)]=ROOT.kGray
+        nodes['volTarget_1/volWallborder_{}'.format(i)] = ROOT.kGray
+    
     for i in range(mi.NDownstreamPlanes):
-       nodes['volMuFilter_1/volMuDownstreamDet_{}_{}'.format(i, i+mi.NVetoPlanes+mi.NUpstreamPlanes)]=ROOT.kBlue+1
-       for j in range(mi.NDownstreamBars):
-          nodes['volMuFilter_1/volMuDownstreamDet_{}_{}/volMuDownstreamBar_ver_3{}{:0>3d}'.format(i, i+mi.NVetoPlanes+mi.NUpstreamPlanes, i, j+mi.NDownstreamBars)]=ROOT.kBlue+1
-          if i < 3:
-             nodes['volMuFilter_1/volMuDownstreamDet_{}_{}/volMuDownstreamBar_hor_3{}{:0>3d}'.format(i, i+mi.NVetoPlanes+mi.NUpstreamPlanes, i, j)]=ROOT.kBlue+1
+        nodes['volMuFilter_1/volMuDownstreamDet_{}_{}'.format(i, i+mi.NVetoPlanes+mi.NUpstreamPlanes)] = ROOT.kBlue+1
+
+        for j in range(mi.NDownstreamBars):
+            nodes['volMuFilter_1/volMuDownstreamDet_{}_{}/volMuDownstreamBar_ver_3{}{:0>3d}'.format(i, i+mi.NVetoPlanes+mi.NUpstreamPlanes, i, j+mi.NDownstreamBars)] = ROOT.kBlue+1
+            if i < 3:
+                nodes['volMuFilter_1/volMuDownstreamDet_{}_{}/volMuDownstreamBar_hor_3{}{:0>3d}'.format(i, i+mi.NVetoPlanes+mi.NUpstreamPlanes, i, j)] = ROOT.kBlue+1
+    
     for i in range(mi.NDownstreamPlanes):
-       nodes['volMuFilter_1/subDSBox_{}'.format(i+mi.NVetoPlanes+mi.NUpstreamPlanes)]=ROOT.kGray+1
+        nodes['volMuFilter_1/subDSBox_{}'.format(i+mi.NVetoPlanes+mi.NUpstreamPlanes)]=ROOT.kGray+1
+
     for i in range(mi.NUpstreamPlanes):
-       nodes['volMuFilter_1/subUSBox_{}'.format(i+mi.NVetoPlanes)]=ROOT.kGray+1
-       nodes['volMuFilter_1/volMuUpstreamDet_{}_{}'.format(i, i+mi.NVetoPlanes)]=ROOT.kBlue+1
-       for j in range(mi.NUpstreamBars):
-          nodes['volMuFilter_1/volMuUpstreamDet_{}_{}/volMuUpstreamBar_2{}00{}'.format(i, i+mi.NVetoPlanes, i, j)]=ROOT.kBlue+1
-       nodes['volMuFilter_1/volFeBlock_{}'.format(i)]=ROOT.kGreen-6
+        nodes['volMuFilter_1/subUSBox_{}'.format(i+mi.NVetoPlanes)]=ROOT.kGray+1
+        nodes['volMuFilter_1/volMuUpstreamDet_{}_{}'.format(i, i+mi.NVetoPlanes)]=ROOT.kBlue+1
+    
+        for j in range(mi.NUpstreamBars):
+            nodes['volMuFilter_1/volMuUpstreamDet_{}_{}/volMuUpstreamBar_2{}00{}'.format(i, i+mi.NVetoPlanes, i, j)]=ROOT.kBlue+1
+        nodes['volMuFilter_1/volFeBlock_{}'.format(i)]=ROOT.kGreen-6
+    
     for i in range(mi.NVetoPlanes+mi.NUpstreamPlanes,mi.NVetoPlanes+mi.NUpstreamPlanes+mi.NDownstreamPlanes):
-       nodes['volMuFilter_1/volFeBlock_{}'.format(i)]=ROOT.kGreen-6
+        nodes['volMuFilter_1/volFeBlock_{}'.format(i)]=ROOT.kGreen-6
 
     passNodes = {'Block', 'Wall', 'FeTarget'}
     xNodes = {'UpstreamBar', 'VetoBar', 'hor'}
     proj_map = {'X':0,'Y':1}
 
     for node_ in nodes:
-       node = '/cave_1/Detector_0/'+node_
-       for p in ['X', 'Y']:
-          if not nav.CheckPath(node): continue
-          nav.cd(node)
-          N = nav.GetCurrentNode()
-          S = N.GetVolume().GetShape()
-          dx,dy,dz = S.GetDX(),S.GetDY(),S.GetDZ()
-          ox,oy,oz = S.GetOrigin()[0],S.GetOrigin()[1],S.GetOrigin()[2]
-          P, M = {}, {}
-          if p=='X' and (not any(xNode in node for xNode in xNodes) or 'VetoBar_ver' in node):
-             P['LB'] = array('d',[-dx+ox,oy,-dz+oz]); P['LT'] = array('d',[dx+ox,oy,-dz+oz])
-             P['RB'] = array('d',[-dx+ox,oy,dz+oz]);  P['RT'] = array('d',[dx+ox,oy,dz+oz])
-          elif p=='Y' and 'ver' not in node:
-             P['LB'] = array('d',[ox,-dy+oy,-dz+oz]); P['LT'] = array('d',[ox,dy+oy,-dz+oz])
-             P['RB'] = array('d',[ox,-dy+oy,dz+oz]);  P['RT'] = array('d',[ox,dy+oy,dz+oz])
-          else: continue
+        node = f'/cave_1/Detector_0/{node_}'
 
-          for C in P:
-             M[C] = array('d',[0,0,0])
-             nav.LocalToMaster(P[C],M[C])
+        for p in ['X', 'Y']:
+            if not nav.CheckPath(node):
+                continue
 
-          poly = ROOT.TPolyLine()
-          c = proj_map[p]
-          poly.SetPoint(0,M['LB'][2],M['LB'][c]); poly.SetPoint(1,M['LT'][2],M['LT'][c])
-          poly.SetPoint(2,M['RT'][2],M['RT'][c]); poly.SetPoint(3,M['RB'][2],M['RB'][c])
-          poly.SetPoint(4,M['LB'][2],M['LB'][c])
-          poly.SetLineColor(nodes[node_]); poly.SetLineWidth(1)
+            nav.cd(node)
+            N = nav.GetCurrentNode()
+            S = N.GetVolume().GetShape()
+            dx,dy,dz = S.GetDX(),S.GetDY(),S.GetDZ()
+            ox,oy,oz = S.GetOrigin()[0],S.GetOrigin()[1],S.GetOrigin()[2]
+            P, M = {}, {}
+          
+            if p=='X' and (not any(xNode in node for xNode in xNodes) or 'VetoBar_ver' in node):
+                P['LB'] = array('d',[-dx+ox,oy,-dz+oz]); P['LT'] = array('d',[dx+ox,oy,-dz+oz])
+                P['RB'] = array('d',[-dx+ox,oy,dz+oz]);  P['RT'] = array('d',[dx+ox,oy,dz+oz])
+            elif p=='Y' and 'ver' not in node:
+                P['LB'] = array('d',[ox,-dy+oy,-dz+oz]); P['LT'] = array('d',[ox,dy+oy,-dz+oz])
+                P['RB'] = array('d',[ox,-dy+oy,dz+oz]);  P['RT'] = array('d',[ox,dy+oy,dz+oz])
+            else:
+                continue
 
-          h['simpleDisplay'].cd(c+1)
-          if any(passNode in node for passNode in passNodes):
-             poly.SetFillColorAlpha(nodes[node_], 0.5)
-             poly.Draw('f&&same')
-          poly.Draw('same')
-          h[f"{node}_{p}"] = poly
+            for C in P:
+                M[C] = array('d',[0,0,0])
+                nav.LocalToMaster(P[C],M[C])
+
+            poly = ROOT.TPolyLine()
+            c = proj_map[p]
+            poly.SetPoint(0,M['LB'][2],M['LB'][c]); poly.SetPoint(1,M['LT'][2],M['LT'][c])
+            poly.SetPoint(2,M['RT'][2],M['RT'][c]); poly.SetPoint(3,M['RB'][2],M['RB'][c])
+            poly.SetPoint(4,M['LB'][2],M['LB'][c])
+            poly.SetLineColor(nodes[node_]); poly.SetLineWidth(1)
+
+            h['simpleDisplay'].cd(c+1)
+            if any(passNode in node for passNode in passNodes):
+                poly.SetFillColorAlpha(nodes[node_], 0.5)
+                poly.Draw('f&&same')
+            poly.Draw('same')
+            h[f"{node}_{p}"] = poly
 
 def draw_event(event, geo, hough_lines):
     """Draw SciFi & MuFilter hits and hough lines on the canvas."""
