@@ -1,0 +1,17 @@
+executable            = find_tridents
+
+output                = out/in_gallery_$(ProcId).out
+error                 = err/in_gallery_$(ProcId).err
+log                   = log/in_gallery_$(ProcId).log
+
+getenv                = False
+notification          = Never
+requirements          = (OpSysAndVer =?= "AlmaLinux9")
+should_transfer_files = IF_NEEDED
+
+max_retries           = 3
+
++JobFlavour           = "espresso"
++AccountingGroup      = "group_u_SNDLHC.users"
+
+queue arguments from _args_gallery_only.txt
