@@ -9,7 +9,7 @@ OUTPUT_PARQUET="$5"
 FRACTION="$6"
 PAR_FILE="$7"
 GALLERY="$8"
-PYTHON_SCRIPT="${9-/afs/cern.ch/work/i/idioniso/sndTridentValidation/trident_hough_search.py}"
+PYTHON_SCRIPT="${9-/afs/cern.ch/work/i/idioniso/sndTridentCrossCheck/scripts/trident_hough_search.py}"
 
 # 1. Clean the environment thoroughly
 unset PYTHONPATH
@@ -35,7 +35,8 @@ echo " ~ 3) SNDSW_ROOT is set to: $SNDSW_ROOT"
 export SND_HOME=/afs/cern.ch/user/i/idioniso/snd_master
 export SHIPLHC=${SND_HOME}/sndsw/shipLHC
 export DDF_UTILS=/afs/cern.ch/user/i/idioniso/ddfUtils
-export PYTHONPATH=${PYTHONPATH}:${DDF_UTILS}:${SNDSW_ROOT}/python
+export PROJECT_ROOT=/afs/cern.ch/work/i/idioniso/sndTridentCrossCheck
+export PYTHONPATH=${PYTHONPATH}:${DDF_UTILS}:${SNDSW_ROOT}/python:${PROJECT_ROOT}
 
 echo " ~ 4) Executing tracking script..."
 

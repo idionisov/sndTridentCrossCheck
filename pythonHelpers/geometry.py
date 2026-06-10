@@ -1,7 +1,8 @@
 import ROOT
+from array import array
+import rootUtils as ut
 
-
-def initialize_event_display(geo):
+def initialize_event_display(geo, histograms):
     """Setup the canvas and background histograms for event display."""
     ut.bookCanvas(histograms, key='simpleDisplay', title='simple event display', nx=1200, ny=1016, cx=1, cy=2)
 
@@ -20,7 +21,7 @@ def initialize_event_display(geo):
         ut.bookHist(histograms, projection, title, 500, histograms['zmin'], histograms['zmax'], 100, histograms[f'{projection[0]}min'], histograms[f'{projection[0]}max'])
         histograms[projection].SetStats(0)
 
-def draw_detector_geometry(geo):
+def draw_detector_geometry(geo, histograms):
     """Draw geometry boxes for display."""
     mu_filter = geo.snd_geo.MuFilter
     scifi = geo.snd_geo.Scifi
@@ -76,7 +77,7 @@ def draw_detector_geometry(geo):
             navigator.cd(full_path)
             shape = navigator.GetCurrentNode().GetVolume().GetShape()
             dx, dy, dz = shape.GetDX(), shape.GetDY(), shape.GetDZ()
-            ox, oy, oz = ox, oy, oz = shape.GetOrigin()[0], shape.GetOrigin()[1], shape.GetOrigin()[2]
+            ox, oy, oz = shape.GetOrigin()[0], shape.GetOrigin()[1], shape.GetOrigin()[2]
 
             corners = {}
             if view == 'X' and (not any(tn in full_path for tn in transverse_nodes) or 'VetoBar_ver' in full_path):
@@ -103,13 +104,13 @@ def draw_detector_geometry(geo):
             polyline.Draw('same')
             histograms[f"{full_path}_{view}"] = polyline
 
-def draw_event_hits_and_tracks(event, geo, hough_lines):
+def draw_event_hits_and_tracks(event, geo, hough_lines, histograms, projections):
     """Draw hits and hough lines on the canvas."""
     for p_idx in projections:
         histograms['simpleDisplay'].cd(p_idx)
         histograms[projections[p_idx]].Draw('b')
 
-    draw_detector_geometry(geo)
+    draw_detector_geometry(geo, histograms)
 
     hit_graphs = {view: {system: ROOT.TGraphErrors() for system in ['Scifi', 'MuFilter']} for view in ['X', 'Y']}
     counts = {view: {system: 0 for system in ['Scifi', 'MuFilter']} for view in ['X', 'Y']}
