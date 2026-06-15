@@ -124,6 +124,8 @@ conditionsDatabase/**/.cache/
 *.csv
 *.log
 *.tmp
+*.err
+*.out
 
 # =====================
 # Cython

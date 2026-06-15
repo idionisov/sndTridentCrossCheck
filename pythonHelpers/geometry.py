@@ -150,7 +150,9 @@ def draw_event_hits_and_tracks(event, geo, hough_lines, histograms, projections)
         histograms['simpleDisplay'].cd(p_idx)
         for system, color, style in [('Scifi', ROOT.kBlue+2, 20), ('MuFilter', ROOT.kRed+1, 21)]:
             g = hit_graphs[view][system]
-            g.SetMarkerStyle(style); g.SetMarkerSize(0.8); g.SetMarkerColor(color)
+            g.SetMarkerStyle(style)
+            g.SetMarkerSize(0.8)
+            g.SetMarkerColor(color)
             g.Draw('sameP')
             histograms[f'hits_{system.lower()[:2]}_{view}'] = g
 

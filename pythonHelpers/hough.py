@@ -49,7 +49,6 @@ def run_hough_transform(muon_reco_task, event, geo, z_vtx_min=None, z_vtx_max=No
             mask = np.logical_and(hit_collection['vert'] == is_vertical, ~hits_used)
             if not np.any(mask): break
 
-            # Perform Hough fit
             fit_result = hough_object.fit_randomize(
                 np.dstack([hit_collection['pos'][2][mask], hit_collection['pos'][axis][mask]])[0],
                 np.dstack([hit_collection['d'][2][mask], hit_collection['d'][axis][mask]])[0],
@@ -57,6 +56,7 @@ def run_hough_transform(muon_reco_task, event, geo, z_vtx_min=None, z_vtx_max=No
             )
 
             if fit_result[0] in [-1, -999]:
+                # print(f"DEBUG: fit_randomize returned {fit_result[0]} for {projection_name}")
                 break
 
             new_slope, new_intercept = fit_result[0], fit_result[1]
@@ -69,7 +69,9 @@ def run_hough_transform(muon_reco_task, event, geo, z_vtx_min=None, z_vtx_max=No
 
             if len(related_hits) == 0: break
 
-            if SndlhcMuonReco.numPlanesHit(hit_collection['system'][mask][related_hits], hit_collection['detectorID'][mask][related_hits]) >= muon_reco_task.min_planes_hit:
+            n_planes = SndlhcMuonReco.numPlanesHit(hit_collection['system'][mask][related_hits], hit_collection['detectorID'][mask][related_hits])
+            # print(f"DEBUG: {projection_name} track candidate: {n_planes} planes hit (min: {muon_reco_task.min_planes_hit})")
+            if n_planes >= muon_reco_task.min_planes_hit:
                 skip_track = False
                 conflict_params = None
 
@@ -84,7 +86,6 @@ def run_hough_transform(muon_reco_task, event, geo, z_vtx_min=None, z_vtx_max=No
 
                 if skip_track:
                     if conflict_params:
-                        # Find closest hit to conflicting track and exclude it
                         global_indices = np.where(mask)[0][related_hits]
                         z_bad, c_bad = hit_collection['pos'][2][global_indices], hit_collection['pos'][axis][global_indices]
                         dist = np.abs(c_bad - (conflict_params[0] * z_bad + conflict_params[1]))
@@ -93,11 +94,9 @@ def run_hough_transform(muon_reco_task, event, geo, z_vtx_min=None, z_vtx_max=No
                         hits_used[np.where(mask)[0][related_hits]] = True
                     continue
 
-                # Valid track found
                 counts[projection_name] += 1
                 lines[projection_name].append(fit_result)
 
-                # Hit exclusion logic (transverse + Z plane)
                 selected_global_idx = np.where(mask)[0][related_hits]
                 projection_idx = np.where(hit_collection['vert'] == is_vertical)[0]
 

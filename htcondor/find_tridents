@@ -12,9 +12,9 @@ GALLERY="$8"
 PYTHON_SCRIPT="${9-/afs/cern.ch/work/i/idioniso/sndTridentCrossCheck/scripts/trident_hough_search.py}"
 
 # 1. Clean the environment thoroughly
-unset PYTHONPATH
-unset LD_LIBRARY_PATH
-unset ROOTSYS
+#unset PYTHONPATH
+#unset LD_LIBRARY_PATH
+#unset ROOTSYS
 
 # 2. Source the base CVMFS stack
 export snd_stack=/cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30
@@ -25,30 +25,42 @@ SLEEP_TIME=$((RANDOM % 60))
 echo " ~ Sleeping for $SLEEP_TIME seconds to avoid AFS DDOS..."
 #sleep $SLEEP_TIME
 
-# 3. Load your local SNDSW build
-# We use 'master-local1' instead of 'latest-master-release'
 echo " ~ 2) Loading sndsw environment..."
-eval $(alienv load -w /afs/cern.ch/user/i/idioniso/snd_master/sw-root6.28 sndsw/latest-master-release --no-refresh)
+WORKSPACE="/afs/cern.ch/user/i/idioniso/snd_master/sw-root6.28"
+MODULE="sndsw/latest-hough-lines-release"
+eval $(alienv load -w "$WORKSPACE" "$MODULE")
 echo " ~ 3) SNDSW_ROOT is set to: $SNDSW_ROOT"
+
+if [ -f "$SNDSW_ROOT/bin/thisroot.sh" ]; then
+    source $SNDSW_ROOT/bin/thisroot.sh
+fi
 
 # 4. Set custom paths AFTER loading the environment
 export SND_HOME=/afs/cern.ch/user/i/idioniso/snd_master
 export SHIPLHC=${SND_HOME}/sndsw/shipLHC
 export DDF_UTILS=/afs/cern.ch/user/i/idioniso/ddfUtils
 export PROJECT_ROOT=/afs/cern.ch/work/i/idioniso/sndTridentCrossCheck
-export PYTHONPATH=${PYTHONPATH}:${DDF_UTILS}:${SNDSW_ROOT}/python:${PROJECT_ROOT}
+export PYTHONPATH=${PYTHONPATH}:${DDF_UTILS}:${PROJECT_ROOT}
 
 echo " ~ 4) Executing tracking script..."
 
-# 5. Run the python script
-python "$PYTHON_SCRIPT" \
+PYTHON_EXE=$(command -v python)
+CMD="\"$PYTHON_EXE\" \"$PYTHON_SCRIPT\" \
     -i ${INPUT_FILE} \
     -s ${START_EVENT} \
     -n ${N_EVENTS} \
     -o ${OUTPUT_ROOT} \
     -parquet ${OUTPUT_PARQUET} \
-    -f ${FRACTION} \
-    -par ${PAR_FILE} \
-    -gal ${GALLERY}
+    -f ${FRACTION}"
+
+if [ ! -z "${PAR_FILE}" ] && [ "${PAR_FILE}" != "None" ]; then
+    CMD="${CMD} -par ${PAR_FILE}"
+fi
+
+if [ ! -z "${GALLERY}" ] && [ "${GALLERY}" != "None" ]; then
+    CMD="${CMD} -gal ${GALLERY}"
+fi
+
+eval ${CMD}
 
 echo " ~ 5) DONE !"

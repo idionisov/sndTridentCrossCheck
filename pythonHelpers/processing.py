@@ -32,7 +32,7 @@ def run_hough_selection_data(
     start_event: int = 0,
     n_events: int = 1000000,
     fraction: float = 1.0,
-    par_file: str = "TrackingParams.xml",
+    par_file: str = os.path.join(os.path.dirname(__file__), '..', 'parFiles', 'TrackingParams.xml'),
     z_vtx_min: Optional[float] = None,
     z_vtx_max: Optional[float] = None,
     gallery_file: Optional[str] = None
@@ -70,9 +70,11 @@ def run_hough_selection_data(
         return
 
     total_entries = input_tree.GetEntries()
+    print(f"Total entries in tree: {total_entries}")
 
     input_tree.GetEntry(0)
     run_number = input_tree.EventHeader.GetRunId()
+    print(f"Run number: {run_number}")
 
     fair_run = ROOT.FairRunAna()
     io_manager = ROOT.FairRootManager.Instance()
@@ -83,6 +85,7 @@ def run_hough_selection_data(
 
     rtdb = fair_run.GetRuntimeDb()
     if os.path.exists(par_file):
+        print(f"Found parameter file: {par_file}")
         par_source = ROOT.FairParAsciiFileIo()
 
         if not par_source.open(par_file, 'in'):
@@ -90,8 +93,6 @@ def run_hough_selection_data(
             return
 
         rtdb.setFirstInput(par_source)
-
-        print(f"Setting RunId: {run_number} (type: {type(run_number)})")
         rtdb.addRun(int(run_number))
 
         rtdb.setOutput(par_source)
@@ -129,31 +130,36 @@ def run_hough_selection_data(
         'sum_hit_weight_density', 'sum_qdc'
     ]
 
-    processed_count = 0
+    gallery_match_count = 0
     progress_step = 0
-    num_events_to_process = min(n_events, total_entries - start_event)
 
-    for entry_index in range(start_event, total_entries):
-        if processed_count >= n_events:
-            break
+    end_event = min(start_event + n_events, total_entries)
+    num_to_scan = end_event - start_event
+
+    print(f"Scanning entries {start_event} to {end_event} (max {n_events} entries)")
+
+    for entry_index in range(start_event, end_event):
+        current_progress_pct = int((entry_index - start_event) * 100 / num_to_scan) if num_to_scan > 0 else 100
+        if current_progress_pct >= progress_step:
+            elapsed = int(time.time() - start_time_process)
+            h, rem = divmod(elapsed, 3600)
+            m, s = divmod(rem, 60)
+            print(f"[{current_progress_pct}%] \t {entry_index-start_event:,}/{num_to_scan:,} \t {h:02d}:{m:02d}:{s:02d}")
+            progress_step = ((current_progress_pct // 10) + 1) * 10
 
         input_tree.GetEntry(entry_index)
         event_number = input_tree.EventHeader.GetEventNumber()
+
+        n_scifi = input_tree.Digi_ScifiHits.GetEntries() if hasattr(input_tree, 'Digi_ScifiHits') else -1
 
         if gallery_file:
             run_str = str(run_number)
             if run_str not in gallery or event_number not in gallery[run_str]:
                 continue
+            gallery_match_count += 1
         else:
             if random.random() >= fraction:
                 continue
-
-        if num_events_to_process > 0 and ((entry_index - start_event) * 100 / num_events_to_process) >= progress_step:
-            elapsed = int(time.time() - start_time_process)
-            h, rem = divmod(elapsed, 3600)
-            m, s = divmod(rem, 60)
-            print(f"[{progress_step}%] \t {entry_index-start_event:,}/{num_events_to_process:,} \t {h:02d}:{m:02d}:{s:02d}")
-            progress_step += 1
 
         if input_tree.EventHeader.ClassName() == 'SNDLHCEventHeader':
             geo.modules['Scifi'].InitEvent(input_tree.EventHeader)
@@ -192,15 +198,15 @@ def run_hough_selection_data(
 
 
         if n_lines >= 2 and output_tree:
+            print(f"Event {event_number}\tnLines: {n_lines}")
             output_tree.Fill()
             draw_event_hits_and_tracks(input_tree, geo, track_lines, histograms, projections)
             canvas = histograms['simpleDisplay']
             canvas.SetName(f"c_Run{run_number}_{event_number}")
             canvas.Write()
 
-        processed_count += 1
-
-
+    if gallery_file:
+        print(f"Gallery matches found: {gallery_match_count} out of {num_to_scan} entries scanned.")
 
     if buffer:
         flush_to_parquet(buffer, batch_counter, columns, output_parquet)
