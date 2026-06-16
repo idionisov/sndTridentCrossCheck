@@ -21,9 +21,9 @@ export snd_stack=/cvmfs/sndlhc.cern.ch/SNDLHC-2025/Jan30
 source ${snd_stack}/setUp.sh
 echo " ~ 1) Base stack loaded."
 
-SLEEP_TIME=$((RANDOM % 60))
+SLEEP_TIME=$((RANDOM % 120))
 echo " ~ Sleeping for $SLEEP_TIME seconds to avoid AFS DDOS..."
-#sleep $SLEEP_TIME
+sleep $SLEEP_TIME
 
 echo " ~ 2) Loading sndsw environment..."
 WORKSPACE="/afs/cern.ch/user/i/idioniso/snd_master/sw-root6.28"
@@ -38,14 +38,34 @@ fi
 # 4. Set custom paths AFTER loading the environment
 export SND_HOME=/afs/cern.ch/user/i/idioniso/snd_master
 export SHIPLHC=${SND_HOME}/sndsw/shipLHC
-export DDF_UTILS=/afs/cern.ch/user/i/idioniso/ddfUtils
-export PROJECT_ROOT=/afs/cern.ch/work/i/idioniso/sndTridentCrossCheck
+
+ABS_DDF_UTILS=/afs/cern.ch/user/i/idioniso/ddfUtils
+if [ -d "$ABS_DDF_UTILS" ]; then
+    export DDF_UTILS="$ABS_DDF_UTILS"
+else
+    export DDF_UTILS=$(pwd)/ddfUtils
+fi
+
+# If PROJECT_ROOT is not accessible, assume we are in a transferred environment
+ABS_PROJECT_ROOT=/afs/cern.ch/work/i/idioniso/sndTridentCrossCheck
+if [ -d "$ABS_PROJECT_ROOT" ]; then
+    export PROJECT_ROOT="$ABS_PROJECT_ROOT"
+else
+    export PROJECT_ROOT=$(pwd)
+fi
 export PYTHONPATH=${PYTHONPATH}:${DDF_UTILS}:${PROJECT_ROOT}
 
 echo " ~ 4) Executing tracking script..."
 
+# Determine the python script path
+if [ -f "$PROJECT_ROOT/scripts/runHoughSelection.py" ]; then
+    LOCAL_PYTHON_SCRIPT="$PROJECT_ROOT/scripts/runHoughSelection.py"
+else
+    LOCAL_PYTHON_SCRIPT="$PYTHON_SCRIPT"
+fi
+
 PYTHON_EXE=$(command -v python)
-CMD="\"$PYTHON_EXE\" \"$PYTHON_SCRIPT\" \
+CMD="\"$PYTHON_EXE\" \"$LOCAL_PYTHON_SCRIPT\" \
     -i ${INPUT_FILE} \
     -s ${START_EVENT} \
     -n ${N_EVENTS} \
@@ -53,11 +73,24 @@ CMD="\"$PYTHON_EXE\" \"$PYTHON_SCRIPT\" \
     -parquet ${OUTPUT_PARQUET} \
     -f ${FRACTION}"
 
+# Determine if we should override absolute paths with local ones
 if [ ! -z "${PAR_FILE}" ] && [ "${PAR_FILE}" != "None" ]; then
+    if [[ "$PAR_FILE" == "$ABS_PROJECT_ROOT"* ]] && [ ! -f "$PAR_FILE" ]; then
+        LOCAL_PAR_FILE="${PROJECT_ROOT}/${PAR_FILE#$ABS_PROJECT_ROOT/}"
+        if [ -f "$LOCAL_PAR_FILE" ]; then
+            PAR_FILE="$LOCAL_PAR_FILE"
+        fi
+    fi
     CMD="${CMD} -par ${PAR_FILE}"
 fi
 
 if [ ! -z "${GALLERY}" ] && [ "${GALLERY}" != "None" ]; then
+    if [[ "$GALLERY" == "$ABS_PROJECT_ROOT"* ]] && [ ! -f "$GALLERY" ]; then
+        LOCAL_GALLERY="${PROJECT_ROOT}/${GALLERY#$ABS_PROJECT_ROOT/}"
+        if [ -f "$LOCAL_GALLERY" ]; then
+            GALLERY="$LOCAL_GALLERY"
+        fi
+    fi
     CMD="${CMD} -gal ${GALLERY}"
 fi
 

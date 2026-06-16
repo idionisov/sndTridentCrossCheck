@@ -7,7 +7,9 @@ log                   = log/in_gallery_$(ProcId).log
 getenv                = False
 notification          = Never
 requirements          = (OpSysAndVer =?= "AlmaLinux9")
-should_transfer_files = IF_NEEDED
+should_transfer_files = YES
+when_to_transfer_output = ON_EXIT
+transfer_input_files  = find_tridents, ../pythonHelpers, ../scripts, ../parFiles, ../gallery.json, /afs/cern.ch/user/i/idioniso/ddfUtils
 
 max_retries           = 3
 
