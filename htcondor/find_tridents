@@ -9,7 +9,7 @@ OUTPUT_PARQUET="$5"
 FRACTION="$6"
 PAR_FILE="$7"
 GALLERY="$8"
-PYTHON_SCRIPT="${9-/afs/cern.ch/work/i/idioniso/sndTridentCrossCheck/scripts/trident_hough_search.py}"
+PYTHON_SCRIPT="${9-/afs/cern.ch/work/i/idioniso/sndTridentCrossCheck/scripts/runHoughSelection.py}"
 
 # 1. Clean the environment thoroughly
 #unset PYTHONPATH

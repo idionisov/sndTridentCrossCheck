@@ -50,8 +50,12 @@ def run_hough_selection_data(
         try:
             with open(gallery_file, "r") as f:
                 gallery = json.load(f)
-        except FileNotFoundError:
-            print(f"Error: {gallery_file} not found!")
+            # Convert lists to sets for O(1) lookup
+            for r in gallery:
+                gallery[r] = set(gallery[r])
+            print(f"Loaded gallery from {gallery_file}")
+        except Exception as e:
+            print(f"Error loading gallery {gallery_file}: {e}")
             return
 
     input_file = ROOT.TFile.Open(input_file_path)
@@ -149,16 +153,15 @@ def run_hough_selection_data(
 
         input_tree.GetEntry(entry_index)
         event_number = input_tree.EventHeader.GetEventNumber()
-
-        n_scifi = input_tree.Digi_ScifiHits.GetEntries() if hasattr(input_tree, 'Digi_ScifiHits') else -1
+        current_run = input_tree.EventHeader.GetRunId()
 
         if gallery_file:
-            run_str = str(run_number)
+            run_str = str(current_run)
             if run_str not in gallery or event_number not in gallery[run_str]:
                 continue
             gallery_match_count += 1
         else:
-            if random.random() >= fraction:
+            if fraction < 1.0 and random.random() >= fraction:
                 continue
 
         if input_tree.EventHeader.ClassName() == 'SNDLHCEventHeader':
@@ -171,7 +174,7 @@ def run_hough_selection_data(
 
         if n_lines >= 1:
             row = {
-                'run': run_number,
+                'run': current_run,
                 'event_number': event_number,
                 'n_lines': n_lines,
                 'xz_m1': get_line_params('XZ', 0, track_lines)[0],
@@ -202,7 +205,7 @@ def run_hough_selection_data(
             output_tree.Fill()
             draw_event_hits_and_tracks(input_tree, geo, track_lines, histograms, projections)
             canvas = histograms['simpleDisplay']
-            canvas.SetName(f"c_Run{run_number}_{event_number}")
+            canvas.SetName(f"c_Run{current_run}_{event_number}")
             canvas.Write()
 
     if gallery_file:

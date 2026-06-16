@@ -18,7 +18,7 @@ def get_args():
     parser.add_argument('-gal', '--gallery', type=str, help='Only process events listed in the provided gallery json file')
     return parser.parse_args()
 
-    def main():
+def main():
     args = get_args()
     default_input = "/eos/user/i/idioniso/tridents/initial_cuts/tridents_sndsw_raw-*.root"
     
@@ -49,8 +49,8 @@ def get_args():
                 for file_num in files_dict.keys():
                     file_path = f"/eos/experiment/sndlhc/convertedData/physics/{year}/run_{run_num:06d}/sndsw_raw-{file_num:04d}.root"
                     if os.path.exists(file_path):
-                        out_root = f"{args.output_dir}/recoTri_{run_num}_f{file_num:04d}.root"
-                        out_parquet = f"{args.output_dir}/recoTri_{run_num}_f{file_num:04d}"
+                        out_root = f"/eos/user/i/idioniso/tridents/gallery-15Jun26/recoTri_{run_num}_f{file_num:04d}.root"
+                        out_parquet = f"/eos/user/i/idioniso/tridents/gallery-15Jun26/recoTri_{run_num}_f{file_num:04d}"
                         f_out.write(f"{file_path} 0 {args.n_events} {out_root} {out_parquet} {args.fraction} {args.parFile} {args.gallery}\n")
                         count += 1
 
