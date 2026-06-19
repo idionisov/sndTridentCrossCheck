@@ -9,11 +9,11 @@ notification          = Never
 requirements          = (OpSysAndVer =?= "AlmaLinux9")
 should_transfer_files = YES
 when_to_transfer_output = ON_EXIT
-transfer_input_files  = find_tridents, ../pythonHelpers, ../scripts, ../parFiles, ../gallery.json, /afs/cern.ch/user/i/idioniso/ddfUtils
+transfer_input_files  = find_tridents, ../pythonHelpers, ../scripts, ../parFiles, ../gallery.json, /afs/cern.ch/user/i/idioniso/ddfUtils, sndswEnv.sh
 
 max_retries           = 3
 
 +JobFlavour           = "testmatch"
 +AccountingGroup      = "group_u_SNDLHC.users"
 
-queue arguments from _args_gallery_only.txt
+queue arguments from args_tridents.txt

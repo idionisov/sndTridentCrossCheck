@@ -38,14 +38,13 @@ echo " ~ 1) Base stack loaded."
 #echo " ~ Sleeping for $SLEEP_TIME seconds to avoid AFS DDOS..."
 #sleep $SLEEP_TIME
 
-echo " ~ 2) Loading static sndsw environment..."
-source sndswEnv.sh
-
-# Re-export SNDSW_ROOT if your script explicitly needs it (alienv usually sets it)
-if [ -z "$SNDSW_ROOT" ]; then
-    export SNDSW_ROOT=/eos/user/i/idioniso/sw-root6.28/sndsw/latest-hough-lines-release
-fi
+echo " ~ 2) Loading sndsw environment..."
+#eval $(alienv load -w "$WORKSPACE" "$MODULE")
 echo " ~ 3) SNDSW_ROOT is set to: $SNDSW_ROOT"
+
+if [ -f "$SNDSW_ROOT/bin/thisroot.sh" ]; then
+    source $SNDSW_ROOT/bin/thisroot.sh
+fi
 
 
 if [ -d "$(pwd)/ddfUtils" ]; then
