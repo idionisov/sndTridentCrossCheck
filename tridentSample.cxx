@@ -62,6 +62,10 @@ int main(int argc, char ** argv) {
   }
   std::cout << "Got input tree" << std::endl;
 
+  // Disable Event_Type branch to avoid crash due to missing dictionary in standard sndsw
+  ch->SetBranchStatus("Event_Type", 0);
+  ch->SetBranchStatus("Event_Type.", 0);
+
   // MC truth
   TClonesArray * MCTracks = new TClonesArray("ShipMCTrack", 5000);
   if (isMC) ch->SetBranchAddress("MCTrack", &MCTracks);
