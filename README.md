@@ -65,7 +65,7 @@ The new **Cut Set Option (`<cut_set> = 6`)** is for Trident Selection. It demand
 
 ### (II) Running the Hough Selection (Python)
 
-```python
+```bash
 python scripts/runHoughSelection.py -i <input_file_name> -parquet <output_parquet_file> -o <output_root_file>
 ```
 
