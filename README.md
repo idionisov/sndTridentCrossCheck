@@ -4,6 +4,8 @@ SND@LHC Muonic trident cross check with event cuts and Hough transform selection
 
 ## Project Structure
 
+### (1) Cut Flow Implementation (C++)
+
 * **`tridentSample.cxx`**: The main executable with the cut flows.
 * **`cuts/`**: All implemented event cuts
   * SciFi and DS fiducial volume cuts
@@ -11,6 +13,8 @@ SND@LHC Muonic trident cross check with event cuts and Hough transform selection
   * Event time delta cuts
   * Dense tracking / trident hits selection cuts
 * **`CMakeLists.txt`**
+
+### (2) Hough Selection Implementation (Python)
 
 ---
 
