@@ -1,4 +1,4 @@
-executable            = find_tridents_2
+executable            = find_tridents
 
 output                = out/in_gallery_$(ProcId).out
 error                 = err/in_gallery_$(ProcId).err

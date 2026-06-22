@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -90,12 +91,17 @@ def get_scifi_max_qdc_per_plane(scifi_hits):
     return get_scifi_hit_params(scifi_hits)[4]
 
 
-
 def flush_to_parquet(data, batch_idx, cols, base_filename, verbose=False):
-        df = pd.DataFrame(data, columns=cols)
-        table = pa.Table.from_pandas(df)
-        filename = f"{base_filename}_{batch_idx}.parquet"
-        pq.write_table(table, filename, compression='snappy')
+    df = pd.DataFrame(data, columns=cols)
+    table = pa.Table.from_pandas(df)
+    
+    path = Path(base_filename)
+    if path.suffix.lower() == '.parquet':
+        filename = f"{path.with_suffix('')}_{batch_idx}.parquet"
+    else:
+        filename = f"{path}_{batch_idx}.parquet"
+        
+    pq.write_table(table, filename, compression='snappy')
 
-        if verbose:
-            print(f"Batch {batch_idx} written to {filename}")
+    if verbose:
+        print(f"Batch {batch_idx} written to {filename}")

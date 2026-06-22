@@ -51,7 +51,6 @@ def run_hough_selection_data(
         try:
             with open(gallery_file, "r") as f:
                 gallery = json.load(f)
-            # Convert lists to sets for O(1) lookup
             for r in gallery:
                 gallery[r] = set(gallery[r])
             print(f"Loaded gallery from {gallery_file}")
@@ -73,7 +72,7 @@ def run_hough_selection_data(
     if not input_tree:
         print(f"Error: Could not find rawConv or cbmsim tree in {input_file_path}")
         return
-
+    
     total_entries = input_tree.GetEntries()
     print(f"Total entries in tree: {total_entries}")
 
@@ -121,9 +120,18 @@ def run_hough_selection_data(
         input_tree.Digi_MuFilterHits = input_tree.Digi_MuFilterHit
 
     output_root_file, output_tree = None, None
+    root_file_counter = 0
+
+    def create_new_root_batch(base_path, counter, source_tree):
+        clean_path = base_path[:-5] if base_path.lower().endswith('.root') else base_path
+        batch_filename = f"{clean_path}_{counter}.root"
+        
+        new_file = ROOT.TFile(batch_filename, "RECREATE")
+        new_tree = source_tree.CloneTree(0)
+        return new_file, new_tree
+
     if output_root:
-        output_root_file = ROOT.TFile(output_root if output_root.endswith(".root") else f"{output_root}.root", "RECREATE")
-        output_tree = input_tree.CloneTree(0)
+        output_root_file, output_tree = create_new_root_batch(output_root, root_file_counter, input_tree)
 
     buffer = []
     BUFFER_SIZE = 5000
@@ -135,7 +143,6 @@ def run_hough_selection_data(
         'scifi_nhits', 'sum_hit_weight_density', 'sum_qdc',
         'max_scifi_nhits_per_plane', 'max_scifi_qdc_per_plane'
     ]
-
     gallery_match_count = 0
     progress_step = 0
 
@@ -144,6 +151,7 @@ def run_hough_selection_data(
 
     print(f"Scanning entries {start_event} to {end_event} (max {n_events} entries)")
 
+    # ==================== MAIN LOOP ====================
     for entry_index in range(start_event, end_event):
         current_progress_pct = int((entry_index - start_event) * 100 / num_to_scan) if num_to_scan > 0 else 100
         if current_progress_pct >= progress_step:
@@ -200,10 +208,19 @@ def run_hough_selection_data(
             }
             buffer.append(row)
 
+            # --- FLUSH BOTH PARQUET AND ROOT BATCHES ---
             if len(buffer) >= BUFFER_SIZE:
                 flush_to_parquet(buffer, batch_counter, columns, output_parquet)
                 buffer = []
                 batch_counter += 1
+
+                if output_root_file and output_tree:
+                    output_root_file.cd()
+                    output_tree.Write()
+                    output_root_file.Close()
+                    
+                    root_file_counter += 1
+                    output_root_file, output_tree = create_new_root_batch(output_root, root_file_counter, input_tree)
 
 
         if n_lines >= 2 and output_tree:
@@ -214,14 +231,17 @@ def run_hough_selection_data(
             canvas.SetName(f"c_Run{current_run}_{event_number}")
             canvas.Write()
 
+    # ==================== CLEANUP & FINALIZE ====================
     if gallery_file:
         print(f"Gallery matches found: {gallery_match_count} out of {num_to_scan} entries scanned.")
 
     if buffer:
         flush_to_parquet(buffer, batch_counter, columns, output_parquet)
 
-    if output_root_file:
+    if output_root_file and output_tree:
         output_root_file.cd()
         output_tree.Write()
         output_root_file.Close()
+        print(f"Final ROOT batch saved successfully.")
+
     print(f"Finished in {time.time() - start_time_process:.2f}s.")
