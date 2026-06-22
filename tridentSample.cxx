@@ -62,10 +62,6 @@ int main(int argc, char ** argv) {
   }
   std::cout << "Got input tree" << std::endl;
 
-  // Disable Event_Type branch to avoid crash due to missing dictionary in standard sndsw
-  ch->SetBranchStatus("Event_Type", 0);
-  ch->SetBranchStatus("Event_Type.", 0);
-
   // MC truth
   TClonesArray * MCTracks = new TClonesArray("ShipMCTrack", 5000);
   if (isMC) ch->SetBranchAddress("MCTrack", &MCTracks);
@@ -149,11 +145,11 @@ int main(int argc, char ** argv) {
     cutFlow.push_back( new snd::analysis_cuts::hasVetoHitsCut(ch)); // Require veto hits
     cutFlow.push_back( new snd::analysis_cuts::minSciFiPlanesCut(3, 3, ch)); // Require at least 3 planes in each projection
     cutFlow.push_back( new snd::analysis_cuts::tridentHitsCut(9, 3, ch)); // Require 9/3 or 3/9 hits
-    cutFlow.push_back( new snd::analysis_cuts::maxSciFiHitsCut(120, ch)); // Total hits < 120
-    cutFlow.push_back( new snd::analysis_cuts::maxPlaneSciFiHitsCut(60, ch)); // Max hits in any plane < 60
-    cutFlow.push_back( new snd::analysis_cuts::maxSciFiSignalCut(200, ch)); // Total signal < 200
-    cutFlow.push_back( new snd::analysis_cuts::maxPlaneSciFiSignalCut(100, ch)); // Max signal in any plane < 100
-    cutFlow.push_back( new snd::analysis_cuts::tridentDensityCut(40, 2500, ch)); // Sum density < 2500
+    cutFlow.push_back( new snd::analysis_cuts::maxSciFiHitsCut(200, ch)); // Total hits < 200
+    cutFlow.push_back( new snd::analysis_cuts::maxPlaneSciFiHitsCut(100, ch)); // Max hits in any plane < 100
+    cutFlow.push_back( new snd::analysis_cuts::maxSciFiSignalCut(400, ch)); // Total signal < 400
+    cutFlow.push_back( new snd::analysis_cuts::maxPlaneSciFiSignalCut(250, ch)); // Max signal in any plane < 100
+    cutFlow.push_back( new snd::analysis_cuts::tridentDensityCut(40, 5000, ch)); // Sum density < 5000
     cutFlow.push_back( new snd::analysis_cuts::avgSciFiFiducialCut(200, 1200, 300, 128*12-200, ch)); 
     cutFlow.push_back( new snd::analysis_cuts::avgDSFiducialCut(70, 105, 10, 50, ch)); 
     if (not isMC) cutFlow.push_back( new snd::analysis_cuts::eventDeltatCut(-1, 100, ch)); 

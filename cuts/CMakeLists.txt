@@ -22,6 +22,7 @@ set(CUTS_HEADERS
   sndMaxSciFiSignalCut.h
   sndMaxPlaneSciFiSignalCut.h
   sndTridentDensityCut.h
+  Event_Type.h
 )
 
 set(CUTS_SRCS

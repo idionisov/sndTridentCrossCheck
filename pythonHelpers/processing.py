@@ -7,15 +7,16 @@ import numpy as np
 import pandas as pd
 import rootUtils as ut
 
-from pythonHelpers.general import get_scifi_hit_density, get_scifi_total_qdc, flush_to_parquet
+from pythonHelpers.general import get_scifi_hit_params, flush_to_parquet
 from pythonHelpers.hough import run_hough_transform, get_line_params
 from pythonHelpers.geometry import initialize_event_display, draw_event_hits_and_tracks
 
 from typing import Optional
 
 ROOT.gROOT.SetBatch(True)
-for library in ["libBase", "libShipData", "libshipLHC", "libsnd_analysis_tools"]:
-    ROOT.gSystem.Load(library)
+if not hasattr(ROOT, 'sndScifiHit'):
+    for library in ["libBase", "libShipData", "libshipLHC", "libsnd_analysis_tools"]:
+        ROOT.gSystem.Load(library)
 
 import SndlhcGeo
 import SndlhcMuonReco
@@ -131,7 +132,8 @@ def run_hough_selection_data(
         'run', 'event_number', 'n_lines',
         'xz_m1', 'xz_c1', 'xz_m2', 'xz_c2', 'xz_m3', 'xz_c3',
         'yz_m1', 'yz_c1', 'yz_m2', 'yz_c2', 'yz_m3', 'yz_c3',
-        'sum_hit_weight_density', 'sum_qdc'
+        'scifi_nhits', 'sum_hit_weight_density', 'sum_qdc',
+        'max_scifi_nhits_per_plane', 'max_scifi_qdc_per_plane'
     ]
 
     gallery_match_count = 0
@@ -173,6 +175,7 @@ def run_hough_selection_data(
         )
 
         if n_lines >= 1:
+            sf_nhits, hit_w_density, sf_total_qdc, max_sf_nhits, max_sf_qdc = get_scifi_hit_params(input_tree.Digi_ScifiHits)
             row = {
                 'run': current_run,
                 'event_number': event_number,
@@ -189,8 +192,11 @@ def run_hough_selection_data(
                 'yz_c2': get_line_params('YZ', 1, track_lines)[1],
                 'yz_m3': get_line_params('YZ', 2, track_lines)[0],
                 'yz_c3': get_line_params('YZ', 2, track_lines)[1],
-                'sum_hit_weight_density': get_scifi_hit_density(input_tree.Digi_ScifiHits),
-                'sum_qdc': get_scifi_total_qdc(input_tree.Digi_ScifiHits)
+                'scifi_nhits': sf_nhits,
+                'sum_hit_weight_density': hit_w_density,
+                'sum_qdc': sf_total_qdc,
+                'max_scifi_nhits_per_plane': max_sf_nhits,
+                'max_scifi_qdc_per_plane': max_sf_qdc
             }
             buffer.append(row)
 

@@ -32,4 +32,6 @@
 #pragma link C++ class snd::analysis_cuts::maxPlaneSciFiSignalCut+;
 #pragma link C++ class snd::analysis_cuts::tridentDensityCut+;
 
+#pragma link C++ class Event_Type+;
+
 #endif
