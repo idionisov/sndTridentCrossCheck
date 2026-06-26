@@ -6,7 +6,7 @@ def run_hough_transform(muon_reco_task, event, geo, z_vtx_min=None, z_vtx_max=No
     """Identify tracks using Hough transform with vertex constraints."""
     hit_collection = {
         "pos": [[], [], []], "d": [[], [], []],
-        "vert": [], "system": [], "detectorID": []
+        "vert": [], "system": [], "detectorID": [], "qdc": []
     }
     pos_a, pos_b = ROOT.TVector3(), ROOT.TVector3()
 
@@ -24,16 +24,18 @@ def run_hough_transform(muon_reco_task, event, geo, z_vtx_min=None, z_vtx_max=No
         hit_collection["vert"].append(hit.isVertical())
         hit_collection["system"].append(0)
         hit_collection["detectorID"].append(hit.GetDetectorID())
+        hit_collection["qdc"].append(hit.GetSignal())
 
     if not hit_collection['pos'][0]:
-        return 0, {'XZ': [], 'YZ': []}
+        return 0, {'XZ': [], 'YZ': []}, {'XZ': [], 'YZ': []}
 
     for k in ["pos", "d"]:
         hit_collection[k] = np.array(hit_collection[k], dtype=np.float32)
-    for k, dt in [("vert", np.bool_), ("system", np.int32), ("detectorID", np.int32)]:
+    for k, dt in [("vert", np.bool_), ("system", np.int32), ("detectorID", np.int32), ("qdc", np.float32)]:
         hit_collection[k] = np.array(hit_collection[k], dtype=dt)
 
     counts, lines = {'XZ': 0, 'YZ': 0}, {'XZ': [], 'YZ': []}
+    track_hit_indices = {'XZ': [], 'YZ': []}
 
     for projection_name in ['XZ', 'YZ']:
         is_vertical, axis = (projection_name == 'XZ'), (0 if projection_name == 'XZ' else 1)
@@ -96,8 +98,9 @@ def run_hough_transform(muon_reco_task, event, geo, z_vtx_min=None, z_vtx_max=No
 
                 counts[projection_name] += 1
                 lines[projection_name].append(fit_result)
-
                 selected_global_idx = np.where(mask)[0][related_hits]
+                track_hit_indices[projection_name].append(selected_global_idx.tolist())
+
                 projection_idx = np.where(hit_collection['vert'] == is_vertical)[0]
 
                 z_sel, c_sel = hit_collection['pos'][2][selected_global_idx], hit_collection['pos'][axis][selected_global_idx]
@@ -111,7 +114,7 @@ def run_hough_transform(muon_reco_task, event, geo, z_vtx_min=None, z_vtx_max=No
             else:
                 break
 
-    return max(counts.values()), lines
+    return max(counts.values()), lines, track_hit_indices
 
 def get_line_params(projection, index, track_lines):
     if index < len(track_lines[projection]):

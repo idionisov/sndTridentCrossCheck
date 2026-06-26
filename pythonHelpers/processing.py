@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import rootUtils as ut
 
-from pythonHelpers.general import get_scifi_hit_params, flush_to_parquet
+from pythonHelpers.general import get_scifi_hit_params, flush_to_parquet, get_event_scifi_info
 from pythonHelpers.hough import run_hough_transform, get_line_params
 from pythonHelpers.geometry import initialize_event_display, draw_event_hits_and_tracks
 
@@ -72,7 +72,7 @@ def run_hough_selection_data(
     if not input_tree:
         print(f"Error: Could not find rawConv or cbmsim tree in {input_file_path}")
         return
-    
+
     total_entries = input_tree.GetEntries()
     print(f"Total entries in tree: {total_entries}")
 
@@ -105,12 +105,13 @@ def run_hough_selection_data(
 
 
 
+    current_weight = 1.0
     if "MonteCarlo" in input_file_path or "boost" in os.path.basename(input_file_path):
         print("Detected Monte Carlo simulation input. Searching for local geofile...")
-        
+
         input_dir = os.path.dirname(input_file_path)
         boost_suffix = "boost1000" if "boost1000" in input_file_path else "boost100"
-        
+
         if "boost1000" in input_file_path:
             current_weight = 1.0 / 1000.0
         elif "boost100" in input_file_path:
@@ -119,15 +120,15 @@ def run_hough_selection_data(
             current_weight = 1.0
 
         geofile_path = os.path.join(input_dir, f"geofile_full.Ntuple-TGeant4_{boost_suffix}.0.root")
-        
+
         if not os.path.exists(geofile_path):
             geofile_path = os.path.join(input_dir, "geofile_full.Ntuple-TGeant4_boost100.0.root")
-            
+
         if os.path.exists(geofile_path):
             print(f"Loading MC geometry from: {geofile_path}")
             geo = SndlhcGeo.GeoInterface(geofile_path)
         else:
-            raise FileNotFoundError(f"Critical Error: Could not locate a geofile in {input_dir}")
+            raise FileNotFoundError(f"Could not locate a geofile in {input_dir}")
     else:
         geo = SndlhcGeo.GeoInterface(ROOT.snd.analysis_tools.GetGeoPath(run_number))
 
@@ -152,7 +153,7 @@ def run_hough_selection_data(
     def create_new_root_batch(base_path, counter, source_tree):
         clean_path = base_path[:-5] if base_path.lower().endswith('.root') else base_path
         batch_filename = f"{clean_path}_{counter}.root"
-        
+
         new_file = ROOT.TFile(batch_filename, "RECREATE")
         new_tree = source_tree.CloneTree(0)
         return new_file, new_tree
@@ -165,10 +166,35 @@ def run_hough_selection_data(
     batch_counter = 0
     columns = [
         'run', 'event_number', 'n_lines',
+        'scifi_nhits',
+        'sum_hit_weight_density', 'max_hit_weight_density',
+        'sum_qdc_weight_density', 'max_qdc_weight_density',
+        'sum_qdc', 'max_qdc',
+        'max_scifi_nhits_per_plane', 'max_scifi_qdc_per_plane',
         'xz_m1', 'xz_c1', 'xz_m2', 'xz_c2', 'xz_m3', 'xz_c3',
         'yz_m1', 'yz_c1', 'yz_m2', 'yz_c2', 'yz_m3', 'yz_c3',
-        'scifi_nhits', 'sum_hit_weight_density', 'sum_qdc',
-        'max_scifi_nhits_per_plane', 'max_scifi_qdc_per_plane',
+        
+        'xz_n_hits_1', 'xz_n_hits_2', 'xz_n_hits_3',
+        'yz_n_hits_1', 'yz_n_hits_2', 'yz_n_hits_3',
+        
+        'xz_max_qdc_1', 'xz_max_qdc_2', 'xz_max_qdc_3',
+        'yz_max_qdc_1', 'yz_max_qdc_2', 'yz_max_qdc_3',
+        
+        'xz_sum_qdc_1', 'xz_sum_qdc_2', 'xz_sum_qdc_3',
+        'yz_sum_qdc_1', 'yz_sum_qdc_2', 'yz_sum_qdc_3',
+        
+        'xz_max_hit_weight_density_1', 'xz_max_hit_weight_density_2', 'xz_max_hit_weight_density_3',
+        'yz_max_hit_weight_density_1', 'yz_max_hit_weight_density_2', 'yz_max_hit_weight_density_3',
+        
+        'xz_max_qdc_weight_density_1', 'xz_max_qdc_weight_density_2', 'xz_max_qdc_weight_density_3',
+        'yz_max_qdc_weight_density_1', 'yz_max_qdc_weight_density_2', 'yz_max_qdc_weight_density_3',
+        
+        'xz_sum_hit_weight_density_1', 'xz_sum_hit_weight_density_2', 'xz_sum_hit_weight_density_3',
+        'yz_sum_hit_weight_density_1', 'yz_sum_hit_weight_density_2', 'yz_sum_hit_weight_density_3',
+        
+        'xz_sum_qdc_weight_density_1', 'xz_sum_qdc_weight_density_2', 'xz_sum_qdc_weight_density_3',
+        'yz_sum_qdc_weight_density_1', 'yz_sum_qdc_weight_density_2', 'yz_sum_qdc_weight_density_3',
+        
         'w'
     ]
     gallery_match_count = 0
@@ -205,17 +231,26 @@ def run_hough_selection_data(
         if input_tree.EventHeader.ClassName() == 'SNDLHCEventHeader':
             geo.modules['Scifi'].InitEvent(input_tree.EventHeader)
 
-        n_lines, track_lines = run_hough_transform(
+        n_lines, track_lines, track_hit_indices = run_hough_transform(
             muon_reco_task, input_tree, geo,
             z_vtx_min=z_vtx_min, z_vtx_max=z_vtx_max
         )
 
         if n_lines >= 1:
-            sf_nhits, hit_w_density, sf_total_qdc, max_sf_nhits, max_sf_qdc = get_scifi_hit_params(input_tree.Digi_ScifiHits)
+            info = get_event_scifi_info(input_tree.Digi_ScifiHits)
             row = {
                 'run': current_run,
                 'event_number': event_number,
                 'n_lines': n_lines,
+                'scifi_nhits': info['sf_nhits'],
+                'sum_hit_weight_density': info['sum_hit_weight_density'],
+                'max_hit_weight_density': info['max_hit_weight_density'],
+                'sum_qdc_weight_density': info['sum_qdc_weight_density'],
+                'max_qdc_weight_density': info['max_qdc_weight_density'],
+                'sum_qdc': info['sum_qdc'],
+                'max_qdc': info['max_qdc'],
+                'max_scifi_nhits_per_plane': info['max_scifi_nhits_per_plane'],
+                'max_scifi_qdc_per_plane': info['max_scifi_qdc_per_plane'],
                 'xz_m1': get_line_params('XZ', 0, track_lines)[0],
                 'xz_c1': get_line_params('XZ', 0, track_lines)[1],
                 'xz_m2': get_line_params('XZ', 1, track_lines)[0],
@@ -228,13 +263,45 @@ def run_hough_selection_data(
                 'yz_c2': get_line_params('YZ', 1, track_lines)[1],
                 'yz_m3': get_line_params('YZ', 2, track_lines)[0],
                 'yz_c3': get_line_params('YZ', 2, track_lines)[1],
-                'scifi_nhits': sf_nhits,
-                'sum_hit_weight_density': hit_w_density,
-                'sum_qdc': sf_total_qdc,
-                'max_scifi_nhits_per_plane': max_sf_nhits,
-                'max_scifi_qdc_per_plane': max_sf_qdc,
-                'w': current_weight
             }
+            
+            for proj in ['xz', 'yz']:
+                proj_upper = proj.upper()
+                for idx in range(1, 4):
+                    line_idx = idx - 1
+                    indices_list = track_hit_indices[proj_upper]
+                    if line_idx < len(indices_list):
+                        indices = indices_list[line_idx]
+                        if len(indices) > 0:
+                            line_qdcs = [info['qdcs'][i] for i in indices]
+                            line_hit_w = [info['hit_w_densities'][i] for i in indices]
+                            line_qdc_w = [info['qdc_w_densities'][i] for i in indices]
+                            
+                            row[f'{proj}_n_hits_{idx}'] = len(indices)
+                            row[f'{proj}_max_qdc_{idx}'] = max(line_qdcs)
+                            row[f'{proj}_sum_qdc_{idx}'] = sum(line_qdcs)
+                            row[f'{proj}_max_hit_weight_density_{idx}'] = max(line_hit_w)
+                            row[f'{proj}_max_qdc_weight_density_{idx}'] = max(line_qdc_w)
+                            row[f'{proj}_sum_hit_weight_density_{idx}'] = sum(line_hit_w)
+                            row[f'{proj}_sum_qdc_weight_density_{idx}'] = sum(line_qdc_w)
+                        else:
+                            row[f'{proj}_n_hits_{idx}'] = 0
+                            row[f'{proj}_max_qdc_{idx}'] = np.nan
+                            row[f'{proj}_sum_qdc_{idx}'] = np.nan
+                            row[f'{proj}_max_hit_weight_density_{idx}'] = np.nan
+                            row[f'{proj}_max_qdc_weight_density_{idx}'] = np.nan
+                            row[f'{proj}_sum_hit_weight_density_{idx}'] = np.nan
+                            row[f'{proj}_sum_qdc_weight_density_{idx}'] = np.nan
+                    else:
+                        row[f'{proj}_n_hits_{idx}'] = np.nan
+                        row[f'{proj}_max_qdc_{idx}'] = np.nan
+                        row[f'{proj}_sum_qdc_{idx}'] = np.nan
+                        row[f'{proj}_max_hit_weight_density_{idx}'] = np.nan
+                        row[f'{proj}_max_qdc_weight_density_{idx}'] = np.nan
+                        row[f'{proj}_sum_hit_weight_density_{idx}'] = np.nan
+                        row[f'{proj}_sum_qdc_weight_density_{idx}'] = np.nan
+
+            row['w'] = current_weight
             buffer.append(row)
 
             # --- FLUSH BOTH PARQUET AND ROOT BATCHES ---
@@ -247,7 +314,7 @@ def run_hough_selection_data(
                     output_root_file.cd()
                     output_tree.Write()
                     output_root_file.Close()
-                    
+
                     root_file_counter += 1
                     output_root_file, output_tree = create_new_root_batch(output_root, root_file_counter, input_tree)
 
