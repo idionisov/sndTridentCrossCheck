@@ -104,7 +104,34 @@ def run_hough_selection_data(
         print(f"Warning: Parameter file {par_file} not found!")
 
 
-    geo = SndlhcGeo.GeoInterface(ROOT.snd.analysis_tools.GetGeoPath(run_number))
+
+    if "MonteCarlo" in input_file_path or "boost" in os.path.basename(input_file_path):
+        print("Detected Monte Carlo simulation input. Searching for local geofile...")
+        
+        input_dir = os.path.dirname(input_file_path)
+        boost_suffix = "boost1000" if "boost1000" in input_file_path else "boost100"
+        
+        if "boost1000" in input_file_path:
+            current_weight = 1.0 / 1000.0
+        elif "boost100" in input_file_path:
+            current_weight = 1.0 / 100.0
+        else:
+            current_weight = 1.0
+
+        geofile_path = os.path.join(input_dir, f"geofile_full.Ntuple-TGeant4_{boost_suffix}.0.root")
+        
+        if not os.path.exists(geofile_path):
+            geofile_path = os.path.join(input_dir, "geofile_full.Ntuple-TGeant4_boost100.0.root")
+            
+        if os.path.exists(geofile_path):
+            print(f"Loading MC geometry from: {geofile_path}")
+            geo = SndlhcGeo.GeoInterface(geofile_path)
+        else:
+            raise FileNotFoundError(f"Critical Error: Could not locate a geofile in {input_dir}")
+    else:
+        geo = SndlhcGeo.GeoInterface(ROOT.snd.analysis_tools.GetGeoPath(run_number))
+
+
     initialize_event_display(geo, histograms)
 
     muon_reco_task = SndlhcMuonReco.MuonReco()
@@ -141,7 +168,8 @@ def run_hough_selection_data(
         'xz_m1', 'xz_c1', 'xz_m2', 'xz_c2', 'xz_m3', 'xz_c3',
         'yz_m1', 'yz_c1', 'yz_m2', 'yz_c2', 'yz_m3', 'yz_c3',
         'scifi_nhits', 'sum_hit_weight_density', 'sum_qdc',
-        'max_scifi_nhits_per_plane', 'max_scifi_qdc_per_plane'
+        'max_scifi_nhits_per_plane', 'max_scifi_qdc_per_plane',
+        'w'
     ]
     gallery_match_count = 0
     progress_step = 0
@@ -204,7 +232,8 @@ def run_hough_selection_data(
                 'sum_hit_weight_density': hit_w_density,
                 'sum_qdc': sf_total_qdc,
                 'max_scifi_nhits_per_plane': max_sf_nhits,
-                'max_scifi_qdc_per_plane': max_sf_qdc
+                'max_scifi_qdc_per_plane': max_sf_qdc,
+                'w': current_weight
             }
             buffer.append(row)
 

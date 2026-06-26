@@ -16,6 +16,7 @@ def get_args():
     parser.add_argument('-fr', '--fraction', type=float, default=1, help="Fraction of events to process.")
     parser.add_argument('-par', '--parFile', type=str, default=os.path.join(sndsw_path, "python/TrackingParams.xml"), help="Tracking parameter file")
     parser.add_argument('-gal', '--gallery', type=str, help='Only process events listed in the provided gallery json file')
+    parser.add_argument('--mc', action='store_true', help='Generate arguments for ThreeMuons MC production files instead')
     return parser.parse_args()
 
 def main():
@@ -54,6 +55,36 @@ def main():
                         f_out.write(f"{file_path} 0 {args.n_events} {out_root} {out_parquet} {args.fraction} {args.parFile} {args.gallery}\n")
                         count += 1
 
+
+
+        elif args.mc:
+            mc_pattern = "/eos/experiment/sndlhc/MonteCarlo/ThreeMuons/sndLHC.Ntuple-TGeant4_boost*_digCPP-*.root"
+
+            files = sorted(glob.glob(mc_pattern))
+            print(f"Generating MC jobs for {len(files)} files found in ThreeMuons...")
+
+            for file_path in files:
+                filename = os.path.basename(file_path)
+                
+                match = re.search(r'boost(\d+).*?_digCPP-(\d+)\.root', filename)
+                if not match:
+                    continue
+                
+                boost_factor = match.group(1)   # "100" or "1000"
+                run_file_idx = int(match.group(2)) # e.g. 0-9 or 200-299
+                
+                for sub_job in range(args.jobs_per_file):
+                    start_ev = sub_job * args.n_events
+                    
+                    out_root = f"{args.output_dir}/recoTri_MC_boost{boost_factor}_{run_file_idx:04d}_j{sub_job:02d}.root"
+                    out_parquet = f"{args.output_dir}/recoTri_MC_boost{boost_factor}_{run_file_idx:04d}_j{sub_job:02d}"
+                    
+                    gal_val = args.gallery if args.gallery else "none"
+                    
+                    f_out.write(f"{file_path} {start_ev} {args.n_events} {out_root} {out_parquet} {args.fraction} {args.parFile} {gal_val}\n")
+                    count += 1
+
+
         else:
             files = sorted(glob.glob(args.input_files))
             for file_path in files:
@@ -63,13 +94,14 @@ def main():
                 run_num = 6640
                 file_num = int(file_match.group(1))
                 
-                out_root = f"{args.output_dir}/recoTri_{run_num}_f{file_num:04d}.root"
-                out_parquet = f"{args.output_dir}/recoTri_{run_num}_f{file_num:04d}"
-                f_out.write(f"{file_path} 0 {args.n_events} {out_root} {out_parquet} {args.fraction} {args.parFile} {args.gallery}\n")
-                count += 1
-            
-        print(f"Successfully generated {count} job arguments in {args.args_file}")
-
+                for sub_job in range(args.jobs_per_file):
+                    start_ev = sub_job * args.n_events
+                    
+                    out_root = f"{args.output_dir}/recoTri_{run_num}_f{file_num:04d}_j{sub_job:02d}.root"
+                    out_parquet = f"{args.output_dir}/recoTri_{run_num}_f{file_num:04d}_j{sub_job:02d}"
+                    
+                    f_out.write(f"{file_path} {start_ev} {args.n_events} {out_root} {out_parquet} {args.fraction} {args.parFile} {args.gallery}\n")
+                    count += 1
 
 
 if __name__=="__main__":
