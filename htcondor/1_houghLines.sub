@@ -1,9 +1,9 @@
 executable            = run_hough_reco_subtasks.sh
 arguments             = $(input_file) $(geo_file) $(par_file) $(start_ev) $(n_ev) $(out_file)
 
-output                = out/houghLines/hough_run6640_looseCuts_$(ProcId).out
-error                 = err/houghLines/hough_run6640_looseCuts_$(ProcId).err
-log                   = log/houghLines/hough_run6640_looseCuts_$(ProcId).log
+output                = out/houghLines/hough_trimuon_boost100_$(ProcId).out
+error                 = err/houghLines/hough_trimuon_boost100_$(ProcId).err
+log                   = log/houghLines/hough_trimuon_boost100_$(ProcId).log
 
 getenv                = False
 notification          = Never
@@ -15,7 +15,7 @@ transfer_input_files  = sndswEnv.sh, TrackingParams_sf4.xml, /afs/cern.ch/work/i
 
 max_retries           = 3
 
-+JobFlavour           = "testmatch"
++JobFlavour           = "tomorrow"
 +AccountingGroup      = "group_u_SNDLHC.users"
 
-queue input_file, geo_file, par_file, start_ev, n_ev, out_file from args_run6640_features.txt
+queue input_file, geo_file, par_file, start_ev, n_ev, out_file from args_trimuon_boost100_hough.txt
