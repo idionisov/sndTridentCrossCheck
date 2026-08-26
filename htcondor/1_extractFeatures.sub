@@ -1,0 +1,21 @@
+executable            = run_extract_features_subtasks.sh
+arguments             = $(input_file) $(geo_file) $(par_file) $(start_ev) $(n_ev) $(out_file)
+
+output                = out/feat_trimuon_looseCuts_$(ProcId).out
+error                 = err/feat_trimuon_looseCuts_$(ProcId).err
+log                   = log/feat_trimuon_looseCuts_$(ProcId).log
+
+getenv                = False
+notification          = Never
+requirements          = (OpSysAndVer =?= "AlmaLinux9")
+
+should_transfer_files = YES
+when_to_transfer_output = ON_EXIT
+transfer_input_files  = sndswEnv.sh, TrackingParams_sf4.xml, /afs/cern.ch/work/i/idioniso/sndMuTri/extract_trident_bdt_features.py
+
+max_retries           = 3
+
++JobFlavour           = "workday"
++AccountingGroup      = "group_u_SNDLHC.users"
+
+queue input_file, geo_file, par_file, start_ev, n_ev, out_file from args_trimuon_looseCuts7_features.txt

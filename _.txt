@@ -1,0 +1,1 @@
+python3 extract_trident_bdt_features.py -i "/eos/user/i/idioniso/sndMuTri/data/run_006640/sndsw_raw-*_hough*.root" -g "/eos/user/i/idioniso/sndMuTri/data/geofile_data_2023" -p TrackingParams_sf4.xml -j 6 --merge /eos/user/i/idioniso/sndMuTri/data/run_006640/run6640_looseCuts7_hough.parquet
