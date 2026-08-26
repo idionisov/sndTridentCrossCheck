@@ -1,9 +1,9 @@
 executable            = run_extract_features_subtasks.sh
 arguments             = $(input_file) $(geo_file) $(par_file) $(start_ev) $(n_ev) $(out_file)
 
-output                = out/feat_trimuon_looseCuts_$(ProcId).out
-error                 = err/feat_trimuon_looseCuts_$(ProcId).err
-log                   = log/feat_trimuon_looseCuts_$(ProcId).log
+output                = out/feat_trimuon_boost100_$(ProcId).out
+error                 = err/feat_trimuon_boost100_$(ProcId).err
+log                   = log/feat_trimuon_boost100_$(ProcId).log
 
 getenv                = False
 notification          = Never
@@ -18,4 +18,4 @@ max_retries           = 3
 +JobFlavour           = "workday"
 +AccountingGroup      = "group_u_SNDLHC.users"
 
-queue input_file, geo_file, par_file, start_ev, n_ev, out_file from args_trimuon_looseCuts7_features.txt
+queue input_file, geo_file, par_file, start_ev, n_ev, out_file from args_trimuon_boost100_features.txt
