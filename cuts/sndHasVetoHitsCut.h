@@ -5,9 +5,9 @@
 #include "TChain.h"
 
 namespace snd {
-  namespace analysis_cuts {
+  namespace trident_cuts {
   
-    class hasVetoHitsCut : public snd::analysis_cuts::MuFilterBaseCut {
+    class hasVetoHitsCut : public snd::trident_cuts::MuFilterBaseCut {
     public :
       hasVetoHitsCut(TChain * ch);
       ~hasVetoHitsCut(){;}

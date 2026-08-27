@@ -6,7 +6,7 @@
 
 #include <vector>
 
-namespace snd::analysis_cuts {
+namespace snd::trident_cuts {
 
   DSQDCCut::DSQDCCut(float threshold, TChain * ch) : MuFilterBaseCut(ch) {
     qdc_threshold = threshold;

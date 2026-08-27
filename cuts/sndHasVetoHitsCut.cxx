@@ -4,7 +4,7 @@
 #include "TChain.h"
 #include "MuFilterHit.h"
 
-namespace snd::analysis_cuts {
+namespace snd::trident_cuts {
 
   hasVetoHitsCut::hasVetoHitsCut(TChain * ch) : MuFilterBaseCut(ch) {
     cutName = "At least one hit in veto";

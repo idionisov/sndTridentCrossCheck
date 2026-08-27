@@ -12,10 +12,11 @@ unset ROOTSYS
 # Load CERN sndsw environment stack
 export snd_stack=/cvmfs/sndlhc.cern.ch/SNDLHC-2025/Oct7
 source ${snd_stack}/setUp.sh
-source sndswEnv.sh
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+source "${SCRIPT_DIR}/sndswEnv.sh"
 
 # Ensure library path includes libtrident_cuts.so
-export LD_LIBRARY_PATH="$(pwd):$(pwd)/lib:/afs/cern.ch/work/i/idioniso/sndMuTri/build/lib:${LD_LIBRARY_PATH}"
+export LD_LIBRARY_PATH="${SCRIPT_DIR}:${SCRIPT_DIR}/lib:/afs/cern.ch/work/i/idioniso/sndMuTri/build/lib:${LD_LIBRARY_PATH}"
 
 # Executable location
 if [ -f "./tridentSample" ]; then

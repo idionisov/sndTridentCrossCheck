@@ -4,8 +4,8 @@
 #include "TChain.h"
 
 namespace snd {
-  namespace analysis_cuts {
-    class minDSHitsCut : public snd::analysis_cuts::MuFilterBaseCut {
+  namespace trident_cuts {
+    class minDSHitsCut : public snd::trident_cuts::MuFilterBaseCut {
     private:
       int hit_threshold;
     public:

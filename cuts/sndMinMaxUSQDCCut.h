@@ -2,7 +2,7 @@
 
 #include "sndMuFilterBaseCut.h"
 
-namespace snd::analysis_cuts {
+namespace snd::trident_cuts {
 
   class minMaxUSQDCCut : public MuFilterBaseCut {
   private:

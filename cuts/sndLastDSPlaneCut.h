@@ -4,8 +4,8 @@
 #include "TChain.h"
 
 namespace snd {
-  namespace analysis_cuts {
-    class lastDSPlaneCut : public snd::analysis_cuts::MuFilterBaseCut {
+  namespace trident_cuts {
+    class lastDSPlaneCut : public snd::trident_cuts::MuFilterBaseCut {
     private:
       int min_last_plane;
     public:

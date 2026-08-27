@@ -1,7 +1,7 @@
 #include "sndMaxSciFiSignalCut.h"
 #include <numeric>
 
-namespace snd::analysis_cuts {
+namespace snd::trident_cuts {
 
   maxSciFiSignalCut::maxSciFiSignalCut(double threshold, TChain * ch) : sciFiBaseCut(ch), signalThreshold(threshold) {
     cutName = "Maximum Total SciFi Signal Cut";

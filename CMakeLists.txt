@@ -14,6 +14,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
+include_directories(BEFORE ${CMAKE_CURRENT_SOURCE_DIR}/cuts ${CMAKE_CURRENT_SOURCE_DIR})
+
 # Ensure ROOT prefix directory is in CMAKE_PREFIX_PATH for internal dependency searches (like Vdt)
 if(DEFINED ENV{ROOT_ROOT})
   list(APPEND CMAKE_PREFIX_PATH $ENV{ROOT_ROOT})
@@ -118,10 +120,10 @@ link_directories(
 add_subdirectory(cuts)
 
 # Find sndsw dependencies
-find_library(ANALYSIS_TOOLS_LIB snd_analysis_tools PATHS "${SNDSW_ROOT}/lib" REQUIRED)
-find_library(SHIP_DATA_LIB ShipData PATHS "${SNDSW_ROOT}/lib" REQUIRED)
-find_library(SHIP_LHC_LIB shipLHC PATHS "${SNDSW_ROOT}/lib" REQUIRED)
-find_library(VETO_LIB veto PATHS "${SNDSW_ROOT}/lib" REQUIRED)
+find_library(ANALYSIS_TOOLS_LIB snd_analysis_tools PATHS "${SNDSW_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
+find_library(SHIP_DATA_LIB ShipData PATHS "${SNDSW_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
+find_library(SHIP_LHC_LIB shipLHC PATHS "${SNDSW_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
+find_library(VETO_LIB veto PATHS "${SNDSW_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
 
 # Add executable
 add_executable(tridentSample tridentSample.cxx)

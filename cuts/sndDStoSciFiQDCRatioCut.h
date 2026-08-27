@@ -9,12 +9,10 @@
 
 #include <vector>
 
-namespace snd::analysis_cuts {
+namespace snd::trident_cuts {
 
   class DStoSciFiQDCRatioCut : public baseCut {
   private:
-    static TClonesArray * scifiDigiHitCollection;
-    static TClonesArray * muFilterDigiHitCollection;
     double ratio_threshold;
 
   public:

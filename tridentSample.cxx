@@ -59,12 +59,11 @@ int main(int argc, char ** argv) {
   // Cleanly probe tree name without noisy TChain error messages
   TFile * test_file = TFile::Open(argv[1]);
   if (test_file && !test_file->IsZombie()) {
-    if (test_file->Get("cbmsim")) {
-      tree_name = "cbmsim";
-      isMC = true;
-    } else if (test_file->Get("rawConv")) {
-      tree_name = "rawConv";
-      isMC = false;
+    TTree * t = (TTree*) test_file->Get("cbmsim");
+    if (!t) t = (TTree*) test_file->Get("rawConv");
+    if (t) {
+      tree_name = t->GetName();
+      isMC = (t->GetBranch("MCTrack") != nullptr);
     }
     test_file->Close();
     delete test_file;
@@ -79,11 +78,13 @@ int main(int argc, char ** argv) {
     ch = new TChain(tree_name.c_str());
     ch->Add(argv[1]);
     if (ch->GetEntries() > 0) {
-      isMC = (tree_name == "cbmsim");
+      isMC = (ch->GetBranch("MCTrack") != nullptr);
     } else {
       std::cout << "Didn't find rawConv or cbmsim in input file" << std::endl;
       exit(-1);
     }
+  } else {
+    isMC = (ch->GetBranch("MCTrack") != nullptr);
   }
 
   if (isMC) {
@@ -131,6 +132,107 @@ int main(int argc, char ** argv) {
     }
   }
 
+  // Set up cuts
+  std::cout << "Starting cut set up" << std::endl;
+
+  std::vector< snd::trident_cuts::baseCut * > cutFlow;
+
+  int selected_cutset = std::atoi(argv[3]);
+  bool is_trident_cutset = (selected_cutset == tridentSelection || 
+                            selected_cutset == looseTridentCuts || 
+                            selected_cutset == rockTridentPreselection);
+
+  if (selected_cutset == stage1cuts){ // Stage 1 cuts
+    cutFlow.push_back( new snd::trident_cuts::avgSciFiFiducialCut(200, 1200, 300, 128*12-200, ch)); // E. Average SciFi hit channel number must be within [200, 1200] (ver) and [300, max-200] (hor)
+    cutFlow.push_back( new snd::trident_cuts::avgDSFiducialCut(70, 105, 10, 50, ch)); // F. Average DS hit bar number must be within [70, 105] (ver) and [10, 50] (hor)
+    cutFlow.push_back( new snd::trident_cuts::vetoCut(ch)); // B. No veto hits
+    cutFlow.push_back( new snd::trident_cuts::sciFiStationCut(0., std::vector<int>(1, 1), ch)); // C. No hits in first SciFi plane
+    cutFlow.push_back( new snd::trident_cuts::sciFiStationCut(0., std::vector<int>(1, 2), ch)); // C. No hits in second SciFi plane
+    cutFlow.push_back( new snd::trident_cuts::sciFiStationCut(0.05, std::vector<int>(1, 5), ch)); // D. Vertex not in 5th wall
+    cutFlow.push_back( new snd::trident_cuts::minSciFiConsecutivePlanes(ch)); // G. At least two consecutive SciFi planes hit
+    cutFlow.push_back( new snd::trident_cuts::DSActivityCut(ch)); // H. If there is a downstream hit, require hits in all upstream stations.
+    if (not isMC) cutFlow.push_back( new snd::trident_cuts::eventDeltatCut(-1, 100, ch)); // J. Previous event more than 100 clock cycles away. To avoid deadtime issues.
+
+  } else if (selected_cutset == stage1cutsVetoFirst){ // Stage 1 cuts but with Veto cut upfront. For neutral hadron background estimation
+    cutFlow.push_back( new snd::trident_cuts::vetoCut(ch)); // B. No veto hits
+    cutFlow.push_back( new snd::trident_cuts::avgSciFiFiducialCut(200, 1200, 300, 128*12-200, ch)); // E. Average SciFi hit channel number must be within [200, 1200] (ver) and [300, max-200] (hor)
+    cutFlow.push_back( new snd::trident_cuts::avgDSFiducialCut(70, 105, 10, 50, ch)); // F. Average DS hit bar number must be within [70, 105] (ver) and [10, 50] (hor)
+    cutFlow.push_back( new snd::trident_cuts::sciFiStationCut(0., std::vector<int>(1, 1), ch)); // C. No hits in first SciFi plane
+    cutFlow.push_back( new snd::trident_cuts::sciFiStationCut(0., std::vector<int>(1, 2), ch)); // C. No hits in second SciFi plane
+    cutFlow.push_back( new snd::trident_cuts::sciFiStationCut(0.05, std::vector<int>(1, 5), ch)); // D. Vertex not in 5th wall
+    cutFlow.push_back( new snd::trident_cuts::minSciFiConsecutivePlanes(ch)); // G. At least two consecutive SciFi planes hit
+    cutFlow.push_back( new snd::trident_cuts::DSActivityCut(ch)); // H. If there is a downstream hit, require hits in all upstream stations.
+    if (not isMC) cutFlow.push_back( new snd::trident_cuts::eventDeltatCut(-1, 100, ch)); // J. Previous event more than 100 clock cycles away. To avoid deadtime issues.
+
+  } else if (selected_cutset == novetocuts) {
+    cutFlow.push_back( new snd::trident_cuts::sciFiStationCut(0.05, std::vector<int>(1, 5), ch)); // D. Vertex not in 5th wall
+    cutFlow.push_back( new snd::trident_cuts::avgSciFiFiducialCut(200, 1200, 300, 128*12-200, ch)); // E. Average SciFi hit channel number must be within [200, 1200] (ver) and [300, max-200] (hor)
+    cutFlow.push_back( new snd::trident_cuts::avgDSFiducialCut(70, 105, 10, 50, ch)); // F. Average DS hit bar number must be within [70, 105] (ver) and [10, 50] (hor)
+    cutFlow.push_back( new snd::trident_cuts::minSciFiConsecutivePlanes(ch)); // G. At least two consecutive SciFi planes hit
+    cutFlow.push_back( new snd::trident_cuts::DSActivityCut(ch)); // H. If there is a downstream hit, require hits in all upstream stations.
+    if (not isMC) cutFlow.push_back( new snd::trident_cuts::eventDeltatCut(-1, 100, ch)); // J. Previous event more than 100 clock cycles away. To avoid deadtime issues.
+
+  } else if (selected_cutset == FVsideband){
+    cutFlow.push_back( new snd::trident_cuts::vetoCut(ch)); // B. No veto hits
+    cutFlow.push_back( new snd::trident_cuts::sciFiStationCut(0., std::vector<int>(1, 1), ch)); // C. No hits in first SciFi plane
+    cutFlow.push_back( new snd::trident_cuts::sciFiStationCut(0., std::vector<int>(1, 2), ch)); // D. Vertex not in 5th wall
+    cutFlow.push_back( new snd::trident_cuts::sciFiStationCut(0.05, std::vector<int>(1, 5), ch)); // D. Vertex not in 5th wall
+    cutFlow.push_back( new snd::trident_cuts::avgSciFiFiducialCut(200, 1200, 300, 128*12-200, ch, true)); // E. Average SciFi hit channel number must be within [200, 1200] (ver) and [300, max-200] (hor)
+    cutFlow.push_back( new snd::trident_cuts::minSciFiConsecutivePlanes(ch)); // G. At least two consecutive SciFi planes hit
+    cutFlow.push_back( new snd::trident_cuts::DSActivityCut(ch)); // H. If there is a downstream hit, require hits in all upstream stations.
+    if (not isMC) cutFlow.push_back( new snd::trident_cuts::eventDeltatCut(-1, 100, ch)); // J. Previous event more than 100 clock cycles away. To avoid deadtime issues.
+
+  } else if (selected_cutset == allowWalls2and5) {
+    cutFlow.push_back( new snd::trident_cuts::avgSciFiFiducialCut(200, 1200, 300, 128*12-200, ch)); // E. Average SciFi hit channel number must be within [200, 1200] (ver) and [300, max-200] (hor)
+    cutFlow.push_back( new snd::trident_cuts::avgDSFiducialCut(70, 105, 10, 50, ch)); // F. Average DS hit bar number must be within [70, 105] (ver) and [10, 50] (hor)
+    cutFlow.push_back( new snd::trident_cuts::vetoCut(ch)); // B. No veto hits
+    cutFlow.push_back( new snd::trident_cuts::sciFiStationCut(0., std::vector<int>(1, 1), ch)); // C. No hits in first SciFi plane
+    cutFlow.push_back( new snd::trident_cuts::DSActivityCut(ch)); // H. If there is a downstream hit, require hits in all upstream stations.
+    if (not isMC) cutFlow.push_back( new snd::trident_cuts::eventDeltatCut(-1, 100, ch)); // J. Previous event more than 100 clock cycles away. To avoid deadtime issues.
+
+  } else if (selected_cutset == nueFilter) {
+    cutFlow.push_back( new snd::trident_cuts::avgSciFiFiducialCut(200, 1200, 300, 128*12-200, ch)); // E. Average SciFi hit channel number must be within [200, 1200] (ver) and [300, max-200] (hor)
+    cutFlow.push_back( new snd::trident_cuts::vetoCut(ch)); // B. No veto hits
+    cutFlow.push_back( new snd::trident_cuts::sciFiStationCut(0.05, std::vector<int>(1, 5), ch)); // D. Vertex not in 5th wall
+    cutFlow.push_back( new snd::trident_cuts::DSVetoCut(ch)); // D. Veto events with hits in last DS planes
+    if (not isMC) cutFlow.push_back( new snd::trident_cuts::eventDeltatCut(-1, 100, ch)); // J. Previous event more than 100 clock cycles away. To avoid deadtime issues.
+  } else if (selected_cutset == tridentSelection) {
+    cutFlow.push_back( new snd::trident_cuts::hasVetoHitsCut(ch)); // Require veto hits
+    cutFlow.push_back( new snd::trident_cuts::minSciFiPlanesCut(3, 3, ch)); // Require at least 3 planes in each projection
+    cutFlow.push_back( new snd::trident_cuts::tridentHitsCut(9, 3, ch)); // Require 9/3 or 3/9 hits
+    cutFlow.push_back( new snd::trident_cuts::maxSciFiHitsCut(200, ch)); // Total hits < 200
+    cutFlow.push_back( new snd::trident_cuts::maxPlaneSciFiHitsCut(100, ch)); // Max hits in any plane < 100
+    cutFlow.push_back( new snd::trident_cuts::maxSciFiSignalCut(400, ch)); // Total signal < 400
+    cutFlow.push_back( new snd::trident_cuts::maxPlaneSciFiSignalCut(250, ch)); // Max signal in any plane < 100
+    cutFlow.push_back( new snd::trident_cuts::tridentDensityCut(40, 5000, ch)); // Sum density < 5000
+    cutFlow.push_back( new snd::trident_cuts::avgSciFiFiducialCut(200, 1200, 300, 128*12-200, ch)); 
+    cutFlow.push_back( new snd::trident_cuts::avgDSFiducialCut(70, 105, 10, 50, ch)); 
+    if (not isMC) cutFlow.push_back( new snd::trident_cuts::eventDeltatCut(-1, 100, ch)); 
+  } else if (selected_cutset == looseTridentCuts) {
+    cutFlow.push_back( new snd::trident_cuts::DSQDCCut(400.0, ch)); // 1. Total DS QDC >= 400
+    cutFlow.push_back( new snd::trident_cuts::minDSHitsCut(8, ch)); // 2. Minimum 8 DS hits
+    cutFlow.push_back( new snd::trident_cuts::lastDSPlaneCut(2, ch)); // 3. Last active DS plane is 3rd or 4th (plane index >= 2)
+    cutFlow.push_back( new snd::trident_cuts::minSciFiHits(10, ch)); // 4. Total SciFi hits >= 10
+    if (not isMC) cutFlow.push_back( new snd::trident_cuts::eventDeltatCut(-1, 100, ch)); // 5. Previous event > 100 clock cycles away
+  } else if (selected_cutset == rockTridentPreselection) {
+    cutFlow.push_back( new snd::trident_cuts::minDSHitsCut(8, ch));             // 1) ds_nhits >= 8
+    cutFlow.push_back( new snd::trident_cuts::minUSHitsCut(5, ch));             // 2) us_nhits >= 5
+    cutFlow.push_back( new snd::trident_cuts::tridentHitsCut(9, 3, ch));        // 3) 9/3 or 3/9 scifi hits
+    cutFlow.push_back( new snd::trident_cuts::minMaxSciFiSignalCut(5.0, ch));   // 4) scifi_max_qdc >= 5
+    cutFlow.push_back( new snd::trident_cuts::DSQDCCut(500.0, ch));             // 6) ds_sum_qdc >= 500
+    cutFlow.push_back( new snd::trident_cuts::USQDCCut(40.0, ch));              // 7) us_sum_qdc >= 40
+    cutFlow.push_back( new snd::trident_cuts::minMaxUSQDCCut(7.5, ch));         // 8) us_max_qdc >= 7.5
+    cutFlow.push_back( new snd::trident_cuts::DStoSciFiQDCRatioCut(0.05, ch));  // 9) ratio_ds_to_scifi_qdc >= 0.05
+    cutFlow.push_back( new snd::trident_cuts::lastDSPlaneCut(3, ch));           // 10) ds_deepest_station == 4 (station index >= 3)
+    if (not isMC) cutFlow.push_back( new snd::trident_cuts::eventDeltatCut(-1, 100, ch)); // 11) event 100 clock cycles away (data only)
+  } else {
+    std::cout << "Unrecognized cutset. Exitting" << std::endl;
+    return -1;
+  }
+  std::cout << "Done initializing cuts" << std::endl;
+
+  int n_cuts = (int) cutFlow.size();
+
   // Output file
   TFile * outFile = new TFile(argv[2], "RECREATE");
   std::cout << "Got output file" << std::endl;
@@ -145,123 +247,35 @@ int main(int argc, char ** argv) {
   TTree * outTree = ch->CloneTree(0);
   std::cout << "Got output tree" << std::endl;
 
-  // Set up cuts
-  std::cout << "Starting cut set up" << std::endl;
-
-  std::vector< snd::analysis_cuts::baseCut * > cutFlow;
-
-  int selected_cutset = std::atoi(argv[3]);
-
-  if (selected_cutset == stage1cuts){ // Stage 1 cuts
-    cutFlow.push_back( new snd::analysis_cuts::avgSciFiFiducialCut(200, 1200, 300, 128*12-200, ch)); // E. Average SciFi hit channel number must be within [200, 1200] (ver) and [300, max-200] (hor)
-    cutFlow.push_back( new snd::analysis_cuts::avgDSFiducialCut(70, 105, 10, 50, ch)); // F. Average DS hit bar number must be within [70, 105] (ver) and [10, 50] (hor)
-    cutFlow.push_back( new snd::analysis_cuts::vetoCut(ch)); // B. No veto hits
-    cutFlow.push_back( new snd::analysis_cuts::sciFiStationCut(0., std::vector<int>(1, 1), ch)); // C. No hits in first SciFi plane
-    cutFlow.push_back( new snd::analysis_cuts::sciFiStationCut(0., std::vector<int>(1, 2), ch)); // C. No hits in second SciFi plane
-    cutFlow.push_back( new snd::analysis_cuts::sciFiStationCut(0.05, std::vector<int>(1, 5), ch)); // D. Vertex not in 5th wall
-    cutFlow.push_back( new snd::analysis_cuts::minSciFiConsecutivePlanes(ch)); // G. At least two consecutive SciFi planes hit
-    cutFlow.push_back( new snd::analysis_cuts::DSActivityCut(ch)); // H. If there is a downstream hit, require hits in all upstream stations.
-    if (not isMC) cutFlow.push_back( new snd::analysis_cuts::eventDeltatCut(-1, 100, ch)); // J. Previous event more than 100 clock cycles away. To avoid deadtime issues.
-
-  } else if (selected_cutset == stage1cutsVetoFirst){ // Stage 1 cuts but with Veto cut upfront. For neutral hadron background estimation
-    cutFlow.push_back( new snd::analysis_cuts::vetoCut(ch)); // B. No veto hits
-    cutFlow.push_back( new snd::analysis_cuts::avgSciFiFiducialCut(200, 1200, 300, 128*12-200, ch)); // E. Average SciFi hit channel number must be within [200, 1200] (ver) and [300, max-200] (hor)
-    cutFlow.push_back( new snd::analysis_cuts::avgDSFiducialCut(70, 105, 10, 50, ch)); // F. Average DS hit bar number must be within [70, 105] (ver) and [10, 50] (hor)
-    cutFlow.push_back( new snd::analysis_cuts::sciFiStationCut(0., std::vector<int>(1, 1), ch)); // C. No hits in first SciFi plane
-    cutFlow.push_back( new snd::analysis_cuts::sciFiStationCut(0., std::vector<int>(1, 2), ch)); // C. No hits in second SciFi plane
-    cutFlow.push_back( new snd::analysis_cuts::sciFiStationCut(0.05, std::vector<int>(1, 5), ch)); // D. Vertex not in 5th wall
-    cutFlow.push_back( new snd::analysis_cuts::minSciFiConsecutivePlanes(ch)); // G. At least two consecutive SciFi planes hit
-    cutFlow.push_back( new snd::analysis_cuts::DSActivityCut(ch)); // H. If there is a downstream hit, require hits in all upstream stations.
-    if (not isMC) cutFlow.push_back( new snd::analysis_cuts::eventDeltatCut(-1, 100, ch)); // J. Previous event more than 100 clock cycles away. To avoid deadtime issues.
-
-  } else if (selected_cutset == novetocuts) {
-    cutFlow.push_back( new snd::analysis_cuts::sciFiStationCut(0.05, std::vector<int>(1, 5), ch)); // D. Vertex not in 5th wall
-    cutFlow.push_back( new snd::analysis_cuts::avgSciFiFiducialCut(200, 1200, 300, 128*12-200, ch)); // E. Average SciFi hit channel number must be within [200, 1200] (ver) and [300, max-200] (hor)
-    cutFlow.push_back( new snd::analysis_cuts::avgDSFiducialCut(70, 105, 10, 50, ch)); // F. Average DS hit bar number must be within [70, 105] (ver) and [10, 50] (hor)
-    cutFlow.push_back( new snd::analysis_cuts::minSciFiConsecutivePlanes(ch)); // G. At least two consecutive SciFi planes hit
-    cutFlow.push_back( new snd::analysis_cuts::DSActivityCut(ch)); // H. If there is a downstream hit, require hits in all upstream stations.
-    if (not isMC) cutFlow.push_back( new snd::analysis_cuts::eventDeltatCut(-1, 100, ch)); // J. Previous event more than 100 clock cycles away. To avoid deadtime issues.
-
-  } else if (selected_cutset == FVsideband){
-    cutFlow.push_back( new snd::analysis_cuts::vetoCut(ch)); // B. No veto hits
-    cutFlow.push_back( new snd::analysis_cuts::sciFiStationCut(0., std::vector<int>(1, 1), ch)); // C. No hits in first SciFi plane
-    cutFlow.push_back( new snd::analysis_cuts::sciFiStationCut(0., std::vector<int>(1, 2), ch)); // D. Vertex not in 5th wall
-    cutFlow.push_back( new snd::analysis_cuts::sciFiStationCut(0.05, std::vector<int>(1, 5), ch)); // D. Vertex not in 5th wall
-    cutFlow.push_back( new snd::analysis_cuts::avgSciFiFiducialCut(200, 1200, 300, 128*12-200, ch, true)); // E. Average SciFi hit channel number must be within [200, 1200] (ver) and [300, max-200] (hor)
-    cutFlow.push_back( new snd::analysis_cuts::minSciFiConsecutivePlanes(ch)); // G. At least two consecutive SciFi planes hit
-    cutFlow.push_back( new snd::analysis_cuts::DSActivityCut(ch)); // H. If there is a downstream hit, require hits in all upstream stations.
-    if (not isMC) cutFlow.push_back( new snd::analysis_cuts::eventDeltatCut(-1, 100, ch)); // J. Previous event more than 100 clock cycles away. To avoid deadtime issues.
-
-  } else if (selected_cutset == allowWalls2and5) {
-    cutFlow.push_back( new snd::analysis_cuts::avgSciFiFiducialCut(200, 1200, 300, 128*12-200, ch)); // E. Average SciFi hit channel number must be within [200, 1200] (ver) and [300, max-200] (hor)
-    cutFlow.push_back( new snd::analysis_cuts::avgDSFiducialCut(70, 105, 10, 50, ch)); // F. Average DS hit bar number must be within [70, 105] (ver) and [10, 50] (hor)
-    cutFlow.push_back( new snd::analysis_cuts::vetoCut(ch)); // B. No veto hits
-    cutFlow.push_back( new snd::analysis_cuts::sciFiStationCut(0., std::vector<int>(1, 1), ch)); // C. No hits in first SciFi plane
-    cutFlow.push_back( new snd::analysis_cuts::DSActivityCut(ch)); // H. If there is a downstream hit, require hits in all upstream stations.
-    if (not isMC) cutFlow.push_back( new snd::analysis_cuts::eventDeltatCut(-1, 100, ch)); // J. Previous event more than 100 clock cycles away. To avoid deadtime issues.
-
-  } else if (selected_cutset == nueFilter) {
-    cutFlow.push_back( new snd::analysis_cuts::avgSciFiFiducialCut(200, 1200, 300, 128*12-200, ch)); // E. Average SciFi hit channel number must be within [200, 1200] (ver) and [300, max-200] (hor)
-    cutFlow.push_back( new snd::analysis_cuts::vetoCut(ch)); // B. No veto hits
-    cutFlow.push_back( new snd::analysis_cuts::sciFiStationCut(0.05, std::vector<int>(1, 5), ch)); // D. Vertex not in 5th wall
-    cutFlow.push_back( new snd::analysis_cuts::DSVetoCut(ch)); // D. Veto events with hits in last DS planes
-    if (not isMC) cutFlow.push_back( new snd::analysis_cuts::eventDeltatCut(-1, 100, ch)); // J. Previous event more than 100 clock cycles away. To avoid deadtime issues.
-  } else if (selected_cutset == tridentSelection) {
-    cutFlow.push_back( new snd::analysis_cuts::hasVetoHitsCut(ch)); // Require veto hits
-    cutFlow.push_back( new snd::analysis_cuts::minSciFiPlanesCut(3, 3, ch)); // Require at least 3 planes in each projection
-    cutFlow.push_back( new snd::analysis_cuts::tridentHitsCut(9, 3, ch)); // Require 9/3 or 3/9 hits
-    cutFlow.push_back( new snd::analysis_cuts::maxSciFiHitsCut(200, ch)); // Total hits < 200
-    cutFlow.push_back( new snd::analysis_cuts::maxPlaneSciFiHitsCut(100, ch)); // Max hits in any plane < 100
-    cutFlow.push_back( new snd::analysis_cuts::maxSciFiSignalCut(400, ch)); // Total signal < 400
-    cutFlow.push_back( new snd::analysis_cuts::maxPlaneSciFiSignalCut(250, ch)); // Max signal in any plane < 100
-    cutFlow.push_back( new snd::analysis_cuts::tridentDensityCut(40, 5000, ch)); // Sum density < 5000
-    cutFlow.push_back( new snd::analysis_cuts::avgSciFiFiducialCut(200, 1200, 300, 128*12-200, ch)); 
-    cutFlow.push_back( new snd::analysis_cuts::avgDSFiducialCut(70, 105, 10, 50, ch)); 
-    if (not isMC) cutFlow.push_back( new snd::analysis_cuts::eventDeltatCut(-1, 100, ch)); 
-  } else if (selected_cutset == looseTridentCuts) {
-    cutFlow.push_back( new snd::analysis_cuts::DSQDCCut(400.0, ch)); // 1. Total DS QDC >= 400
-    cutFlow.push_back( new snd::analysis_cuts::minDSHitsCut(8, ch)); // 2. Minimum 8 DS hits
-    cutFlow.push_back( new snd::analysis_cuts::lastDSPlaneCut(2, ch)); // 3. Last active DS plane is 3rd or 4th (plane index >= 2)
-    cutFlow.push_back( new snd::analysis_cuts::minSciFiHits(10, ch)); // 4. Total SciFi hits >= 10
-    if (not isMC) cutFlow.push_back( new snd::analysis_cuts::eventDeltatCut(-1, 100, ch)); // 5. Previous event > 100 clock cycles away
-  } else if (selected_cutset == rockTridentPreselection) {
-    cutFlow.push_back( new snd::analysis_cuts::minDSHitsCut(8, ch));             // 1) ds_nhits >= 8
-    cutFlow.push_back( new snd::analysis_cuts::minUSHitsCut(5, ch));             // 2) us_nhits >= 5
-    cutFlow.push_back( new snd::analysis_cuts::tridentHitsCut(9, 3, ch));        // 3) 9/3 or 3/9 scifi hits
-    cutFlow.push_back( new snd::analysis_cuts::minMaxSciFiSignalCut(5.0, ch));   // 4) scifi_max_qdc >= 5
-    cutFlow.push_back( new snd::analysis_cuts::DSQDCCut(500.0, ch));             // 6) ds_sum_qdc >= 500
-    cutFlow.push_back( new snd::analysis_cuts::USQDCCut(40.0, ch));              // 7) us_sum_qdc >= 40
-    cutFlow.push_back( new snd::analysis_cuts::minMaxUSQDCCut(7.5, ch));         // 8) us_max_qdc >= 7.5
-    cutFlow.push_back( new snd::analysis_cuts::DStoSciFiQDCRatioCut(0.05, ch));  // 9) ratio_ds_to_scifi_qdc >= 0.05
-    cutFlow.push_back( new snd::analysis_cuts::lastDSPlaneCut(3, ch));           // 10) ds_deepest_station == 4 (station index >= 3)
-    if (not isMC) cutFlow.push_back( new snd::analysis_cuts::eventDeltatCut(-1, 100, ch)); // 11) event 100 clock cycles away (data only)
-  } else {
-    std::cout << "Unrecognized cutset. Exitting" << std::endl;
-    return -1;
-  }
-  std::cout << "Done initializing cuts" << std::endl;
-
-  int n_cuts = (int) cutFlow.size();
-
   // Book histograms
   // Cut-by-cut
-  // All cut variables
+  // All cut variables (unweighted and weighted)
   std::vector<std::vector<TH1D*> > cut_by_cut_var_histos = std::vector<std::vector<TH1D*> >();
+  std::vector<std::vector<TH1D*> > cut_by_cut_var_weighted_histos = std::vector<std::vector<TH1D*> >();
+
   for (int i_cut = -1; i_cut < n_cuts; i_cut++){
     std::vector<TH1D*> this_cut_by_cut_var_histos = std::vector<TH1D*>();
-    for (snd::analysis_cuts::baseCut * cut : cutFlow) {
+    std::vector<TH1D*> this_cut_by_cut_var_w_histos = std::vector<TH1D*>();
+    for (snd::trident_cuts::baseCut * cut : cutFlow) {
       for(int i_dim = 0; i_dim < cut->getNbins().size(); i_dim++){
 	this_cut_by_cut_var_histos.push_back(new TH1D((std::to_string(i_cut)+"_"+cut->getShortName()+"_"+std::to_string(i_dim)).c_str(),
 						      cut->getShortName().c_str(),
 						      cut->getNbins()[i_dim], cut->getRangeStart()[i_dim], cut->getRangeEnd()[i_dim]));
+	if (has_mc_weight) {
+	  this_cut_by_cut_var_w_histos.push_back(new TH1D((std::to_string(i_cut)+"_"+cut->getShortName()+"_"+std::to_string(i_dim)+"_weighted").c_str(),
+							 (cut->getShortName() + " (weighted)").c_str(),
+							 cut->getNbins()[i_dim], cut->getRangeStart()[i_dim], cut->getRangeEnd()[i_dim]));
+	}
       }
     }
     cut_by_cut_var_histos.push_back(this_cut_by_cut_var_histos);
+    if (has_mc_weight) cut_by_cut_var_weighted_histos.push_back(this_cut_by_cut_var_w_histos);
   }
 
+  // Neutrino MC truth histograms (only booked for neutrino cutsets 0..5)
   std::vector<std::vector<std::vector<TH1D*> > > cut_by_cut_truth_histos = std::vector<std::vector<std::vector<TH1D*> > >();
-  if (isMC) {
-    for (int i_species = 0; i_species < 5; i_species++){ // e, mu, tau, NC
+  if (isMC && !is_trident_cutset) {
+    for (int i_species = 0; i_species < 5; i_species++){ // e, mu, tau, NC, Other
       std::vector<std::vector<TH1D*> > this_species_histos = std::vector<std::vector<TH1D*> >();
       std::string species_suffix;
       switch (i_species) {
@@ -286,7 +300,6 @@ int main(int argc, char ** argv) {
       }
 
       for (int i_cut = -1; i_cut < n_cuts; i_cut++){
-
 	std::vector<TH1D*> this_cut_by_cut_truth_histos = std::vector<TH1D*>();
 	this_cut_by_cut_truth_histos.push_back(new TH1D((species_suffix+"_"+std::to_string(i_cut)+"_Enu").c_str(), "Enu", 300, 0, 3000));
 	this_cut_by_cut_truth_histos.push_back(new TH1D((species_suffix+"_"+std::to_string(i_cut)+"_EEM").c_str(), "ELep", 300, 0, 3000));
@@ -301,11 +314,11 @@ int main(int argc, char ** argv) {
     }
   }
 
-  // Trident MCTruth histograms: [cut_index + 1][var_index]
+  // Trident MCTruth histograms: [cut_index + 1][var_index] (only booked for trident cutsets 6..8)
   std::vector<std::vector<TH1D*>> cut_by_cut_trident_truth_histos;
   std::vector<std::vector<TH1D*>> cut_by_cut_trident_truth_weighted_histos;
 
-  if (isMC && has_trident_truth) {
+  if (isMC && is_trident_cutset && has_trident_truth) {
     for (int i_cut = -1; i_cut < n_cuts; i_cut++) {
       std::string c_str = std::to_string(i_cut);
       std::vector<TH1D*> this_cut_trident_histos;
@@ -351,11 +364,17 @@ int main(int argc, char ** argv) {
   }
   // N-1
   std::vector<TH1D*> n_minus_1_var_histos = std::vector<TH1D*>();
-  for (snd::analysis_cuts::baseCut * cut : cutFlow) {
+  std::vector<TH1D*> n_minus_1_var_weighted_histos = std::vector<TH1D*>();
+  for (snd::trident_cuts::baseCut * cut : cutFlow) {
     for(int i_dim = 0; i_dim < cut->getNbins().size(); i_dim++){
       n_minus_1_var_histos.push_back(new TH1D(("n_minus_1_"+cut->getShortName()+"_"+std::to_string(i_dim)).c_str(),
 					      cut->getShortName().c_str(),
 					      cut->getNbins()[i_dim], cut->getRangeStart()[i_dim], cut->getRangeEnd()[i_dim]));
+      if (has_mc_weight) {
+	n_minus_1_var_weighted_histos.push_back(new TH1D(("n_minus_1_"+cut->getShortName()+"_"+std::to_string(i_dim)+"_weighted").c_str(),
+							(cut->getShortName() + " (weighted)").c_str(),
+							cut->getNbins()[i_dim], cut->getRangeStart()[i_dim], cut->getRangeEnd()[i_dim]));
+      }
     }
   }
 
@@ -395,7 +414,7 @@ int main(int argc, char ** argv) {
     int n_cuts_passed = 0;
     bool accept_event = true;
     int i_cut = 0;
-    for (snd::analysis_cuts::baseCut * cut : cutFlow){
+    for (snd::trident_cuts::baseCut * cut : cutFlow){
       if (cut->passCut()){
 	if (accept_event) {
 	  cutFlowHistogram->Fill(1 + i_cut);
@@ -414,20 +433,27 @@ int main(int argc, char ** argv) {
 
     // Fill histograms
     std::vector<TH1D*>::iterator hist_it;
+    std::vector<TH1D*>::iterator hist_w_it;
     // Sequential
     for (int seq_cut = -1; seq_cut < ((int) passes_cut.size()); seq_cut++){
       if (seq_cut >= 0){
 	if (not passes_cut[seq_cut]) break;
       }
       hist_it = cut_by_cut_var_histos[seq_cut+1].begin();
-      for (snd::analysis_cuts::baseCut * cut : cutFlow) {
+      if (has_mc_weight) hist_w_it = cut_by_cut_var_weighted_histos[seq_cut+1].begin();
+
+      for (snd::trident_cuts::baseCut * cut : cutFlow) {
 	for (int i_dim = 0; i_dim < cut->getPlotVar().size(); i_dim++){
 	  (*hist_it)->Fill(cut->getPlotVar()[i_dim]);
 	  hist_it++;
+	  if (has_mc_weight) {
+	    (*hist_w_it)->Fill(cut->getPlotVar()[i_dim], mc_weight);
+	    hist_w_it++;
+	  }
 	}
       }
-      if (isMC) {
 
+      if (isMC && !is_trident_cutset) {
 	int this_species = 4; // Default to 'Other' (4)
 	int n_tracks = MCTracks ? MCTracks->GetEntries() : 0;
 	if (n_tracks >= 2) {
@@ -468,31 +494,31 @@ int main(int argc, char ** argv) {
 	    cut_by_cut_truth_histos[this_species][seq_cut+1][5]->Fill(track0->GetStartZ()); // Z
 	  }
 	}
+      }
 
-	if (has_trident_truth && is_signal) {
-	  cut_by_cut_trident_truth_histos[seq_cut+1][0]->Fill(inv_mass_2mu);
-	  cut_by_cut_trident_truth_histos[seq_cut+1][1]->Fill(opening_angle_mrad);
-	  cut_by_cut_trident_truth_histos[seq_cut+1][2]->Fill(p_mu_in);
-	  cut_by_cut_trident_truth_histos[seq_cut+1][3]->Fill(p_mu_minus);
-	  cut_by_cut_trident_truth_histos[seq_cut+1][4]->Fill(p_mu_plus);
-	  cut_by_cut_trident_truth_histos[seq_cut+1][5]->Fill(vtx_z);
-	  cut_by_cut_trident_truth_histos[seq_cut+1][6]->Fill(vtx_x);
-	  cut_by_cut_trident_truth_histos[seq_cut+1][7]->Fill(vtx_y);
-	  cut_by_cut_trident_truth_histos[seq_cut+1][8]->Fill(energy_asym);
-	  cut_by_cut_trident_truth_histos[seq_cut+1][9]->Fill(pt_2mu);
+      if (isMC && is_trident_cutset && has_trident_truth && is_signal) {
+	cut_by_cut_trident_truth_histos[seq_cut+1][0]->Fill(inv_mass_2mu);
+	cut_by_cut_trident_truth_histos[seq_cut+1][1]->Fill(opening_angle_mrad);
+	cut_by_cut_trident_truth_histos[seq_cut+1][2]->Fill(p_mu_in);
+	cut_by_cut_trident_truth_histos[seq_cut+1][3]->Fill(p_mu_minus);
+	cut_by_cut_trident_truth_histos[seq_cut+1][4]->Fill(p_mu_plus);
+	cut_by_cut_trident_truth_histos[seq_cut+1][5]->Fill(vtx_z);
+	cut_by_cut_trident_truth_histos[seq_cut+1][6]->Fill(vtx_x);
+	cut_by_cut_trident_truth_histos[seq_cut+1][7]->Fill(vtx_y);
+	cut_by_cut_trident_truth_histos[seq_cut+1][8]->Fill(energy_asym);
+	cut_by_cut_trident_truth_histos[seq_cut+1][9]->Fill(pt_2mu);
 
-	  if (has_mc_weight) {
-	    cut_by_cut_trident_truth_weighted_histos[seq_cut+1][0]->Fill(inv_mass_2mu, mc_weight);
-	    cut_by_cut_trident_truth_weighted_histos[seq_cut+1][1]->Fill(opening_angle_mrad, mc_weight);
-	    cut_by_cut_trident_truth_weighted_histos[seq_cut+1][2]->Fill(p_mu_in, mc_weight);
-	    cut_by_cut_trident_truth_weighted_histos[seq_cut+1][3]->Fill(p_mu_minus, mc_weight);
-	    cut_by_cut_trident_truth_weighted_histos[seq_cut+1][4]->Fill(p_mu_plus, mc_weight);
-	    cut_by_cut_trident_truth_weighted_histos[seq_cut+1][5]->Fill(vtx_z, mc_weight);
-	    cut_by_cut_trident_truth_weighted_histos[seq_cut+1][6]->Fill(vtx_x, mc_weight);
-	    cut_by_cut_trident_truth_weighted_histos[seq_cut+1][7]->Fill(vtx_y, mc_weight);
-	    cut_by_cut_trident_truth_weighted_histos[seq_cut+1][8]->Fill(energy_asym, mc_weight);
-	    cut_by_cut_trident_truth_weighted_histos[seq_cut+1][9]->Fill(pt_2mu, mc_weight);
-	  }
+	if (has_mc_weight) {
+	  cut_by_cut_trident_truth_weighted_histos[seq_cut+1][0]->Fill(inv_mass_2mu, mc_weight);
+	  cut_by_cut_trident_truth_weighted_histos[seq_cut+1][1]->Fill(opening_angle_mrad, mc_weight);
+	  cut_by_cut_trident_truth_weighted_histos[seq_cut+1][2]->Fill(p_mu_in, mc_weight);
+	  cut_by_cut_trident_truth_weighted_histos[seq_cut+1][3]->Fill(p_mu_minus, mc_weight);
+	  cut_by_cut_trident_truth_weighted_histos[seq_cut+1][4]->Fill(p_mu_plus, mc_weight);
+	  cut_by_cut_trident_truth_weighted_histos[seq_cut+1][5]->Fill(vtx_z, mc_weight);
+	  cut_by_cut_trident_truth_weighted_histos[seq_cut+1][6]->Fill(vtx_x, mc_weight);
+	  cut_by_cut_trident_truth_weighted_histos[seq_cut+1][7]->Fill(vtx_y, mc_weight);
+	  cut_by_cut_trident_truth_weighted_histos[seq_cut+1][8]->Fill(energy_asym, mc_weight);
+	  cut_by_cut_trident_truth_weighted_histos[seq_cut+1][9]->Fill(pt_2mu, mc_weight);
 	}
       }
     }
@@ -500,11 +526,17 @@ int main(int argc, char ** argv) {
     // N-1
     int current_cut = 0;
     hist_it = n_minus_1_var_histos.begin();
-    for (snd::analysis_cuts::baseCut * cut : cutFlow) {
+    if (has_mc_weight) hist_w_it = n_minus_1_var_weighted_histos.begin();
+
+    for (snd::trident_cuts::baseCut * cut : cutFlow) {
       for (int i_dim = 0; i_dim < cut->getPlotVar().size(); i_dim++){
 	if (((not passes_cut[current_cut]) and (n_cuts_passed == (cutFlow.size()-1)))
-	    or (n_cuts_passed == cutFlow.size()) ) (*hist_it)->Fill(cut->getPlotVar()[i_dim]);
+	    or (n_cuts_passed == cutFlow.size()) ) {
+	  (*hist_it)->Fill(cut->getPlotVar()[i_dim]);
+	  if (has_mc_weight) (*hist_w_it)->Fill(cut->getPlotVar()[i_dim], mc_weight);
+	}
 	hist_it++;
+	if (has_mc_weight) hist_w_it++;
       }
       current_cut++;
     }

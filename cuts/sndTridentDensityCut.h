@@ -4,8 +4,8 @@
 #include "TChain.h"
 
 namespace snd {
-  namespace analysis_cuts {
-    class tridentDensityCut : public snd::analysis_cuts::sciFiBaseCut {
+  namespace trident_cuts {
+    class tridentDensityCut : public snd::trident_cuts::sciFiBaseCut {
     private :
       int radius;
       int threshold;

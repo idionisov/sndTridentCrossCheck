@@ -7,7 +7,7 @@
 #include "TChain.h"
 #include "sndScifiHit.h"
 
-namespace snd::analysis_cuts {
+namespace snd::trident_cuts {
 
   minMaxSciFiSignalCut::minMaxSciFiSignalCut(double threshold, TChain * ch) : sciFiBaseCut(ch), signal_threshold(threshold) {
     cutName = "SciFi Max Single Hit QDC >= " + std::to_string(signal_threshold);

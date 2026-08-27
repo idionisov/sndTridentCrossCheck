@@ -6,7 +6,7 @@
 
 #include <vector>
 
-namespace snd::analysis_cuts {
+namespace snd::trident_cuts {
 
   lastDSPlaneCut::lastDSPlaneCut(int min_plane, TChain * ch) : MuFilterBaseCut(ch) {
     min_last_plane = min_plane; // min_plane = 2 for 3rd DS plane (0: DS1, 1: DS2, 2: DS3, 3: DS4)

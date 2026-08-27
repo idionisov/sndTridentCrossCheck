@@ -6,7 +6,7 @@
 
 #include <vector>
 
-namespace snd::analysis_cuts {
+namespace snd::trident_cuts {
 
   minUSHitsCut::minUSHitsCut(int threshold, TChain * ch) : MuFilterBaseCut(ch) {
     hit_threshold = threshold;

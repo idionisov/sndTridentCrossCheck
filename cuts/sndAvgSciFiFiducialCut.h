@@ -6,8 +6,8 @@
 #include "sndScifiHit.h"
 
 namespace snd {
-  namespace analysis_cuts {
-    class avgSciFiFiducialCut : public snd::analysis_cuts::sciFiBaseCut {
+  namespace trident_cuts {
+    class avgSciFiFiducialCut : public snd::trident_cuts::sciFiBaseCut {
     private :
       double vertical_min, vertical_max, horizontal_min, horizontal_max;
       bool reversed;

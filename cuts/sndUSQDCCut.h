@@ -5,9 +5,9 @@
 #include "TChain.h"
 
 namespace snd {
-  namespace analysis_cuts {
+  namespace trident_cuts {
   
-    class USQDCCut : public snd::analysis_cuts::MuFilterBaseCut {
+    class USQDCCut : public snd::trident_cuts::MuFilterBaseCut {
     private :
       float qdc_threshold;
     public :

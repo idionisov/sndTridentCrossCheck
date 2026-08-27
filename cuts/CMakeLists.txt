@@ -1,3 +1,5 @@
+include_directories(BEFORE ${CMAKE_CURRENT_SOURCE_DIR})
+
 # Header files for dictionary generation
 set(CUTS_HEADERS
   sndBaseCut.h
@@ -76,9 +78,9 @@ add_library(trident_cuts SHARED
 )
 
 # Find sndsw dependencies
-find_library(SHIP_LHC_LIB shipLHC PATHS "${SNDSW_ROOT}/lib" REQUIRED)
-find_library(VETO_LIB veto PATHS "${SNDSW_ROOT}/lib" REQUIRED)
-find_library(ANALYSIS_TOOLS_LIB snd_analysis_tools PATHS "${SNDSW_ROOT}/lib" REQUIRED)
+find_library(SHIP_LHC_LIB shipLHC PATHS "${SNDSW_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
+find_library(VETO_LIB veto PATHS "${SNDSW_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
+find_library(ANALYSIS_TOOLS_LIB snd_analysis_tools PATHS "${SNDSW_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)
 
 target_link_libraries(trident_cuts
   PUBLIC

@@ -4,7 +4,7 @@
 #include <vector>
 
 namespace snd {
-  namespace analysis_cuts{
+  namespace trident_cuts{
     class baseCut{
     protected :
       std::string cutName;

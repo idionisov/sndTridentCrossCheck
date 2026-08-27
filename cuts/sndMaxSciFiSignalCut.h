@@ -4,8 +4,8 @@
 #include "TChain.h"
 
 namespace snd {
-  namespace analysis_cuts {
-    class maxSciFiSignalCut : public snd::analysis_cuts::sciFiBaseCut {
+  namespace trident_cuts {
+    class maxSciFiSignalCut : public snd::trident_cuts::sciFiBaseCut {
     private :
       double signalThreshold;
     public :

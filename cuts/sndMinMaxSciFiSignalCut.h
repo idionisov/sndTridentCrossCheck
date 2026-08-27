@@ -2,7 +2,7 @@
 
 #include "sndSciFiBaseCut.h"
 
-namespace snd::analysis_cuts {
+namespace snd::trident_cuts {
 
   class minMaxSciFiSignalCut : public sciFiBaseCut {
   private:

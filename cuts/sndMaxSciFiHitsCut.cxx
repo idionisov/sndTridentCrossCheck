@@ -1,7 +1,7 @@
 #include "sndMaxSciFiHitsCut.h"
 #include <numeric>
 
-namespace snd::analysis_cuts {
+namespace snd::trident_cuts {
 
   maxSciFiHitsCut::maxSciFiHitsCut(int threshold, TChain * ch) : sciFiBaseCut(ch), hitThreshold(threshold) {
     cutName = "Maximum Total SciFi Hits Cut";

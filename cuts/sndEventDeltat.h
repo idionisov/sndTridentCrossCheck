@@ -5,9 +5,9 @@
 #include "TChain.h"
 
 namespace snd {
-  namespace analysis_cuts {
+  namespace trident_cuts {
 
-    class eventDeltatCut : public snd::analysis_cuts::EventHeaderBaseCut {
+    class eventDeltatCut : public snd::trident_cuts::EventHeaderBaseCut {
     private:
       int delta_t;
       int delta_e;

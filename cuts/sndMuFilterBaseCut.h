@@ -8,14 +8,17 @@
 #include "TClonesArray.h"
 
 namespace snd {
-  namespace analysis_cuts {
-    class MuFilterBaseCut : public snd::analysis_cuts::baseCut {
+  namespace trident_cuts {
+    class MuFilterBaseCut : public snd::trident_cuts::baseCut {
 
     protected :
       static TClonesArray * muFilterDigiHitCollection;
 
+    public :
       MuFilterBaseCut(TChain * ch);
-      ~MuFilterBaseCut(){;}
+      virtual ~MuFilterBaseCut(){;}
+      static void setupBranch(TChain * ch);
+      static TClonesArray * getMuFilterDigiHitCollection() { return muFilterDigiHitCollection; }
     };
 
   }

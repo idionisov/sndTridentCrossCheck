@@ -5,9 +5,9 @@
 #include "TChain.h"
 
 namespace snd {
-  namespace analysis_cuts {
+  namespace trident_cuts {
 
-    class DSActivityCut : public snd::analysis_cuts::MuFilterBaseCut {
+    class DSActivityCut : public snd::trident_cuts::MuFilterBaseCut {
     public :
       DSActivityCut(TChain * ch);
       ~DSActivityCut(){;}

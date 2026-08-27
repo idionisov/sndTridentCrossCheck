@@ -9,9 +9,9 @@
 #include "sndScifiHit.h"
 
 namespace snd {
-  namespace analysis_cuts {
+  namespace trident_cuts {
   
-    class sciFiBaseCut : public snd::analysis_cuts::baseCut {
+    class sciFiBaseCut : public snd::trident_cuts::baseCut {
 
     private : 
       static TChain * tree;
@@ -27,8 +27,11 @@ namespace snd {
 
       void initializeEvent();
 
+    public :
       sciFiBaseCut(TChain * ch);
-      ~sciFiBaseCut(){;}
+      virtual ~sciFiBaseCut(){;}
+      static void setupBranch(TChain * ch);
+      static TClonesArray * getSciFiDigiHitCollection() { return scifiDigiHitCollection; }
     };
 
   }

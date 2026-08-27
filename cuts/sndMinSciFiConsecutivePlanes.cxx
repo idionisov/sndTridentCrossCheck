@@ -4,7 +4,7 @@
 
 #include "TChain.h"
 
-namespace snd::analysis_cuts{
+namespace snd::trident_cuts{
   minSciFiConsecutivePlanes::minSciFiConsecutivePlanes(TChain * ch) : sciFiBaseCut(ch){
     cutName = "Two or more consecutive SciFi planes";
 

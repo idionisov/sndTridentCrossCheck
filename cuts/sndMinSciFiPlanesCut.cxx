@@ -1,7 +1,7 @@
 #include "sndMinSciFiPlanesCut.h"
 #include <algorithm>
 
-namespace snd::analysis_cuts {
+namespace snd::trident_cuts {
 
   minSciFiPlanesCut::minSciFiPlanesCut(int minH, int minV, TChain * ch) : sciFiBaseCut(ch), minPlanesH(minH), minPlanesV(minV) {
     cutName = "Minimum SciFi Planes Cut";

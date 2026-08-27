@@ -6,7 +6,7 @@
 
 #include <vector>
 
-namespace snd::analysis_cuts {
+namespace snd::trident_cuts {
 
   minMaxUSQDCCut::minMaxUSQDCCut(double threshold, TChain * ch) : MuFilterBaseCut(ch), qdc_threshold(threshold) {
     cutName = "US Max Single Hit QDC >= " + std::to_string(qdc_threshold);

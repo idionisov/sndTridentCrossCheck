@@ -6,8 +6,8 @@
 #include "MuFilterHit.h"
 
 namespace snd {
-  namespace analysis_cuts {
-    class avgDSFiducialCut : public snd::analysis_cuts::MuFilterBaseCut {
+  namespace trident_cuts {
+    class avgDSFiducialCut : public snd::trident_cuts::MuFilterBaseCut {
     private :
       double vertical_min, vertical_max, horizontal_min, horizontal_max;
     public :

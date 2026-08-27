@@ -1,26 +1,20 @@
 #include "sndDStoSciFiQDCRatioCut.h"
+#include "sndSciFiBaseCut.h"
+#include "sndMuFilterBaseCut.h"
 
 #include <vector>
+#include <map>
 
 #include "TClonesArray.h"
 #include "TChain.h"
 #include "sndScifiHit.h"
 #include "MuFilterHit.h"
 
-namespace snd::analysis_cuts {
-
-  TClonesArray * DStoSciFiQDCRatioCut::scifiDigiHitCollection = 0;
-  TClonesArray * DStoSciFiQDCRatioCut::muFilterDigiHitCollection = 0;
+namespace snd::trident_cuts {
 
   DStoSciFiQDCRatioCut::DStoSciFiQDCRatioCut(double threshold, TChain * ch) : ratio_threshold(threshold) {
-    if (scifiDigiHitCollection == 0) {
-      scifiDigiHitCollection = new TClonesArray("sndScifiHit", 3000);
-      ch->SetBranchAddress("Digi_ScifiHits", &scifiDigiHitCollection);
-    }
-    if (muFilterDigiHitCollection == 0) {
-      muFilterDigiHitCollection = new TClonesArray("MuFilterHit", 470);
-      ch->SetBranchAddress("Digi_MuFilterHits", &muFilterDigiHitCollection);
-    }
+    snd::trident_cuts::sciFiBaseCut::setupBranch(ch);
+    snd::trident_cuts::MuFilterBaseCut::setupBranch(ch);
 
     cutName = "DS/SciFi QDC Ratio >= " + std::to_string(ratio_threshold);
     shortName = "DStoSciFiQDCRatio";
@@ -31,6 +25,9 @@ namespace snd::analysis_cuts {
   }
 
   bool DStoSciFiQDCRatioCut::passCut() {
+    TClonesArray * scifiDigiHitCollection = sciFiBaseCut::getSciFiDigiHitCollection();
+    TClonesArray * muFilterDigiHitCollection = MuFilterBaseCut::getMuFilterDigiHitCollection();
+
     double totalSciFiQDC = 0.0;
     if (scifiDigiHitCollection) {
       sndScifiHit * hit;
@@ -47,17 +44,21 @@ namespace snd::analysis_cuts {
       MuFilterHit * hit;
       TIter hitIterator(muFilterDigiHitCollection);
       while ((hit = (MuFilterHit*) hitIterator.Next())) {
-        if (hit && hit->isValid() && hit->GetSystem() == 3) { // 3 = DS
-          for (const auto& [key, value] : hit->GetAllSignals()) {
-            totalDSQDC += value;
+        if (hit && hit->isValid() && hit->GetSystem() == 3) {
+          std::map<TString, Float_t> signals = hit->SumOfSignals();
+          for (auto const& [key, val] : signals) {
+            totalDSQDC += val;
           }
         }
       }
     }
 
-    double ratio = totalDSQDC / (totalSciFiQDC + 1e-4);
-    plot_var[0] = ratio;
+    double ratio = 0.0;
+    if (totalSciFiQDC > 0.0) {
+      ratio = totalDSQDC / totalSciFiQDC;
+    }
 
+    plot_var[0] = ratio;
     if (ratio >= ratio_threshold) return true;
     return false;
   }

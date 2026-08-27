@@ -3,7 +3,7 @@
 #include "TClonesArray.h"
 #include "sndScifiHit.h"
 
-namespace snd::analysis_cuts {
+namespace snd::trident_cuts {
 
   tridentDensityCut::tridentDensityCut(int r, int t, TChain * ch) : sciFiBaseCut(ch), radius(r), threshold(t) {
     cutName = "Trident SciFi Density Cut";

@@ -1,7 +1,7 @@
 #include "sndMaxPlaneSciFiSignalCut.h"
 #include <algorithm>
 
-namespace snd::analysis_cuts {
+namespace snd::trident_cuts {
 
   maxPlaneSciFiSignalCut::maxPlaneSciFiSignalCut(double threshold, TChain * ch) : sciFiBaseCut(ch), planeThreshold(threshold) {
     cutName = "Maximum Plane SciFi Signal Cut";

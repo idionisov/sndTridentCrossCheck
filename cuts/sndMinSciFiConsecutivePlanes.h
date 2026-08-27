@@ -6,8 +6,8 @@
 #include "sndScifiHit.h"
 
 namespace snd {
-  namespace analysis_cuts {
-    class minSciFiConsecutivePlanes : public snd::analysis_cuts::sciFiBaseCut {
+  namespace trident_cuts {
+    class minSciFiConsecutivePlanes : public snd::trident_cuts::sciFiBaseCut {
     public :
       minSciFiConsecutivePlanes(TChain * ch);
       ~minSciFiConsecutivePlanes(){;}

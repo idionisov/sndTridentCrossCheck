@@ -8,9 +8,9 @@
 #include "TChain.h"
 
 namespace snd {
-  namespace analysis_cuts {
+  namespace trident_cuts {
   
-    class EventHeaderBaseCut : public snd::analysis_cuts::baseCut {
+    class EventHeaderBaseCut : public snd::trident_cuts::baseCut {
 
     protected :
       static SNDLHCEventHeader * header;

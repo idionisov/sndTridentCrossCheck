@@ -6,8 +6,8 @@
 #include "sndScifiHit.h"
 
 namespace snd {
-  namespace analysis_cuts {
-    class minSciFiHits : public snd::analysis_cuts::sciFiBaseCut {
+  namespace trident_cuts {
+    class minSciFiHits : public snd::trident_cuts::sciFiBaseCut {
     private :
       int hitThreshold;
     public :

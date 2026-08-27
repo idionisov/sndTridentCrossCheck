@@ -1,7 +1,7 @@
 #include "sndTridentHitsCut.h"
 #include <numeric>
 
-namespace snd::analysis_cuts {
+namespace snd::trident_cuts {
 
   tridentHitsCut::tridentHitsCut(int threshold1, int threshold2, TChain * ch) : sciFiBaseCut(ch), hitThreshold1(threshold1), hitThreshold2(threshold2) {
     cutName = "Trident SciFi Hits Cut";

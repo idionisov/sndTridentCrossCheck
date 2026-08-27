@@ -6,7 +6,7 @@
 #include "TChain.h"
 #include "sndScifiHit.h"
 
-namespace snd::analysis_cuts {
+namespace snd::trident_cuts {
 
   TClonesArray * sciFiBaseCut::scifiDigiHitCollection = 0;
   TChain * sciFiBaseCut::tree = 0;
@@ -17,12 +17,16 @@ namespace snd::analysis_cuts {
   std::vector<double> sciFiBaseCut::signal_per_plane_vertical = std::vector<double>(5, 0.);
   std::vector<double> sciFiBaseCut::signal_per_plane_horizontal = std::vector<double>(5, 0.);
 
-  sciFiBaseCut::sciFiBaseCut(TChain * ch){
+  void sciFiBaseCut::setupBranch(TChain * ch){
     if (tree == 0){
       tree = ch;
       scifiDigiHitCollection = new TClonesArray("sndScifiHit", 3000);
       tree->SetBranchAddress("Digi_ScifiHits", &scifiDigiHitCollection);
     }
+  }
+
+  sciFiBaseCut::sciFiBaseCut(TChain * ch){
+    setupBranch(ch);
   }
 
   void sciFiBaseCut::initializeEvent(){

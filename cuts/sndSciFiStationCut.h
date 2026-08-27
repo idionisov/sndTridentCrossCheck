@@ -6,9 +6,9 @@
 #include "sndScifiHit.h"
 
 namespace snd {
-  namespace analysis_cuts {
+  namespace trident_cuts {
 
-    class sciFiStationCut : public snd::analysis_cuts::sciFiBaseCut {
+    class sciFiStationCut : public snd::trident_cuts::sciFiBaseCut {
     private :
       float fractionThreshold;
       std::vector<int> stations_to_exclude;
