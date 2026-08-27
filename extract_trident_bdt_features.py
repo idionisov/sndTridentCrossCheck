@@ -36,11 +36,6 @@ import ROOT
 for lib in ["libBase", "libShipData", "libshipLHC", "libsnd_analysis_tools"]:
     ROOT.gSystem.Load(lib)
 
-sndsw_path = os.environ.get("SNDSW_ROOT", "")
-if sndsw_path:
-    ROOT.gInterpreter.ProcessLine(f'#include "{sndsw_path}/analysis/tools/sndSciFiTools.h"')
-    ROOT.gInterpreter.ProcessLine(f'#include "{sndsw_path}/analysis/tools/sndGeometryGetter.h"')
-
 # Declare Fast C++ SciFi and Density Metric Computations
 if not hasattr(ROOT, "computeSciFiMLMetrics"):
     ROOT.gInterpreter.Declare("""

@@ -1,0 +1,18 @@
+#!/bin/bash
+# ==============================================================================
+# Generate HTCondor arguments for 2_extractFeatures.sub on trimuon_boost100 cutset8
+# ==============================================================================
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+IN_DIR="/eos/user/i/idioniso/sndMuTri/data/trimuon_boost100_cutset8/_hough"
+GEO_FILE="/eos/user/i/idioniso/sndMuTri/data/geofile_trimuon_boost100.root"
+PAR_FILE="TrackingParams_sf4.xml"
+ARGS_FILE="args_trimuon_boost100_cutset8_features.txt"
+
+echo "Scanning Hough files in ${IN_DIR}..."
+python3 "${SCRIPT_DIR}/generate_job_arguments.py" \
+    -i "${IN_DIR}/trimuon_digCPP-*_cutset8_hough_*.root" \
+    -g "${GEO_FILE}" \
+    -p "${PAR_FILE}" \
+    -t features \
+    -o "${ARGS_FILE}"

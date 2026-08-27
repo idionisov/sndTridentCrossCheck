@@ -43,10 +43,6 @@ for lib in ["libBase", "libShipData", "libshipLHC", "libsnd_analysis_tools"]:
 import SndlhcGeo
 import SndlhcMuonReco
 
-sndsw_path = os.environ.get("SNDSW_ROOT", "")
-if sndsw_path:
-    ROOT.gInterpreter.ProcessLine(f'#include "{sndsw_path}/analysis/tools/sndSciFiTools.h"')
-    ROOT.gInterpreter.ProcessLine(f'#include "{sndsw_path}/analysis/tools/sndGeometryGetter.h"')
 
 def get_event_scifi_info(scifi_hits) -> Dict:
     """
@@ -851,6 +847,7 @@ def process_single_file(
     return events_processed, events_saved
 
 def main():
+    sndsw_path = os.environ.get("SNDSW_ROOT", "")
     repo_root = os.path.dirname(os.path.abspath(__file__))
     candidates = [
         os.path.join(repo_root, "TrackingParams_sf4.xml"),
