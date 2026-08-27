@@ -1,9 +1,8 @@
 executable            = run_tridentSample.sh
 
-output                = out/tridentSample_.$(ClusterId).$(ProcId).out
-error                 = err/tridentSample_.$(ClusterId).$(ProcId).err
-#log                   = log/tridentSample/cuts7_$(ProcId).log
-log                   = log/tridentSample_$(ClusterId).log
+output                = out/tridentSample/trimuon_boost100_signal_$(ClusterId).$(ProcId).out
+error                 = err/tridentSample/trimuon_boost100_signal_$(ClusterId).$(ProcId).err
+log                   = log/tridentSample/trimuon_boost100_signal_$(ClusterId).log
 
 getenv                = False
 notification          = Never
@@ -14,7 +13,7 @@ transfer_input_files  = run_tridentSample.sh, ../build/bin/tridentSample, ../bui
 
 max_retries           = 3
 
-+JobFlavour           = "workday"
++JobFlavour           = "espresso"
 +AccountingGroup      = "group_u_SNDLHC.users"
 
-queue arguments from args_run6640_tridentSample.txt
+queue arguments from args_trimuon_boost100_signal_cutset8_tridentSample.txt

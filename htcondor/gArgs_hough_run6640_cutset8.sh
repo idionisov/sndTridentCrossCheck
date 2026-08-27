@@ -3,10 +3,10 @@
 # Generate HTCondor arguments for Hough line reconstruction on Run 6640 Cutset 8
 # ==============================================================================
 
-INPUT_DIR="/eos/user/i/idioniso/sndMuTri/data/run_006640_cutset8"
+INPUT_DIR="/eos/user/i/idioniso/sndMuTri/data/cutset8/run_006640"
 GEO_FILE="/eos/user/i/idioniso/sndMuTri/data/geofile_data_2023.root"
 PAR_FILE="TrackingParams_sf4.xml"
-OUT_DIR="/eos/user/i/idioniso/sndMuTri/data/run_006640_cutset8/_hough"
+OUT_DIR="/eos/user/i/idioniso/sndMuTri/data/cutset8/run_006640/hough"
 ARGS_FILE="args_run6640_cutset8_hough.txt"
 CHUNK_SIZE=10000
 
