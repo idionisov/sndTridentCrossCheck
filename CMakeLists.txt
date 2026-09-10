@@ -41,6 +41,7 @@ get_filename_component(SND_BASE ${SNDSW_PARENT} DIRECTORY)
 # Setup include directories
 include_directories(
   ${CMAKE_SOURCE_DIR}/cuts
+  ${CMAKE_SOURCE_DIR}/analysis
   ${SNDSW_ROOT}/include
   ${ROOT_INCLUDE_DIRS}
 )
@@ -118,6 +119,7 @@ link_directories(
 )
 
 add_subdirectory(cuts)
+add_subdirectory(analysis)
 
 # Find sndsw dependencies
 find_library(ANALYSIS_TOOLS_LIB snd_analysis_tools PATHS "${SNDSW_ROOT}/lib" NO_DEFAULT_PATH REQUIRED)

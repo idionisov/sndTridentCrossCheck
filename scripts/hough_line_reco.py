@@ -1,33 +1,37 @@
 #!/usr/bin/env python3
 """
-hough_line_reco.py
-------------------
-Performs Hough transform track/line finding (up to 3 tracks per projection XZ/YZ)
-on SND@LHC event files (MC or Real Data) using core SndlhcMuonReco and geometry tools.
+================================================================================
+SND@LHC Hough Line Track Reconstruction Engine
+================================================================================
+Performs Hough transform track and line reconstruction (up to 3 tracks per
+projection XZ/YZ) for both the SciFi Tracker and Downstream (DS) MuFilter
+on SND@LHC event files (Monte Carlo or Real Collision Data).
 
 Features:
 - Stores all original ROOT branches and objects, augmented with reconstructed
-  Hough line parameters and hit metrics for both SciFi and Downstream (DS) MuFilter.
-- Dedicated and clear branch names:
-  * SciFi: xz_sf_m1..3, xz_sf_c1..3, yz_sf_m1..3, yz_sf_c1..3 (and aliases xz_m1..3, xz_c1..3, etc.)
+  Hough line parameters and hit metrics for both SciFi and Downstream (DS).
+- Dedicated and clear branch naming conventions:
+  * SciFi: xz_sf_m1..3, xz_sf_c1..3, yz_sf_m1..3, yz_sf_c1..3 (and aliases xz_m1..3, etc.)
   * Downstream: xz_ds_m1..3, xz_ds_c1..3, yz_ds_m1..3, yz_ds_c1..3
-- Hit metrics per line and global summaries for both SciFi and DS systems.
+- Hit metrics per line and global event-level hit/QDC densities.
 - Configurable tracking systems: 'both' (default), 'scifi', or 'ds'.
-- Accepts custom geometry file (--geoFile) with automatic fallback detection.
-- Accepts custom tracking parameters XML file (--parFile).
+- Automatic geometry resolution via DataManager and sndsw analysis tools.
 - Optional vertex Z constraint filtering (--z-vtx-range).
-- Placeholder values (NaN / 0) for missing lines (when fewer than 3 lines are found).
-- Single file or multi-file wildcard processing with format pattern output (e.g. -o "out_%s.root").
-- Optional 2D event display canvas storage (--save-displays).
+- Safe atomic file writing (local tempfile -> commit) safe on EOS and network filesystems.
+- Optional 2D event display canvas generation (--save-displays).
+
+Author: SND@LHC Collaboration
+================================================================================
 """
 
 import os
 import sys
-import glob
 import json
 import time
 import random
 import argparse
+import tempfile
+import shutil
 from array import array
 from typing import Optional, Dict, List, Tuple
 
@@ -35,8 +39,18 @@ import ROOT
 import numpy as np
 
 ROOT.gROOT.SetBatch(True)
+ROOT.gErrorIgnoreLevel = ROOT.kWarning
 
-# Load SND@LHC shared libraries
+# Add project root to sys.path
+_script_dir = os.path.dirname(os.path.abspath(__file__))
+_repo_root = os.path.dirname(_script_dir) if os.path.basename(_script_dir) == "scripts" else _script_dir
+if _repo_root not in sys.path:
+    sys.path.insert(0, _repo_root)
+
+from snd import DataManager, load_trident_libraries
+
+# Load SND@LHC shared libraries and compiled analysis tools
+load_trident_libraries(_repo_root)
 for lib in ["libBase", "libShipData", "libshipLHC", "libsnd_analysis_tools"]:
     ROOT.gSystem.Load(lib)
 
@@ -44,6 +58,9 @@ import SndlhcGeo
 import SndlhcMuonReco
 
 
+# ==============================================================================
+# 1. Hit Statistics and Density Computations
+# ==============================================================================
 def get_event_scifi_info(scifi_hits) -> Dict:
     """
     Computes global SciFi hit statistics, QDC sums, and plane-level hit/QDC densities.
@@ -112,6 +129,7 @@ def get_event_scifi_info(scifi_hits) -> Dict:
         "max_qdc_weight_density": max_qdc_weight_density,
     }
 
+
 def get_event_ds_info(mufi_hits) -> Dict:
     """
     Computes global Downstream (DS) MuFilter hit statistics, QDC sums, and plane-level densities.
@@ -175,6 +193,10 @@ def get_event_ds_info(mufi_hits) -> Dict:
         "max_qdc_weight_density": max_qdc_weight_density,
     }
 
+
+# ==============================================================================
+# 2. Hough Transform Track Reconstruction Engine
+# ==============================================================================
 def run_hough_transform(
     muon_reco_task,
     event,
@@ -296,7 +318,7 @@ def run_hough_transform(
                 skip_track = False
                 conflict_params = None
 
-                # Check vertex constraints with existing lines only if explicitly requested
+                # Check vertex constraints with existing lines if explicitly requested
                 if z_vtx_min is not None or z_vtx_max is not None:
                     for existing_line in lines[projection_name]:
                         ext_m, ext_c = existing_line[0], existing_line[1]
@@ -343,6 +365,10 @@ def run_hough_transform(
     n_lines_max = max(counts.values()) if counts else 0
     return n_lines_max, lines, track_hit_indices
 
+
+# ==============================================================================
+# 3. 2D Event Display Generator (Optional)
+# ==============================================================================
 def draw_simple_display(input_tree, geo, track_lines_sf, track_lines_ds, run_number, event_number):
     """Generates a 2D event display canvas with reconstructed SciFi and DS Hough lines overlaid."""
     c_name = f"c_Run{run_number}_{event_number}"
@@ -397,6 +423,10 @@ def draw_simple_display(input_tree, geo, track_lines_sf, track_lines_ds, run_num
     c.Update()
     return c, line_objs
 
+
+# ==============================================================================
+# 4. Single File Augmented Reconstruction Pipeline
+# ==============================================================================
 def process_single_file(
     input_file_path: str,
     output_file_path: str,
@@ -406,7 +436,7 @@ def process_single_file(
     args,
     gallery: Dict[str, set]
 ) -> Tuple[int, int]:
-    """Processes a single input ROOT file and creates an augmented output ROOT file."""
+    """Processes a single input ROOT file and creates an augmented output ROOT file atomically."""
     input_file = ROOT.TFile.Open(input_file_path, "READ")
     if not input_file or input_file.IsZombie():
         print(f"Error: Could not open input file '{input_file_path}'")
@@ -421,13 +451,17 @@ def process_single_file(
 
     total_entries = input_tree.GetEntries()
 
-    out_dir = os.path.dirname(output_file_path)
+    # Use atomic local temporary file
+    out_dir = os.path.dirname(os.path.abspath(output_file_path))
     if out_dir and not os.path.exists(out_dir):
         os.makedirs(out_dir, exist_ok=True)
 
-    output_root_file = ROOT.TFile(output_file_path, "RECREATE")
+    with tempfile.NamedTemporaryFile(suffix=".root", delete=False) as tmp:
+        tmp_output_path = tmp.name
+
+    output_root_file = ROOT.TFile(tmp_output_path, "RECREATE")
     
-    # Check if input tree has branches with missing dictionaries (e.g. Event_Type)
+    # Check if input tree has branches with missing dictionaries
     has_unknown_branch = False
     for b in input_tree.GetListOfBranches():
         cname = b.GetClassName()
@@ -471,7 +505,7 @@ def process_single_file(
     # Declare branch buffer dictionaries
     branches = {
         # Global line counts
-        "n_lines": array("i", [0]),          # SciFi max lines (for backward compat)
+        "n_lines": array("i", [0]),          # SciFi max lines (backward compat)
         "n_lines_sf": array("i", [0]),       # SciFi max lines
         "n_lines_sf_xz": array("i", [0]),    # SciFi XZ lines
         "n_lines_sf_yz": array("i", [0]),    # SciFi YZ lines
@@ -680,7 +714,6 @@ def process_single_file(
 
         # Reset per-line arrays with NaN / 0 placeholders
         for idx in range(1, 4):
-            # SciFi
             branches[f"xz_sf_m{idx}"][0] = float("nan")
             branches[f"xz_sf_c{idx}"][0] = float("nan")
             branches[f"yz_sf_m{idx}"][0] = float("nan")
@@ -723,7 +756,6 @@ def process_single_file(
             branches[f"yz_sum_hit_weight_density_{idx}"][0] = float("nan")
             branches[f"yz_sum_qdc_weight_density_{idx}"][0] = float("nan")
 
-            # DS
             branches[f"xz_ds_m{idx}"][0] = float("nan")
             branches[f"xz_ds_c{idx}"][0] = float("nan")
             branches[f"yz_ds_m{idx}"][0] = float("nan")
@@ -841,17 +873,28 @@ def process_single_file(
         for kname, obj in metadata_keys:
             obj.Write(kname, ROOT.TObject.kSingleKey | ROOT.TObject.kOverwrite)
 
+    output_root_file.Flush()
     output_root_file.Close()
     input_file.Close()
 
+    # Move atomically to final path
+    fsize = os.path.getsize(tmp_output_path)
+    if fsize < 1000:
+        os.remove(tmp_output_path)
+        raise RuntimeError(f"Output file size is suspiciously small ({fsize} bytes). Aborting commit!")
+
+    shutil.move(tmp_output_path, output_file_path)
     return events_processed, events_saved
 
+
+# ==============================================================================
+# 5. Main Execution Entry Point
+# ==============================================================================
 def main():
     sndsw_path = os.environ.get("SNDSW_ROOT", "")
-    repo_root = os.path.dirname(os.path.abspath(__file__))
     candidates = [
-        os.path.join(repo_root, "TrackingParams_sf4.xml"),
-        os.path.join(repo_root, "parFiles", "TrackingParams.xml"),
+        os.path.join(_repo_root, "TrackingParams_sf4.xml"),
+        os.path.join(_repo_root, "parFiles", "TrackingParams.xml"),
         os.path.join(sndsw_path, "TrackingParams_sf4.xml") if sndsw_path else "",
         os.path.join(sndsw_path, "python", "TrackingParams_V2_28January2023.xml") if sndsw_path else "",
         "TrackingParams_sf4.xml", "TrackingParams.xml"
@@ -861,10 +904,11 @@ def main():
             default_par_file = candidate
             break
     else:
-        default_par_file = os.path.join(repo_root, "TrackingParams_sf4.xml")
+        default_par_file = os.path.join(_repo_root, "TrackingParams_sf4.xml")
 
     parser = argparse.ArgumentParser(
-        description="Reconstruct up to 3 Hough lines per projection (XZ/YZ) for SciFi and DS MuFilter on SND@LHC data/MC and store all parameters in the output ROOT file."
+        description="Reconstruct up to 3 Hough lines per projection (XZ/YZ) for SciFi and DS MuFilter on SND@LHC data/MC and store all parameters in the output ROOT file.",
+        formatter_class=argparse.RawDescriptionHelpFormatter
     )
     parser.add_argument(
         "-i", "--input",
@@ -876,13 +920,13 @@ def main():
         "-o", "--output",
         dest="output_pattern",
         default=None,
-        help="Output ROOT file path or pattern (e.g. '/path/to/hough_%s.root' or 'out.root')"
+        help="Output ROOT file path or pattern (e.g. '/path/to/hough_%%s.root' or 'out.root')"
     )
     parser.add_argument(
         "-g", "--geoFile", "--geofile",
         dest="geofile_path",
         default=None,
-        help="Path to geometry ROOT file. If omitted, automatically determined from run number or MC path."
+        help="Path to geometry ROOT file. If omitted, automatically determined from run number or MC path via DataManager."
     )
     parser.add_argument(
         "-p", "--parFile", "--par-file",
@@ -955,18 +999,16 @@ def main():
 
     args = parser.parse_args()
 
-    # Find matching input files
-    matched_files = sorted(glob.glob(args.input_pattern))
+    # Resolve input files using DataManager
+    dm_probe = DataManager(args.input_pattern)
+    matched_files = dm_probe.files
     if not matched_files:
-        if os.path.exists(args.input_pattern):
-            matched_files = [args.input_pattern]
-        else:
-            print(f"Error: No files found matching pattern: {args.input_pattern}")
-            sys.exit(1)
+        print(f"Error: No files found matching pattern: {args.input_pattern}")
+        sys.exit(1)
 
-    print("=" * 65)
-    print("SND@LHC Hough Line Finding & Tracking Processor (SciFi + DS)")
-    print("=" * 65)
+    print("=" * 80)
+    print("SND@LHC HOUGH LINE FINDING & TRACKING PROCESSOR (SciFi + DS)")
+    print("=" * 80)
     print(f"Input Pattern     : {args.input_pattern}")
     print(f"Files Found       : {len(matched_files):,}")
     print(f"Detector System   : {args.system}")
@@ -976,56 +1018,42 @@ def main():
     if args.z_vtx_range:
         print(f"Vertex Z Range    : [{args.z_vtx_range[0]:.1f}, {args.z_vtx_range[1]:.1f}] cm")
     print(f"Max Events / File : {args.n_events:,}")
-    print("=" * 65)
+    print("=" * 80)
 
-    # Resolve geometry file
+    # Resolve geometry file using DataManager
     first_file = matched_files[0]
     geofile_path = args.geofile_path
+
     if not geofile_path:
-        is_real_data = False
-        r_num = 1
-        try:
-            t_first = ROOT.TFile.Open(first_file, "READ")
-            if t_first and not t_first.IsZombie():
-                if t_first.Get("rawConv"):
-                    is_real_data = True
-                t_in = t_first.Get("rawConv") or t_first.Get("cbmsim")
-                if t_in and t_in.GetEntries() > 0:
-                    t_in.GetEntry(0)
-                    if hasattr(t_in, "EventHeader") and hasattr(t_in.EventHeader, "GetRunId"):
-                        r_num = t_in.EventHeader.GetRunId()
-                        is_real_data = True
-                t_first.Close()
-        except Exception:
-            pass
-
-        if not is_real_data and ("run_" in first_file or "rawConv" in first_file):
-            import re
-            m = re.search(r'run_0*(\d+)', first_file)
-            if m:
-                r_num = int(m.group(1))
-                is_real_data = True
-
-        if is_real_data:
-            try:
-                geofile_path = ROOT.snd.analysis_tools.GetGeoPath(int(r_num))
-            except Exception:
-                geofile_path = None
+        if dm_probe.has_geometry:
+            geofile_path = dm_probe.geo_path
+        else:
+            r_num = dm_probe.run_number
+            if r_num > 0:
+                try:
+                    geofile_path = ROOT.snd.DataManager.FetchGeoPath(r_num)
+                except Exception:
+                    geofile_path = None
 
         if not geofile_path:
             input_dir = os.path.dirname(os.path.abspath(first_file))
             boost_suffix = "boost1000" if "boost1000" in first_file else "boost100"
-            candidates = [
+            candidates_geo = [
                 os.path.join(input_dir, f"geofile_full.Ntuple-TGeant4_{boost_suffix}.0.root"),
                 os.path.join(input_dir, "geofile_full.Ntuple-TGeant4_boost100.0.root"),
                 "python/geofile_full.Ntuple-TGeant4_boost100.0.root",
                 os.path.join(sndsw_path, "python", "geofile_full.Ntuple-TGeant4_boost100.0.root") if sndsw_path else None,
                 "/eos/experiment/sndlhc/MonteCarlo/ThreeMuons/geofile_full.Ntuple-TGeant4_boost100.0.root"
             ]
-            for cand in candidates:
+            for cand in candidates_geo:
                 if cand and os.path.exists(cand):
                     geofile_path = cand
                     break
+
+    if geofile_path and "root://eospublic.cern.ch/" in geofile_path:
+        local_cand = geofile_path.replace("root://eospublic.cern.ch/", "")
+        if os.path.exists(local_cand):
+            geofile_path = local_cand
 
     geo_valid = False
     if geofile_path:
@@ -1036,7 +1064,7 @@ def main():
         print(f"Error: Could not locate geometry file (tried: {geofile_path})")
         sys.exit(1)
 
-    print(f"Loading Geometry from: {geofile_path}")
+    print(f"[*] Loading Geometry from: {geofile_path}")
     geo = SndlhcGeo.GeoInterface(geofile_path)
 
     # Initialize FairRunAna environment using a file with valid entries
@@ -1113,7 +1141,7 @@ def main():
                 raw_g = json.load(f)
                 for r in raw_g:
                     gallery[str(r)] = set(raw_g[r])
-            print(f"Loaded {sum(len(v) for v in gallery.values())} events from gallery file.")
+            print(f"[*] Loaded {sum(len(v) for v in gallery.values())} events from gallery file.")
         except Exception as e:
             print(f"Error loading gallery file '{args.gallery_file}': {e}")
             sys.exit(1)
@@ -1147,15 +1175,17 @@ def main():
         print(f"  -> Done: Scanned {n_scanned:,} events | Stored {n_stored:,} events")
 
     total_elapsed = time.time() - t0_overall
-    print("\n" + "=" * 65)
+    print("\n" + "=" * 80)
     print("HOUGH LINE FINDING BATCH COMPLETE (SciFi + DS)")
-    print("=" * 65)
+    print("=" * 80)
     print(f"Total Files Processed : {len(matched_files):,}")
     print(f"Total Files Created   : {len(created_files):,}")
     print(f"Total Events Scanned  : {grand_total_scanned:,}")
     print(f"Total Events Stored   : {grand_total_stored:,}")
-    print(f"Total Elapsed Time    : {total_elapsed:.1f} s ({grand_total_scanned/total_elapsed:.0f} ev/s)")
-    print("=" * 65 + "\n")
+    rate = grand_total_scanned / total_elapsed if total_elapsed > 0 else 0
+    print(f"Total Elapsed Time    : {total_elapsed:.1f} s ({rate:.0f} ev/s)")
+    print("=" * 80 + "\n")
+
 
 if __name__ == "__main__":
     main()

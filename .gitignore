@@ -127,6 +127,14 @@ conditionsDatabase/**/.cache/
 *.err
 *.out
 
+# Plots / Figures
+*.png
+*.pdf
+*.svg
+*.eps
+*.jpg
+*.jpeg
+
 # =====================
 # Cython
 # =====================

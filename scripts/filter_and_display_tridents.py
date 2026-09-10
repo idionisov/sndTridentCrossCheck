@@ -158,29 +158,29 @@ def load_detector_geometry(geofile_path):
             'z': (min(zs), max(zs)),
         })
 
-    # Veto Detector (clean orange outline)
+    # Veto Detector (filled light orange with orange border)
     for i in range(2):
-        extract_node_bounds(f"/cave_1/Detector_0/volVeto_1/subVetoBox_{i}", "Veto Detector", ROOT.kOrange+2, ROOT.kOrange+2, is_filled=False)
+        extract_node_bounds(f"/cave_1/Detector_0/volVeto_1/subVetoBox_{i}", "Veto Detector", ROOT.kOrange-9, ROOT.kOrange+2, is_filled=True)
 
-    # SciFi Target Emulsion Walls (filled light grey)
+    # SciFi Target Emulsion Walls (filled light grey with dark grey border)
     for i in range(5):
         extract_node_bounds(f"/cave_1/Detector_0/volTarget_1/volWallborder_{i}", "Target Emulsion Wall", ROOT.kGray, ROOT.kGray+2, is_filled=True)
 
-    # SciFi Stations (clean blue outline)
+    # SciFi Stations (filled light cyan with blue border)
     for i in range(1, 6):
-        extract_node_bounds(f"/cave_1/Detector_0/volTarget_1/ScifiVolume{i}_{i}000000", "SciFi Station", ROOT.kAzure-4, ROOT.kAzure-4, is_filled=False)
+        extract_node_bounds(f"/cave_1/Detector_0/volTarget_1/ScifiVolume{i}_{i}000000", "SciFi Station", ROOT.kCyan-10, ROOT.kAzure-4, is_filled=True)
 
-    # MuFilter Upstream (5 Iron Blocks filled + 5 Active Planes outline)
+    # MuFilter Upstream (5 Iron Blocks filled + 5 Active Planes filled)
     for i in range(5):
         extract_node_bounds(f"/cave_1/Detector_0/volMuFilter_1/volFeBlock_{i}", "MuFilter Iron Block", ROOT.kGreen-9, ROOT.kGreen-3, is_filled=True)
-        extract_node_bounds(f"/cave_1/Detector_0/volMuFilter_1/volMuUpstreamDet_{i}_{i+2}", "MuFilter Active Plane", ROOT.kBlue-4, ROOT.kBlue-4, is_filled=False)
+        extract_node_bounds(f"/cave_1/Detector_0/volMuFilter_1/volMuUpstreamDet_{i}_{i+2}", "MuFilter Active Plane", ROOT.kAzure-9, ROOT.kBlue-4, is_filled=True)
 
-    # MuFilter Downstream (3 Iron Blocks filled: 7, 8, 9 + 4 Active Planes outline: 0..3)
+    # MuFilter Downstream (3 Iron Blocks filled: 7, 8, 9 + 4 Active Planes filled: 0..3)
     for fe_id in [7, 8, 9]:
         extract_node_bounds(f"/cave_1/Detector_0/volMuFilter_1/volFeBlock_{fe_id}", "MuFilter Iron Block", ROOT.kGreen-9, ROOT.kGreen-3, is_filled=True)
 
     for i in range(4):
-        extract_node_bounds(f"/cave_1/Detector_0/volMuFilter_1/volMuDownstreamDet_{i}_{i+7}", "MuFilter Active Plane", ROOT.kBlue-4, ROOT.kBlue-4, is_filled=False)
+        extract_node_bounds(f"/cave_1/Detector_0/volMuFilter_1/volMuDownstreamDet_{i}_{i+7}", "MuFilter Active Plane", ROOT.kAzure-9, ROOT.kBlue-4, is_filled=True)
 
     # MuFilter End Iron Block (filled)
     extract_node_bounds("/cave_1/Detector_0/volMuFilter_1/volFeBlockEnd_1", "MuFilter Iron Block", ROOT.kGreen-9, ROOT.kGreen-3, is_filled=True)
@@ -285,7 +285,8 @@ def make_box_poly(zmin, zmax, vmin, vmax):
 def draw_detector_geometry(geo_elements, z_range, x_range, y_range, ggeo=None, file_tag="", evt_num=0, i_event=0):
     """
     Initializes 2D (XZ, YZ) and 3D canvases and draws detector geometry boundaries.
-    Uses TPolyLine for 2D boxes to guarantee correct painter depth stacking in both TBrowser and VSCode/JSROOT.
+    Uses TBox primitives with fill style 1001 and alpha transparency to guarantee
+    filled detector areas with crisp outlines in batch mode, TBrowser, and JSROOT.
     """
     z_min_plot, z_max_plot = z_range
     x_min_plot, x_max_plot = x_range
@@ -299,25 +300,25 @@ def draw_detector_geometry(geo_elements, z_range, x_range, y_range, ggeo=None, f
     c_xz.Update()
 
     boxes_xz = []
-    legend_xz = ROOT.TLegend(0.12, 0.70, 0.44, 0.89)
+    legend_xz = ROOT.TLegend(0.12, 0.52, 0.48, 0.89)
     ROOT.SetOwnership(legend_xz, False)
     legend_xz.SetBorderSize(1)
     legend_xz.SetFillStyle(1001)
-    legend_xz.SetFillColorAlpha(ROOT.kWhite, 0.88)
+    legend_xz.SetFillColor(ROOT.kWhite)
     legend_xz.SetTextFont(42)
-    legend_xz.SetTextSize(0.024)
+    legend_xz.SetTextSize(0.022)
 
     for elem in geo_elements:
-        poly = make_box_poly(elem['z'][0], elem['z'][1], elem['x'][0], elem['x'][1])
-        ROOT.SetOwnership(poly, False)
-        poly.SetLineColor(elem.get('line_color', elem['color']))
-        poly.SetLineWidth(1)
-        if elem.get('is_filled', True):
-            poly.SetFillStyle(1001)
-            poly.SetFillColorAlpha(elem['color'], 0.4)
-            poly.Draw("f")
-        poly.Draw()
-        boxes_xz.append(poly)
+        z0, z1 = elem['z']
+        x0, x1 = elem['x']
+        box = ROOT.TBox(z0, x0, z1, x1)
+        ROOT.SetOwnership(box, False)
+        box.SetFillStyle(1001)
+        box.SetFillColorAlpha(elem['color'], elem.get('fill_alpha', 0.40))
+        box.SetLineColor(elem.get('line_color', elem['color']))
+        box.SetLineWidth(1)
+        box.Draw("l same")
+        boxes_xz.append(box)
 
     # ----------------- YZ Projection -----------------
     c_yz = ROOT.TCanvas(f"YZ_Ev_{evt_num}_F_{file_tag}_Idx_{i_event}", f"YZ Projection (Event #{evt_num})", 950, 650)
@@ -327,25 +328,25 @@ def draw_detector_geometry(geo_elements, z_range, x_range, y_range, ggeo=None, f
     c_yz.Update()
 
     boxes_yz = []
-    legend_yz = ROOT.TLegend(0.12, 0.70, 0.44, 0.89)
+    legend_yz = ROOT.TLegend(0.12, 0.52, 0.48, 0.89)
     ROOT.SetOwnership(legend_yz, False)
     legend_yz.SetBorderSize(1)
     legend_yz.SetFillStyle(1001)
-    legend_yz.SetFillColorAlpha(ROOT.kWhite, 0.88)
+    legend_yz.SetFillColor(ROOT.kWhite)
     legend_yz.SetTextFont(42)
-    legend_yz.SetTextSize(0.024)
+    legend_yz.SetTextSize(0.022)
 
     for elem in geo_elements:
-        poly = make_box_poly(elem['z'][0], elem['z'][1], elem['y'][0], elem['y'][1])
-        ROOT.SetOwnership(poly, False)
-        poly.SetLineColor(elem.get('line_color', elem['color']))
-        poly.SetLineWidth(1)
-        if elem.get('is_filled', True):
-            poly.SetFillStyle(1001)
-            poly.SetFillColorAlpha(elem['color'], 0.4)
-            poly.Draw("f")
-        poly.Draw("")
-        boxes_yz.append(poly)
+        z0, z1 = elem['z']
+        y0, y1 = elem['y']
+        box = ROOT.TBox(z0, y0, z1, y1)
+        ROOT.SetOwnership(box, False)
+        box.SetFillStyle(1001)
+        box.SetFillColorAlpha(elem['color'], elem.get('fill_alpha', 0.40))
+        box.SetLineColor(elem.get('line_color', elem['color']))
+        box.SetLineWidth(1)
+        box.Draw("l same")
+        boxes_yz.append(box)
 
     # ----------------- 3D View -----------------
     c_3d = ROOT.TCanvas(f"3D_Ev_{evt_num}_F_{file_tag}_Idx_{i_event}", f"3D View (Event #{evt_num})", 850, 850)
@@ -686,28 +687,29 @@ def identify_trident_topology(event):
     for tr_idx, tr_obj in raw_intermediates:
         pdg = tr_obj.GetPdgCode()
         proc = tr_obj.GetProcID()
+        i_E = tr_obj.GetEnergy() if hasattr(tr_obj, "GetEnergy") else tr_obj.GetP()
         if abs(pdg) == 13:
-            label = f"Radiating #mu^{{{'-' if pdg==13 else '+'}}}"
+            label = f"Radiating #mu^{{{'-' if pdg==13 else '+'}}} (E = {i_E:.1f} GeV)"
             col = ROOT.kMagenta + 2
             style = 1
             width = 3
         elif pdg == 22:
-            label = "Intermediate #gamma (Brem)"
+            label = f"Intermediate #gamma (E = {i_E:.1f} GeV)"
             col = ROOT.kOrange + 7
             style = 7
             width = 2
         elif abs(pdg) == 11:
-            label = f"Intermediate e^{{{'-' if pdg==11 else '+'}}}"
+            label = f"Intermediate e^{{{'-' if pdg==11 else '+'}}} (E = {i_E:.1f} GeV)"
             col = ROOT.kViolet + 1
             style = 1
             width = 2
         elif abs(pdg) in [211, 111, 321, 2212, 2112]:
-            label = f"Intermediate Hadron (PDG {pdg})"
+            label = f"Intermediate Hadron ({pdg}, E = {i_E:.1f} GeV)"
             col = ROOT.kTeal + 2
             style = 1
             width = 2
         else:
-            label = f"Intermediate Track (PDG {pdg})"
+            label = f"Intermediate Track ({pdg}, E = {i_E:.1f} GeV)"
             col = ROOT.kCyan + 2
             style = 1
             width = 2
@@ -835,7 +837,8 @@ def draw_mctracks(event, topo, geo_ctx, z_range, show_all_mctracks=False, mc_poi
         x_p, y_p, z_p = get_track_trajectory_points(primary_idx, primary_track, z_min_2d_plot, z_max_2d_plot, mc_points_map)
         if len(z_p) >= 2:
             p_pdg = primary_track.GetPdgCode()
-            p_label = f"Primary #mu^{{{'-' if p_pdg==13 else '+'}}}" if abs(p_pdg) == 13 else f"Primary Track (PDG {p_pdg})"
+            p_E = primary_track.GetEnergy() if hasattr(primary_track, "GetEnergy") else primary_track.GetP()
+            p_label = f"Primary #mu^{{{'-' if p_pdg==13 else '+'}}} (E = {p_E:.1f} GeV)" if abs(p_pdg) == 13 else f"Primary Track (PDG {p_pdg}, E = {p_E:.1f} GeV)"
             c_xz.cd()
             gr_p_xz = ROOT.TGraph(len(z_p), make_array(z_p), make_array(x_p))
             ROOT.SetOwnership(gr_p_xz, False)
@@ -884,6 +887,10 @@ def draw_mctracks(event, topo, geo_ctx, z_range, show_all_mctracks=False, mc_poi
         x_d, y_d, z_d = get_track_trajectory_points(d_i, d_track, z_min_2d_plot, z_max_2d_plot, mc_points_map)
         if len(z_d) < 2:
             continue
+        d_E = d_track.GetEnergy() if hasattr(d_track, "GetEnergy") else d_track.GetP()
+        d_sign = '-' if d_pdg == 13 else '+'
+        d_label = f"Trident #mu^{{{d_sign}}} (E = {d_E:.1f} GeV)"
+
         c_xz.cd()
         gr_x = ROOT.TGraph(len(z_d), make_array(z_d), make_array(x_d))
         ROOT.SetOwnership(gr_x, False)
@@ -891,7 +898,8 @@ def draw_mctracks(event, topo, geo_ctx, z_range, show_all_mctracks=False, mc_poi
         gr_x.SetLineStyle(2)
         gr_x.SetLineColor(ROOT.kBlue if d_pdg == 13 else ROOT.kRed)
         gr_x.Draw("L")
-        gr_ds_xz.append((gr_x, d_pdg))
+        gr_ds_xz.append((gr_x, d_pdg, d_label))
+        legend_xz.AddEntry(gr_x, d_label, "l")
 
         c_yz.cd()
         gr_y = ROOT.TGraph(len(z_d), make_array(z_d), make_array(y_d))
@@ -900,7 +908,8 @@ def draw_mctracks(event, topo, geo_ctx, z_range, show_all_mctracks=False, mc_poi
         gr_y.SetLineStyle(2)
         gr_y.SetLineColor(ROOT.kBlue if d_pdg == 13 else ROOT.kRed)
         gr_y.Draw("L")
-        gr_ds_yz.append((gr_y, d_pdg))
+        gr_ds_yz.append((gr_y, d_pdg, d_label))
+        legend_yz.AddEntry(gr_y, d_label, "l")
 
         c_3d.cd()
         x_d_3d, y_d_3d, z_d_3d = get_track_trajectory_points(d_i, d_track, Z_3D_MIN, Z_MAX, mc_points_map)
@@ -914,10 +923,6 @@ def draw_mctracks(event, topo, geo_ctx, z_range, show_all_mctracks=False, mc_poi
             pl_3.SetLineWidth(3)
             pl_3.Draw("same")
             pls_3d.append(pl_3)
-
-    if gr_ds_xz:
-        legend_xz.AddEntry(gr_ds_xz[0][0], "Trident #mu^{-} / #mu^{+} daughters", "l")
-        legend_yz.AddEntry(gr_ds_yz[0][0], "Trident #mu^{-} / #mu^{+} daughters", "l")
 
     if show_all_mctracks and gr_other_xz:
         legend_xz.AddEntry(gr_other_xz[0], "Other MC Tracks", "l")
