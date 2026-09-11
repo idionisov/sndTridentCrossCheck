@@ -21,6 +21,7 @@ struct MuonCalibrationConfig {
     int scifi_hits_max{35};
     int ds_hits_min{2};             // Muon filter penetration (DS)
     double ds_match_slope_max{0.04};// Max slope difference between SF and DS tracks
+    double scifi_qdc_min{0.0};      // Offline SciFi threshold in p.e./QDC (0.0 = use isValid())
 };
 
 struct MuonCalibrationMetrics {

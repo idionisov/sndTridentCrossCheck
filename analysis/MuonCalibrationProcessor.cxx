@@ -157,7 +157,13 @@ MuonCalibrationMetrics MuonCalibrationProcessor::process(
 
         for (int i = 0; i < n_sf; ++i) {
             auto* hit = static_cast<sndScifiHit*>(scifiHits->At(i));
-            if (!hit || !hit->isValid()) continue;
+            if (!hit) continue;
+
+            if (fConfig.scifi_qdc_min > 0.0) {
+                if (hit->GetSignal(0) < fConfig.scifi_qdc_min) continue;
+            } else {
+                if (!hit->isValid()) continue;
+            }
 
             double qdc = hit->GetSignal(0);
             if (qdc <= 0.0) continue;

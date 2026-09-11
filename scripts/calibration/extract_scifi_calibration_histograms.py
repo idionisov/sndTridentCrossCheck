@@ -179,6 +179,8 @@ def main():
     parser.add_argument("--max-slope", type=float, default=0.05, help="Max angular slope dx/dz, dy/dz (default: 0.05)")
     parser.add_argument("--scifi-min", type=int, default=10, help="Min SciFi hits (default: 10)")
     parser.add_argument("--scifi-max", type=int, default=35, help="Max SciFi hits (default: 35)")
+    parser.add_argument("--scifi-threshold", "--scifi-qdc-min", dest="scifi_threshold", type=float, default=0.0,
+                        help="Offline SciFi hit threshold [p.e. / QDC] (default: 0.0, uses default hit.isValid())")
     parser.add_argument("--ds-min", type=int, default=2, help="Min Downstream MuFilter hits (default: 2)")
     parser.add_argument("--ds-match-slope", type=float, default=0.04, help="Max slope diff between SF and DS tracks (default: 0.04)")
     parser.add_argument("--fiducial-margin", type=float, default=1.5, help="Fiducial margin in cm (default: 1.5)")
@@ -245,6 +247,7 @@ def main():
     calib_cfg.scifi_hits_max = args.scifi_max
     calib_cfg.ds_hits_min = args.ds_min
     calib_cfg.ds_match_slope_max = args.ds_match_slope
+    calib_cfg.scifi_qdc_min = args.scifi_threshold
 
     df_clean, processor = setup_calibration_dataframe(
         data, calib_cfg, args.max_events,
