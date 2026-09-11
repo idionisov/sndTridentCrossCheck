@@ -1,0 +1,96 @@
+# ==============================================================================
+# SND@LHC SciFi Multi-Parameter Digitization & QDC Calibration Configuration
+# ==============================================================================
+# Central configuration file for systematic scans over SciFi hit thresholds,
+# QDC energy calibration scale factors, and pedestal offsets.
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Parameter Grid Definitions
+# ------------------------------------------------------------------------------
+parameters:
+  # SciFi hit detection threshold in photo-electrons [p.e.]
+  # Nominal SND@LHC simulation default: 3.5 p.e.
+  thresholds:
+    - 3.5
+    - 4.0
+    - 4.5
+    - 5.0
+    - 5.5
+    - 6.0
+    - 6.5
+    - 7.0
+
+  # SciFi QDC calibration scale factor (s_QDC)
+  # Converts raw simulated micro-pixel pulse heights to data single-MIP QDC scale
+  # Nominal empirical ratio (Peak_MC / Peak_Data): ~4.50
+  qdc_scales:
+    - 3.6
+    - 3.9
+    - 4.2
+    - 4.5
+    - 4.8
+    - 5.1
+    - 5.4
+
+  # SciFi QDC pedestal offset in arbitrary units [a.u.]
+  # QDC_calib = (QDC_raw - b0) / s_QDC (Nominal default: 0.0)
+  qdc_offsets:
+    - -0.4
+    - -0.2
+    - 0.0
+    - 0.2
+    - 0.4
+
+  # SiPM saturation energy in p.e. (used in pipeline digitization mode)
+  saturation: 104.0
+
+# ------------------------------------------------------------------------------
+# 2. Loss Function Weights
+# ------------------------------------------------------------------------------
+# Joint Loss = w_hits * Loss(Hits) + w_qdc * Loss(QDC) + w_sumqdc * Loss(SumQDC)
+loss:
+  weight_hits: 1.0      # Weight for SciFi hit multiplicity distribution shape
+  weight_qdc: 1.0       # Weight for SciFi single-hit QDC energy distribution shape
+  weight_sumqdc: 0.0    # Weight for track integrated charge (0.0 disables)
+
+# ------------------------------------------------------------------------------
+# 3. Collision Data References
+# ------------------------------------------------------------------------------
+data_reference:
+  # Reference file for clean through-going muon hit multiplicity
+  hits_file: "plots/passing_muon_selection.root"
+  hits_hist: "HitDistributions/SciFi_Hits/h_sf_hits_data_stage6"
+
+  # Reference file for calibrated collision data QDC (Run 8329 / 6640)
+  qdc_file: "plots/scifi_calibration_run8329.root"
+  qdc_hist: "Histograms/1D/h1_hit_qdc"
+  sumqdc_hist: "Histograms/1D/h1_scifi_sum_qdc"
+
+# ------------------------------------------------------------------------------
+# 4. Simulation Inputs
+# ------------------------------------------------------------------------------
+simulation:
+  # Scan execution mode:
+  #   "offline"  : Filters already-digitized hits in seconds (recommended)
+  #   "pipeline" : Runs Geant4 digitization (run_digiSND.py) and tracking from raw MC
+  mode: "offline"
+
+  # Input reconstructed ROOT file for offline mode (Trimuon MC)
+  input_reco_file: "/eos/user/i/idioniso/1_Data/Monte_Carlo/ThreeMuons/sndLHC.Ntuple-TGeant4_boost100LHC_-160urad_magfield_2022TCL6_muons_rock_2e8pr_filteredAtScoringPlane_digCPP-200_trks.root"
+
+  # Raw simulation and geometry files (used in pipeline mode)
+  raw_sim_file: "/eos/experiment/sndlhc/MonteCarlo/from_sndprodmachine/run200/sndLHC.Ntuple-TGeant4_boost100.0.root"
+  geofile: "/eos/experiment/sndlhc/MonteCarlo/from_sndprodmachine/run200/geofile_full.Ntuple-TGeant4_boost100.0.root"
+  sndsw_home: "/home/idioniso/snd_master/sndsw"
+
+# ------------------------------------------------------------------------------
+# 5. Execution & Output Settings
+# ------------------------------------------------------------------------------
+execution:
+  output_dir: "plots/calibration_scan"
+  work_dir: "plots/calibration_scan/work"
+  num_events: 2000          # Events to process per threshold (0 = all events)
+  threads: 8                # Worker threads for ROOT RDataFrame processing
+  norm: "peak"              # Normalization for plots: "peak", "window", or "area"
+  skip_digi_if_exists: true # Reuses cached calib_ts_*.root files in work_dir

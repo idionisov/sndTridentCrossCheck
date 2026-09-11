@@ -336,10 +336,77 @@ def main():
                         help="Reuse existing intermediate calibration ROOT files if available in work dir (default: True)")
     parser.add_argument("--force-reextract", dest="skip_digi_if_exists", action="store_false",
                         help="Force re-extraction of calibration ROOT files from EOS")
+    parser.add_argument("-c", "--config", dest="config_file", default="",
+                        help="Path to YAML configuration file (e.g. config/calibration_grid_config.yaml)")
     parser.add_argument("--skip-tracking", dest="skip_tracking", action="store_true", default=False,
                         help="Skip track reconstruction in pipeline mode if track files already exist")
 
     args = parser.parse_args()
+
+    # Load configuration from YAML if specified
+    if args.config_file:
+        cfg_path = Path(args.config_file).resolve()
+        assert cfg_path.exists(), f"Configuration file not found: {cfg_path}"
+        try:
+            import yaml
+            with open(cfg_path, "r") as f:
+                cfg = yaml.safe_load(f)
+            print(f"[*] Loaded external grid configuration from: {cfg_path}")
+            if "parameters" in cfg:
+                p = cfg["parameters"]
+                if "thresholds" in p and parser.get_default("thresholds") == args.thresholds:
+                    args.thresholds = [float(x) for x in p["thresholds"]]
+                if "qdc_scales" in p and parser.get_default("qdc_scales") == args.qdc_scales:
+                    args.qdc_scales = [float(x) for x in p["qdc_scales"]]
+                if "qdc_offsets" in p and parser.get_default("qdc_offsets") == args.qdc_offsets:
+                    args.qdc_offsets = [float(x) for x in p["qdc_offsets"]]
+                if "saturation" in p and parser.get_default("saturation") == args.saturation:
+                    args.saturation = float(p["saturation"])
+            if "loss" in cfg:
+                l = cfg["loss"]
+                if "weight_hits" in l: args.weight_hits = float(l["weight_hits"])
+                if "weight_qdc" in l: args.weight_qdc = float(l["weight_qdc"])
+                if "weight_sumqdc" in l: args.weight_sumqdc = float(l["weight_sumqdc"])
+            if "data_reference" in cfg:
+                d = cfg["data_reference"]
+                if "hits_file" in d and parser.get_default("data_ref") == args.data_ref:
+                    args.data_ref = d["hits_file"]
+                if "hits_hist" in d and parser.get_default("data_hist") == args.data_hist:
+                    args.data_hist = d["hits_hist"]
+                if "qdc_file" in d and parser.get_default("data_qdc_ref") == args.data_qdc_ref:
+                    args.data_qdc_ref = d["qdc_file"]
+                if "qdc_hist" in d and parser.get_default("data_qdc_hist") == args.data_qdc_hist:
+                    args.data_qdc_hist = d["qdc_hist"]
+                if "sumqdc_hist" in d and parser.get_default("data_sumqdc_hist") == args.data_sumqdc_hist:
+                    args.data_sumqdc_hist = d["sumqdc_hist"]
+            if "simulation" in cfg:
+                s = cfg["simulation"]
+                if "mode" in s and parser.get_default("mode") == args.mode:
+                    args.mode = s["mode"]
+                if "input_reco_file" in s and parser.get_default("input_file") == args.input_file:
+                    args.input_file = s["input_reco_file"]
+                if "raw_sim_file" in s and parser.get_default("raw_sim") == args.raw_sim:
+                    args.raw_sim = s["raw_sim_file"]
+                if "geofile" in s and parser.get_default("geofile") == args.geofile:
+                    args.geofile = s["geofile"]
+                if "sndsw_home" in s and parser.get_default("snd_home") == args.snd_home:
+                    args.snd_home = s["sndsw_home"]
+            if "execution" in cfg:
+                e = cfg["execution"]
+                if "output_dir" in e and parser.get_default("output_dir") == args.output_dir:
+                    args.output_dir = e["output_dir"]
+                if "work_dir" in e and parser.get_default("work_dir") == args.work_dir:
+                    args.work_dir = e["work_dir"]
+                if "num_events" in e and parser.get_default("num_events") == args.num_events:
+                    args.num_events = int(e["num_events"])
+                if "threads" in e and parser.get_default("num_threads") == args.num_threads:
+                    args.num_threads = int(e["threads"])
+                if "norm" in e and parser.get_default("norm") == args.norm:
+                    args.norm = e["norm"]
+                if "skip_digi_if_exists" in e:
+                    args.skip_digi_if_exists = bool(e["skip_digi_if_exists"])
+        except Exception as err:
+            print(f"[-] Warning: Failed to parse config file '{cfg_path}': {err}")
 
     # Paths resolution
     out_dir = Path(args.output_dir).resolve()
