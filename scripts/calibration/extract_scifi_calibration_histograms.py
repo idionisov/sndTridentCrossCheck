@@ -221,6 +221,46 @@ def main():
         "-c", "--config", dest="config_file", default=DEFAULT_YAML_PATH,
         help=f"Master YAML configuration file (default: {DEFAULT_YAML_PATH})"
     )
+    parser.add_argument(
+        "-i", "--input", dest="input_data", default=None,
+        help="Input reconstructed track ROOT files pattern (overrides YAML)"
+    )
+    parser.add_argument(
+        "-t", "--tree", dest="tree_name", default=None,
+        help="TTree name: 'cbmsim' or 'rawConv' (overrides YAML)"
+    )
+    parser.add_argument(
+        "-o", "--output", dest="output_file", default=None,
+        help="Output calibration histograms ROOT file (overrides YAML)"
+    )
+    parser.add_argument(
+        "-n", "--max-events", dest="max_events", type=int, default=None,
+        help="Max events limit, 0 = all (overrides YAML)"
+    )
+    parser.add_argument(
+        "-j", "--threads", "--workers", dest="num_threads", type=int, default=None,
+        help="Number of RDataFrame worker threads (overrides YAML)"
+    )
+    parser.add_argument(
+        "--scifi-threshold", "--scifi-qdc-min", dest="scifi_threshold", type=float, default=None,
+        help="Offline SciFi hit threshold in p.e./QDC (overrides YAML)"
+    )
+    parser.add_argument(
+        "--save-events", dest="save_events", action="store_true", default=None,
+        help="Force saving passing events to output ROOT file (overrides YAML)"
+    )
+    parser.add_argument(
+        "--no-save-events", dest="save_events", action="store_false",
+        help="Do not save event tree, only extract histograms (overrides YAML)"
+    )
+    parser.add_argument(
+        "--skip-scifi-hits-cut", dest="skip_scifi_hits_cut", action="store_true", default=None,
+        help="Bypass legacy SciFi hits cut [10, 35] in the cut pipeline"
+    )
+    parser.add_argument(
+        "--save-calib-branches", dest="save_calib_branches", action="store_true", default=None,
+        help="Also save calib.* scalar columns in output TTree (overrides YAML)"
+    )
     args = parser.parse_args()
 
     # --------------------------------------------------------------------------
@@ -235,14 +275,14 @@ def main():
     prof_cfg = [tuple(x) for x in cfg.get("profiles", [])]
     progress_cfg = job_cfg.get("progress", {})
 
-    # Job & IO parameters
-    input_data = job_cfg.get("input_data", "/eos/user/i/idioniso/1_Data/Tracks/run_008329/sndsw_raw-*.root")
-    tree_name = job_cfg.get("tree_name", "")
-    output_file = job_cfg.get("output_file", "plots/scifi_calibration_histograms.root")
-    max_events = int(job_cfg.get("max_events", 0))
-    num_threads = int(job_cfg.get("num_threads", 8))
-    save_events = bool(job_cfg.get("save_events", True))
-    save_calib_branches = bool(job_cfg.get("save_calib_branches", False))
+    # Job & IO parameters (YAML defaults overridden by CLI arguments if specified)
+    input_data = args.input_data if args.input_data is not None else job_cfg.get("input_data", "/eos/user/i/idioniso/1_Data/Tracks/run_008329/sndsw_raw-*.root")
+    tree_name = args.tree_name if args.tree_name is not None else job_cfg.get("tree_name", "")
+    output_file = args.output_file if args.output_file is not None else job_cfg.get("output_file", "plots/scifi_calibration_histograms.root")
+    max_events = args.max_events if args.max_events is not None else int(job_cfg.get("max_events", 0))
+    num_threads = args.num_threads if args.num_threads is not None else int(job_cfg.get("num_threads", 8))
+    save_events = args.save_events if args.save_events is not None else bool(job_cfg.get("save_events", True))
+    save_calib_branches = args.save_calib_branches if args.save_calib_branches is not None else bool(job_cfg.get("save_calib_branches", False))
     tree_output_name = job_cfg.get("tree_output_name", "")
 
     # Physics parameters
@@ -252,6 +292,14 @@ def main():
             setattr(calib_cfg, k, v)
         elif k == "scifi_threshold" and hasattr(calib_cfg, "scifi_qdc_min"):
             calib_cfg.scifi_qdc_min = float(v)
+
+    if args.scifi_threshold is not None:
+        calib_cfg.scifi_qdc_min = float(args.scifi_threshold)
+
+    if args.skip_scifi_hits_cut is True:
+        for cut in pipeline_cfg:
+            if cut.get("id") == "scifi_hits_range":
+                cut["enabled"] = False
 
     # --------------------------------------------------------------------------
     # 3. Execution Summary Banner

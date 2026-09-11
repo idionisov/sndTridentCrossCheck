@@ -31,19 +31,21 @@ bool ProgressPrinter::operator()(ULong64_t /*entry*/) const {
     if ((current % check_interval == 0) || (fTotal > 0 && current == fTotal)) {
         auto now = std::chrono::steady_clock::now();
         std::chrono::duration<double> dt = now - fState->last_print_time;
-
         bool time_trigger = (fEverySec > 0.0 && dt.count() >= fEverySec);
         bool count_trigger = (fEveryN > 0 && (current - fState->last_print_count.load()) >= fEveryN);
-        bool final_trigger = (fTotal > 0 && current >= fTotal);
+        bool final_trigger = (fTotal > 0 && current >= fTotal && !fState->summary_printed.load());
 
         if (time_trigger || count_trigger || final_trigger) {
             std::lock_guard<std::mutex> lock(fState->print_mutex);
+            if (final_trigger && fState->summary_printed.load()) {
+                final_trigger = false;
+            }
             auto now_locked = std::chrono::steady_clock::now();
             std::chrono::duration<double> dt_locked = now_locked - fState->last_print_time;
 
             if ((fEverySec > 0.0 && dt_locked.count() >= (fEverySec * 0.9)) ||
                 (fEveryN > 0 && (current - fState->last_print_count.load()) >= fEveryN) ||
-                (fTotal > 0 && current >= fTotal))
+                final_trigger)
             {
                 PrintStatus(current, now_locked, final_trigger);
                 fState->last_print_time = now_locked;
