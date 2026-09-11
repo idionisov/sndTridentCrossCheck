@@ -90,6 +90,9 @@ def setup_calibration_dataframe(
     df = data.rdf()
     if max_events > 0:
         if ROOT.IsImplicitMTEnabled():
+            print(f"[!] Warning: ROOT Implicit Multi-Threading is active ({ROOT.GetThreadPoolSize()} threads).")
+            print(f"[!] ROOT RDataFrame does not support Range() in multi-thread mode.")
+            print(f"[!] Applying software filter (rdfentry_ < {max_events}). Note: To stop processing immediately at {max_events:,} events, run with -j 1.")
             df = df.Filter(f"rdfentry_ < {max_events}")
         else:
             df = df.Range(max_events)
@@ -238,6 +241,10 @@ def main():
         help="Max events limit, 0 = all (overrides YAML)"
     )
     parser.add_argument(
+        "-f", "--n-files", dest="n_files", type=int, default=None,
+        help="Max number of input files to process, <= 0 = all (overrides YAML)"
+    )
+    parser.add_argument(
         "-j", "--threads", "--workers", dest="num_threads", type=int, default=None,
         help="Number of RDataFrame worker threads (overrides YAML)"
     )
@@ -250,7 +257,7 @@ def main():
         help="Force saving passing events to output ROOT file (overrides YAML)"
     )
     parser.add_argument(
-        "--no-save-events", dest="save_events", action="store_false",
+        "--no-save-events", dest="save_events", action="store_false", default=None,
         help="Do not save event tree, only extract histograms (overrides YAML)"
     )
     parser.add_argument(
@@ -280,6 +287,7 @@ def main():
     tree_name = args.tree_name if args.tree_name is not None else job_cfg.get("tree_name", "")
     output_file = args.output_file if args.output_file is not None else job_cfg.get("output_file", "plots/scifi_calibration_histograms.root")
     max_events = args.max_events if args.max_events is not None else int(job_cfg.get("max_events", 0))
+    n_files = args.n_files if args.n_files is not None else int(job_cfg.get("n_files", -1))
     num_threads = args.num_threads if args.num_threads is not None else int(job_cfg.get("num_threads", 8))
     save_events = args.save_events if args.save_events is not None else bool(job_cfg.get("save_events", True))
     save_calib_branches = args.save_calib_branches if args.save_calib_branches is not None else bool(job_cfg.get("save_calib_branches", False))
@@ -312,6 +320,7 @@ def main():
     print(f"Input Pattern       : {input_data}")
     print(f"TTree Name          : {tree_name if tree_name else 'Auto-detect (rawConv / cbmsim)'}")
     print(f"Max Events          : {max_events if max_events > 0 else 'All'}")
+    print(f"Max Files           : {n_files if n_files > 0 else 'All'}")
     print(f"Worker Threads      : {num_threads}")
     print(f"Output File         : {output_file}")
     print("-" * 80)
@@ -333,13 +342,16 @@ def main():
     print(f"Total Active Cuts: {active_cuts_count} / {len(pipeline_cfg)}")
     print("=" * 80)
 
-    # 4. Enable Multi-Threading
+    # 4. Multi-Threading Control
     if num_threads > 1:
         ROOT.EnableImplicitMT(num_threads)
         print(f"[*] Enabled ROOT Implicit Multi-Threading with {num_threads} worker threads.")
+    else:
+        ROOT.DisableImplicitMT()
+        print(f"[*] Implicit Multi-Threading disabled (single thread execution).")
 
     # 5. Setup DataManager
-    data = DataManager(input_data, tree_name=tree_name, num_threads=num_threads)
+    data = DataManager(input_data, tree_name=tree_name, num_threads=num_threads, n_files=n_files)
     print(f"[*] Resolved {data.num_files:,} files | Active tree: '{data.tree_name}'")
 
     # 6. Setup Calibration DataFrame and Dynamic Filter Pipeline

@@ -82,12 +82,22 @@ class DataManager:
         elif isinstance(source, ROOT.TChain):
             self._cpp = ROOT.snd.DataManager(source, False, threads_int)
         elif isinstance(source, (list, tuple)):
+            files = list(source)
+            if n_files > 0:
+                files = files[:n_files]
             vec = ROOT.std.vector('string')()
-            for s in source:
+            for s in files:
                 vec.push_back(str(s))
             self._cpp = ROOT.snd.DataManager(vec, tree_str, threads_int)
         elif source is not None:
-            self._cpp = ROOT.snd.DataManager(str(source), tree_str, threads_int)
+            if n_files > 0:
+                resolved = list(ROOT.snd.DataManager.ResolveFiles(str(source)))
+                vec = ROOT.std.vector('string')()
+                for s in resolved[:n_files]:
+                    vec.push_back(str(s))
+                self._cpp = ROOT.snd.DataManager(vec, tree_str, threads_int)
+            else:
+                self._cpp = ROOT.snd.DataManager(str(source), tree_str, threads_int)
         else:
             self._cpp = ROOT.snd.DataManager()
 

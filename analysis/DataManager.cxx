@@ -215,10 +215,15 @@ namespace snd {
         }
         return *this;
     }
-
     void DataManager::AdoptChain(TChain* chain, bool ownChain, int numThreads) {
-        if (numThreads > 0 && !ROOT::IsImplicitMTEnabled()) {
-            ROOT::EnableImplicitMT(numThreads);
+        if (numThreads > 1) {
+            if (!ROOT::IsImplicitMTEnabled()) {
+                ROOT::EnableImplicitMT(numThreads);
+            }
+        } else if (numThreads == 1) {
+            if (ROOT::IsImplicitMTEnabled()) {
+                ROOT::DisableImplicitMT();
+            }
         }
         if (fOwnChain && fChain) {
             delete fChain;
@@ -272,8 +277,14 @@ namespace snd {
         const std::string& treeName,
         int numThreads
     ){
-        if (numThreads > 1 && !ROOT::IsImplicitMTEnabled()) {
-            ROOT::EnableImplicitMT(numThreads);
+        if (numThreads > 1) {
+            if (!ROOT::IsImplicitMTEnabled()) {
+                ROOT::EnableImplicitMT(numThreads);
+            }
+        } else if (numThreads == 1) {
+            if (ROOT::IsImplicitMTEnabled()) {
+                ROOT::DisableImplicitMT();
+            }
         }
 
         fFiles = ResolveFiles(sources);
