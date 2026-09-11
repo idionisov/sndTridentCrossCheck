@@ -1,17 +1,25 @@
 # ==============================================================================
 # SND@LHC SciFi Multi-Parameter Digitization & QDC Calibration Configuration
 # ==============================================================================
-# Central configuration file for systematic scans over SciFi hit thresholds,
-# QDC energy calibration scale factors, and pedestal offsets.
+# Central configuration file for dense systematic scans over:
+# 1. SciFi hit detection threshold (ts): 1.0 to 10.0 p.e.
+# 2. SciFi QDC calibration scale factor (s_QDC): 2.0 to 8.0
+# 3. SciFi QDC pedestal offset (b0): -0.5 to 0.5 a.u.
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
-# 1. Parameter Grid Definitions
+# 1. Parameter Grid Definitions (Cartesian Product: 19 x 31 x 21 = 12,369 points)
 # ------------------------------------------------------------------------------
 parameters:
-  # SciFi hit detection threshold in photo-electrons [p.e.]
-  # Nominal SND@LHC simulation default: 3.5 p.e.
+  # SciFi hit detection threshold in photo-electrons [p.e.] (Range: 1.0 to 10.0 p.e.)
+  # Note: in pre-digitized MC, min valid hit QDC is ~3.06 p.e. Any threshold below 3.06
+  # accepts all valid hits in the file.
   thresholds:
+    - 1.0
+    - 1.5
+    - 2.0
+    - 2.5
+    - 3.0
     - 3.5
     - 4.0
     - 4.5
@@ -20,27 +28,72 @@ parameters:
     - 6.0
     - 6.5
     - 7.0
+    - 7.5
+    - 8.0
+    - 8.5
+    - 9.0
+    - 9.5
+    - 10.0
 
-  # SciFi QDC calibration scale factor (s_QDC)
+  # SciFi QDC calibration scale factor (s_QDC, Range: 2.0 to 8.0 in steps of 0.2)
   # Converts raw simulated micro-pixel pulse heights to data single-MIP QDC scale
-  # Nominal empirical ratio (Peak_MC / Peak_Data): ~4.50
   qdc_scales:
+    - 2.0
+    - 2.2
+    - 2.4
+    - 2.6
+    - 2.8
+    - 3.0
+    - 3.2
+    - 3.4
     - 3.6
-    - 3.9
+    - 3.8
+    - 4.0
     - 4.2
-    - 4.5
+    - 4.4
+    - 4.6
     - 4.8
-    - 5.1
+    - 5.0
+    - 5.2
     - 5.4
+    - 5.6
+    - 5.8
+    - 6.0
+    - 6.2
+    - 6.4
+    - 6.6
+    - 6.8
+    - 7.0
+    - 7.2
+    - 7.4
+    - 7.6
+    - 7.8
+    - 8.0
 
-  # SciFi QDC pedestal offset in arbitrary units [a.u.]
-  # QDC_calib = (QDC_raw - b0) / s_QDC (Nominal default: 0.0)
+  # SciFi QDC pedestal offset in arbitrary units [a.u.] (Range: -0.5 to 0.5 in steps of 0.05)
+  # QDC_calib = (QDC_raw - b0) / s_QDC
   qdc_offsets:
-    - -0.4
-    - -0.2
-    - 0.0
-    - 0.2
-    - 0.4
+    - -0.50
+    - -0.45
+    - -0.40
+    - -0.35
+    - -0.30
+    - -0.25
+    - -0.20
+    - -0.15
+    - -0.10
+    - -0.05
+    - 0.00
+    - 0.05
+    - 0.10
+    - 0.15
+    - 0.20
+    - 0.25
+    - 0.30
+    - 0.35
+    - 0.40
+    - 0.45
+    - 0.50
 
   # SiPM saturation energy in p.e. (used in pipeline digitization mode)
   saturation: 104.0

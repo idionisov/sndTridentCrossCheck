@@ -611,8 +611,7 @@ def main():
                     # Loss components
                     "loss_hits": loss_hits,
                     "loss_qdc": loss_qdc,
-                    "total_loss": total_loss,
-                    "counts_qdc_rebinned": qm["counts_m_rebinned"]
+                    "total_loss": total_loss
                 }
                 results_grid.append(entry)
 
@@ -631,6 +630,14 @@ def main():
             break
     if not default_entry:
         default_entry = results_grid[-1]
+
+    # Populate rebinned QDC counts only for best and default entries (used in plotting)
+    best["counts_qdc_rebinned"] = compute_rescaled_qdc_metrics(
+        h_data_qdc, mc_cache[best["ts"]]["h_m_qdc"], scale=best["s_qdc"], offset=best["b0"]
+    )["counts_m_rebinned"]
+    default_entry["counts_qdc_rebinned"] = compute_rescaled_qdc_metrics(
+        h_data_qdc, mc_cache[default_entry["ts"]]["h_m_qdc"], scale=default_entry["s_qdc"], offset=default_entry["b0"]
+    )["counts_m_rebinned"]
 
     # 5. Print Summary Ranking Tables
     print("\n" + "=" * 115)
@@ -870,7 +877,13 @@ def main():
         is_best = abs(t - best["ts"]) < 1e-4
         col = 'crimson' if is_best else cmap(idx)
         lw = 2.5 if is_best else 1.2
-        lbl = f"MC ts = {t:.2f} p.e." + (" ★ BEST" if is_best else "")
+        stride = max(1, len(ts_list) // 8)
+        if is_best:
+            lbl = f"MC ts = {t:.2f} p.e. ★ BEST"
+        elif len(ts_list) <= 10 or idx % stride == 0 or idx == len(ts_list) - 1 or idx == 0:
+            lbl = f"MC ts = {t:.2f} p.e."
+        else:
+            lbl = None
         ax4_top.step(x_m, norm_m, where='mid', label=lbl, color=col, linewidth=lw, linestyle='-' if is_best else '--')
 
         norm_m_interp = np.interp(x_dh, x_m, norm_m)
