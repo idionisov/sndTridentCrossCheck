@@ -6,7 +6,13 @@ SND@LHC SciFi Muon Calibration Histogram Extraction Engine
 High-throughput calibration distribution extractor supporting 1D, 2D, and
 TProfile observables for clean single through-going muons in data and MC.
 
+All configuration (IO defaults, physics parameters, cut ordering and activation,
+and histogram binning) is driven by:
+  config/scifi_calibration_config.yaml
+
 Features:
+- Complete configuration driven by YAML config file.
+- Dynamic cut pipeline execution according to YAML configuration order and flags.
 - Multi-threaded event processing via ROOT RDataFrame and DataManager.
 - Selection of clean single muons using compiled C++ MuonCalibrationProcessor.
 - Books and fills all SciFi hit charge, plane sum, attenuation, and track metrics.
@@ -43,7 +49,13 @@ if _repo_root not in sys.path:
     sys.path.insert(0, _repo_root)
 
 from snd import DataManager, load_trident_libraries
-from config.calibration_histograms_config import CALIB_CONFIGS_1D, CALIB_CONFIGS_2D, CALIB_PROFILE_CONFIGS
+from config.calibration_histograms_config import (
+    load_scifi_calibration_config,
+    DEFAULT_YAML_PATH,
+    CALIB_CONFIGS_1D,
+    CALIB_CONFIGS_2D,
+    CALIB_PROFILE_CONFIGS
+)
 
 # Load compiled C++ analysis libraries (libtrident_analysis.so)
 load_trident_libraries(_repo_root)
@@ -63,14 +75,16 @@ def get_or_create_dir(parent_tfile_or_dir, path_str: str):
 
 def setup_calibration_dataframe(
     data: DataManager,
-    config: Any,
+    calib_cfg: Any,
+    cuts_pipeline: List[Dict[str, Any]],
+    hist_configs_1d: List[Tuple],
+    hist_configs_2d: List[Tuple],
+    profile_configs: List[Tuple],
     max_events: int = 0,
-    skip_scifi_hits_cut: bool = True,
-    ip1_only: bool = False,
-) -> Tuple[ROOT.RDataFrame, ROOT.snd.trident.MuonCalibrationProcessor]:
+) -> Tuple[ROOT.RDataFrame, ROOT.snd.trident.MuonCalibrationProcessor, List[str]]:
     """
     Configures multi-threaded RDataFrame with compiled C++ MuonCalibrationProcessor.
-    Dynamically identifies hit and track branches across sndsw production formats.
+    Applies the ordered cut pipeline dynamically as configured in YAML.
     """
     df = data.df()
     if max_events > 0:
@@ -78,10 +92,6 @@ def setup_calibration_dataframe(
             df = df.Filter(f"rdfentry_ < {max_events}")
         else:
             df = df.Range(max_events)
-
-    # Optional IP1 bunch timing selection for collision data
-    if ip1_only and data.has_event_header():
-        df = df.Filter("EventHeader.isIP1()", "Stage 0: IP1 Collision Bunch Crossing")
 
     # 1. Resolve Track and Hit Branch Names dynamically
     track_branch = "Reco_MuonTracks" if data.has_branch("Reco_MuonTracks") else "fittedTracks"
@@ -94,17 +104,30 @@ def setup_calibration_dataframe(
         mf_branch = "Digits_MuFilter"
 
     # 2. Extract Calibration Metrics using compiled C++ processor
-    processor = ROOT.snd.trident.MuonCalibrationProcessor(config)
+    processor = ROOT.snd.trident.MuonCalibrationProcessor(calib_cfg)
     df = df.Define("calib", processor, [track_branch, sf_branch, mf_branch])
 
-    # 3. Filter for Clean Single Through-Going Muon Tracks sequentially
-    df = df.Filter("calib.pass_cut_single_scifi_track", "Stage 1: Exactly 1 Reconstructed SciFi Track")
-    df = df.Filter("calib.pass_cut_chi2", f"Stage 2: SciFi Track Chi2/ndf <= {config.chi2_max}")
-    df = df.Filter("calib.pass_cut_slope", f"Stage 3: Max Angular Slope <= {config.max_slope} rad")
-    df = df.Filter("calib.pass_cut_fiducial", f"Stage 4: Fiducial Boundary Margin >= {config.fiducial_margin} cm")
-    df = df.Filter("calib.pass_cut_ds_match", f"Stage 5: DS Track Slope Match <= {config.ds_match_slope_max} rad")
-    if not skip_scifi_hits_cut:
-        df = df.Filter("calib.pass_cut_scifi_hits", f"Stage 6: SciFi Total Hits [{config.scifi_hits_min}, {config.scifi_hits_max}]")
+    # 3. Setup IP1 bunch filter if EventHeader is present (for real collision data)
+    has_header = data.has_branch("EventHeader.") or data.has_branch("EventHeader")
+    header_col = "EventHeader." if data.has_branch("EventHeader.") else ("EventHeader" if data.has_branch("EventHeader") else None)
+    if has_header and header_col:
+        df = df.Define("is_ip1", ROOT.snd.trident.IP1Filter(), [header_col])
+
+    # 4. Dynamically apply active cuts in the exact sequence specified by YAML
+    applied_cut_labels = []
+    for cut in cuts_pipeline:
+        if not cut.get("enabled", False):
+            continue
+
+        # Check if cut requires event header (e.g. isIP1 for collision data)
+        if cut.get("requires_header", False):
+            if not has_header:
+                continue
+
+        filter_expr = cut["filter"]
+        label = cut["label"]
+        df = df.Filter(filter_expr, label)
+        applied_cut_labels.append(label)
 
     df_clean = df
 
@@ -120,36 +143,51 @@ def setup_calibration_dataframe(
         .Define("plane_station",   "calib.get_plane_station()")
     )
 
-    # 5. Define flat scalar observables from calib struct
+    # 5. Define flat scalar observables from calib struct required by booked histograms
     vector_cols = {"hit_qdc", "hit_distance", "hit_station", "hit_orientation", "plane_qdc", "plane_nhits", "plane_station"}
-    for v_name, _, _, _, _, _ in CALIB_CONFIGS_1D:
+    needed_cols = set()
+    for item in hist_configs_1d:
+        needed_cols.add(item[0])
+    for item in hist_configs_2d:
+        needed_cols.add(item[8])  # x_var
+        needed_cols.add(item[9])  # y_var
+    for item in profile_configs:
+        needed_cols.add(item[5])  # x_var
+        needed_cols.add(item[6])  # y_var
+
+    for v_name in sorted(list(needed_cols)):
         if v_name not in vector_cols:
             if data.has_branch(v_name):
                 df_clean = df_clean.Redefine(v_name, f"calib.{v_name}")
             else:
                 df_clean = df_clean.Define(v_name, f"calib.{v_name}")
 
-    return df_clean, processor
+    return df_clean, processor, applied_cut_labels
 
 
-def book_calibration_histograms(df_node: ROOT.RDataFrame) -> Tuple[Dict[str, Any], Dict[str, Any], Dict[str, Any]]:
+def book_calibration_histograms(
+    df_node: ROOT.RDataFrame,
+    hist_configs_1d: List[Tuple],
+    hist_configs_2d: List[Tuple],
+    profile_configs: List[Tuple],
+) -> Tuple[Dict[str, Any], Dict[str, Any], Dict[str, Any]]:
     """Books 1D, 2D, and Profile histograms for calibration."""
     h1_ptrs: Dict[str, Any] = {}
     h2_ptrs: Dict[str, Any] = {}
     prof_ptrs: Dict[str, Any] = {}
 
     # 1. Book 1D Histograms
-    for v_name, title, nbins, xmin, xmax, _ in CALIB_CONFIGS_1D:
+    for v_name, title, nbins, xmin, xmax, _ in hist_configs_1d:
         model = ROOT.RDF.TH1DModel(f"h1_{v_name}", title, nbins, xmin, xmax)
         h1_ptrs[v_name] = df_node.Histo1D(model, v_name)
 
     # 2. Book 2D Histograms
-    for h2_name, title, nx, xmin, xmax, ny, ymin, ymax, x_var, y_var, _ in CALIB_CONFIGS_2D:
+    for h2_name, title, nx, xmin, xmax, ny, ymin, ymax, x_var, y_var, _ in hist_configs_2d:
         model = ROOT.RDF.TH2DModel(h2_name, title, nx, xmin, xmax, ny, ymin, ymax)
         h2_ptrs[h2_name] = df_node.Histo2D(model, x_var, y_var)
 
     # 3. Book Profiles
-    for prof_name, title, nbins_x, xmin, xmax, x_var, y_var, _ in CALIB_PROFILE_CONFIGS:
+    for prof_name, title, nbins_x, xmin, xmax, x_var, y_var, _ in profile_configs:
         model = ROOT.RDF.TProfile1DModel(prof_name, title, nbins_x, xmin, xmax)
         prof_ptrs[prof_name] = df_node.Profile1D(model, x_var, y_var)
 
@@ -157,131 +195,110 @@ def book_calibration_histograms(df_node: ROOT.RDataFrame) -> Tuple[Dict[str, Any
 
 
 def main():
+    # --------------------------------------------------------------------------
+    # 1. Configuration File Argument Parser
+    # --------------------------------------------------------------------------
     parser = argparse.ArgumentParser(
-        description="Multi-threaded SciFi QDC & Attenuation Histogram Extractor (RDataFrame)",
-        formatter_class=argparse.RawDescriptionHelpFormatter
+        description="SND@LHC SciFi Muon Calibration Histogram & Event Extraction Engine (RDataFrame)",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    parser.add_argument("-i", "--input", dest="input_data",
-                        default="/eos/user/i/idioniso/1_Data/Tracks/run_008329/sndsw_raw-*.root",
-                        help="Input reconstructed track ROOT files pattern (default: run 8329)")
-    parser.add_argument("-t", "--tree", dest="tree_name", default="",
-                        help="TTree name: 'cbmsim' or 'rawConv' (default: auto-detect)")
-    parser.add_argument("-o", "--output", dest="output_file",
-                        default="plots/scifi_calibration_histograms.root",
-                        help="Output calibration histograms ROOT file (default: plots/scifi_calibration_histograms.root)")
-    parser.add_argument("-n", "--max-events", dest="max_events", type=int, default=0,
-                        help="Max events limit (0 = all)")
-    parser.add_argument("-j", "--threads", "--workers", dest="num_threads", type=int, default=8,
-                        help="Number of RDataFrame worker threads (default: 8)")
-
-    # Configurable clean muon selection cuts
-    parser.add_argument("--chi2-max", type=float, default=10.0, help="Max track chi2/ndf (default: 10.0)")
-    parser.add_argument("--max-slope", type=float, default=0.05, help="Max angular slope dx/dz, dy/dz (default: 0.05)")
-    parser.add_argument("--scifi-min", type=int, default=10, help="Min SciFi hits (default: 10)")
-    parser.add_argument("--scifi-max", type=int, default=35, help="Max SciFi hits (default: 35)")
-    parser.add_argument("--ds-min", type=int, default=2, help="Min Downstream MuFilter hits (default: 2)")
-    parser.add_argument("--ds-match-slope", type=float, default=0.04, help="Max slope diff between SF and DS tracks (default: 0.04)")
-    parser.add_argument("--fiducial-margin", type=float, default=1.5, help="Fiducial margin in cm (default: 1.5)")
-
-    # Event saving and cut bypass options
-    parser.add_argument("--save-events", "--copy-events", "--save-tree", dest="save_events", action="store_true", default=True,
-                        help="Copy and store passing events with original branches into output ROOT file (default: True)")
-    parser.add_argument("--no-save-events", dest="save_events", action="store_false",
-                        help="Do not save event tree, only extract histograms")
-    parser.add_argument("--skip-scifi-hits-cut", "--no-scifi-hits-cut", dest="skip_scifi_hits_cut", action="store_true", default=True,
-                        help="Skip the final SciFi hits [10, 35] cut (Stage 6) to preserve full hit spectrum (default: True)")
-    parser.add_argument("--apply-scifi-hits-cut", dest="skip_scifi_hits_cut", action="store_false",
-                        help="Apply the final SciFi hits [10, 35] cut")
-    parser.add_argument("--ip1-only", dest="ip1_only", action="store_true", default=False,
-                        help="Filter data for IP1 collision bunches (default: False)")
-    parser.add_argument("--save-calib-branches", dest="save_calib_branches", action="store_true", default=False,
-                        help="Also save calib.* scalar columns in the output TTree (default: False, only original branches)")
-    parser.add_argument("--tree-output-name", dest="tree_output_name", default="",
-                        help="Output tree name (default: same as input tree, e.g. rawConv or cbmsim)")
-
+    parser.add_argument(
+        "-c", "--config", dest="config_file", default=DEFAULT_YAML_PATH,
+        help=f"Master YAML configuration file (default: {DEFAULT_YAML_PATH})"
+    )
     args = parser.parse_args()
 
+    # --------------------------------------------------------------------------
+    # 2. Load Configuration from YAML
+    # --------------------------------------------------------------------------
+    cfg = load_scifi_calibration_config(args.config_file)
+    job_cfg = cfg.get("job", {})
+    params_cfg = cfg.get("parameters", {})
+    pipeline_cfg = cfg.get("cuts", {}).get("pipeline", [])
+    h1_cfg = [tuple(x) for x in cfg.get("histograms_1d", [])]
+    h2_cfg = [tuple(x) for x in cfg.get("histograms_2d", [])]
+    prof_cfg = [tuple(x) for x in cfg.get("profiles", [])]
+
+    # Job & IO parameters
+    input_data = job_cfg.get("input_data", "/eos/user/i/idioniso/1_Data/Tracks/run_008329/sndsw_raw-*.root")
+    tree_name = job_cfg.get("tree_name", "")
+    output_file = job_cfg.get("output_file", "plots/scifi_calibration_histograms.root")
+    max_events = int(job_cfg.get("max_events", 0))
+    num_threads = int(job_cfg.get("num_threads", 8))
+    save_events = bool(job_cfg.get("save_events", True))
+    save_calib_branches = bool(job_cfg.get("save_calib_branches", False))
+    tree_output_name = job_cfg.get("tree_output_name", "")
+
+    # Physics parameters
+    calib_cfg = ROOT.snd.trident.MuonCalibrationConfig()
+    for k, v in params_cfg.items():
+        if hasattr(calib_cfg, k):
+            setattr(calib_cfg, k, v)
+        elif k == "scifi_threshold" and hasattr(calib_cfg, "scifi_qdc_min"):
+            calib_cfg.scifi_qdc_min = float(v)
+
+    # --------------------------------------------------------------------------
+    # 3. Execution Summary Banner
+    # --------------------------------------------------------------------------
     t0_all = time.time()
     print("=" * 80)
     print("SND@LHC SCIFI CALIBRATION HISTOGRAM & EVENT EXTRACTION ENGINE (RDataFrame)")
     print("=" * 80)
-    print(f"Input Pattern      : {args.input_data}")
-    print(f"TTree Name         : {args.tree_name if args.tree_name else 'Auto-detect (rawConv / cbmsim)'}")
-    print(f"Max Events         : {args.max_events if args.max_events > 0 else 'All'}")
-    print(f"Worker Threads     : {args.num_threads}")
-    print(f"Output File        : {args.output_file}")
+    print(f"Master Configuration: {args.config_file}")
+    print(f"Input Pattern       : {input_data}")
+    print(f"TTree Name          : {tree_name if tree_name else 'Auto-detect (rawConv / cbmsim)'}")
+    print(f"Max Events          : {max_events if max_events > 0 else 'All'}")
+    print(f"Worker Threads      : {num_threads}")
+    print(f"Output File         : {output_file}")
     print("-" * 80)
-    print("Selection Criteria:")
-    if args.ip1_only:
-        print("  Bunch Crossing Timing    : IP1 Collision Bunches only (EventHeader.isIP1())")
-    print(f"  SciFi Track Multiplicity : Exactly 1 Reconstructed SciFi Track")
-    print(f"  SciFi Track #chi2/ndf    : <= {args.chi2_max}")
-    print(f"  Max Angular Slope        : <= {args.max_slope} rad (~3 deg)")
-    print(f"  DS Track Slope Match     : |#Delta slope| <= {args.ds_match_slope}")
-    print(f"  Fiducial Margin          : >= {args.fiducial_margin} cm from borders")
-    if args.skip_scifi_hits_cut:
-        print(f"  SciFi Total Hits         : [SKIPPED - Preserving full hit multiplicity for threshold studies]")
-    else:
-        print(f"  SciFi Total Hits         : [{args.scifi_min}, {args.scifi_max}]")
-    print(f"  DS System Hits           : >= {args.ds_min}")
-    print(f"  Save Filtered Events     : {args.save_events} (tree: '{args.tree_output_name if args.tree_output_name else 'auto-detect'}')")
+    print("Physics Parameters:")
+    print(f"  SciFi Track Type  : {calib_cfg.scifi_track_type} (11 = Hough)")
+    print(f"  DS Track Type     : {calib_cfg.ds_track_type} (13 = Hough)")
+    print(f"  Track #chi2/ndf   : SciFi <= {calib_cfg.chi2_max_scifi}, DS <= {calib_cfg.chi2_max_ds}")
+    print(f"  Max Angular Slope : < {calib_cfg.max_slope} rad")
+    print(f"  Fiducial Plane    : z = {calib_cfg.z_match:.1f} cm (margin >= {calib_cfg.fiducial_margin} cm)")
+    print(f"  DS Matching       : dR <= {calib_cfg.pos_match_max} cm, dTheta <= {calib_cfg.angle_match_max} rad")
+    print("-" * 80)
+    print("Active Cut Sequence Pipeline (in execution order):")
+    active_cuts_count = 0
+    for idx, cut in enumerate(pipeline_cfg, start=1):
+        status_str = "[ACTIVE]" if cut.get("enabled", False) else "[BYPASSED]"
+        print(f"  {idx:2d}. {status_str:10s} {cut['id']:25s} : {cut['label']}")
+        if cut.get("enabled", False):
+            active_cuts_count += 1
+    print(f"Total Active Cuts: {active_cuts_count} / {len(pipeline_cfg)}")
     print("=" * 80)
 
-    # 1. Enable Multi-Threading
-    if args.num_threads > 1:
-        ROOT.EnableImplicitMT(args.num_threads)
-        print(f"[*] Enabled ROOT Implicit Multi-Threading with {args.num_threads} worker threads.")
+    # 4. Enable Multi-Threading
+    if num_threads > 1:
+        ROOT.EnableImplicitMT(num_threads)
+        print(f"[*] Enabled ROOT Implicit Multi-Threading with {num_threads} worker threads.")
 
-    # 2. Setup DataManager
-    data = DataManager(args.input_data, tree_name=args.tree_name, num_threads=args.num_threads)
+    # 5. Setup DataManager
+    data = DataManager(input_data, tree_name=tree_name, num_threads=num_threads)
     print(f"[*] Resolved {data.num_files:,} files | Active tree: '{data.tree_name}'")
 
-    # 3. Setup Calibration Config & RDataFrame
-    calib_cfg = ROOT.snd.trident.MuonCalibrationConfig()
-    calib_cfg.chi2_max = args.chi2_max
-    calib_cfg.max_slope = args.max_slope
-    calib_cfg.fiducial_margin = args.fiducial_margin
-    calib_cfg.scifi_hits_min = args.scifi_min
-    calib_cfg.scifi_hits_max = args.scifi_max
-    calib_cfg.ds_hits_min = args.ds_min
-    calib_cfg.ds_match_slope_max = args.ds_match_slope
-
-    df_clean, processor = setup_calibration_dataframe(
-        data, calib_cfg, args.max_events,
-        skip_scifi_hits_cut=args.skip_scifi_hits_cut,
-        ip1_only=args.ip1_only
+    # 6. Setup Calibration DataFrame and Dynamic Filter Pipeline
+    df_clean, processor, applied_cut_labels = setup_calibration_dataframe(
+        data, calib_cfg, pipeline_cfg,
+        h1_cfg, h2_cfg, prof_cfg,
+        max_events=max_events
     )
 
-    # 4. Prepare Atomic Temporary Container
-    out_dir = os.path.dirname(os.path.abspath(args.output_file))
+    # 7. Prepare Atomic Temporary Container
+    out_dir = os.path.dirname(os.path.abspath(output_file))
     os.makedirs(out_dir, exist_ok=True)
 
     with tempfile.NamedTemporaryFile(suffix=".root", delete=False) as tmp:
         tmp_path = tmp.name
 
-    out_tree_name = args.tree_output_name if args.tree_output_name else data.tree_name
+    out_tree_name = tree_output_name if tree_output_name else data.tree_name
 
-    # Optional Lazy Snapshot to write events during the same event loop pass
-    snap_book = None
-    if args.save_events:
-        branches_to_save = sorted(list(set(data.branch_names)))
-        if args.save_calib_branches:
-            vector_cols = {"hit_qdc", "hit_distance", "hit_station", "hit_orientation", "plane_qdc", "plane_nhits", "plane_station"}
-            for v_name, _, _, _, _, _ in CALIB_CONFIGS_1D:
-                if v_name not in vector_cols and v_name not in branches_to_save:
-                    branches_to_save.append(v_name)
-
-        opts = ROOT.RDF.RSnapshotOptions()
-        opts.fLazy = True
-        opts.fMode = "RECREATE"
-        print(f"[*] Booking lazy snapshot of tree '{out_tree_name}' ({len(branches_to_save)} branches) to {tmp_path}...")
-        snap_book = df_clean.Snapshot(out_tree_name, tmp_path, branches_to_save, opts)
-
-    # 5. Book Histograms and Profiles
-    h1_books, h2_books, prof_books = book_calibration_histograms(df_clean)
+    # 8. Book Histograms and Profiles
+    h1_books, h2_books, prof_books = book_calibration_histograms(df_clean, h1_cfg, h2_cfg, prof_cfg)
     count_book = df_clean.Count()
 
-    # 6. Execute Event Loop across Worker Threads
+    # 9. Execute Event Loop across Worker Threads
     print("[*] RDataFrame computational graph booked. Executing multi-threaded event loop...")
     t_loop = time.time()
     n_clean_muons = count_book.GetValue()
@@ -293,7 +310,30 @@ def main():
     cutflow_rep = df_clean.Report()
     cutflow_rep.Print()
 
-    # 7. Materialize ROOT objects into local memory
+    # Optional Snapshot to write events (executed only if passing events exist to prevent MT empty-tree crashes)
+    events_saved = False
+    if save_events:
+        if n_clean_muons > 0:
+            branches_to_save = sorted(list(set(data.branch_names)))
+            if save_calib_branches:
+                vector_cols = {"hit_qdc", "hit_distance", "hit_station", "hit_orientation", "plane_qdc", "plane_nhits", "plane_station"}
+                for item in h1_cfg:
+                    v_name = item[0]
+                    if v_name not in vector_cols and v_name not in branches_to_save:
+                        branches_to_save.append(v_name)
+
+            opts = ROOT.RDF.RSnapshotOptions()
+            opts.fLazy = False
+            opts.fMode = "RECREATE"
+            print(f"[*] Snapshotting {n_clean_muons:,} passing events ({len(branches_to_save)} branches) to {tmp_path}...")
+            t_snap = time.time()
+            df_clean.Snapshot(out_tree_name, tmp_path, branches_to_save, opts)
+            events_saved = True
+            print(f"[✓] Event snapshot completed in {time.time() - t_snap:.2f} s")
+        else:
+            print("[*] No events survived the selection pipeline. Skipping event snapshot.")
+
+    # 10. Materialize ROOT objects into local memory
     hist_1d: Dict[str, ROOT.TH1D] = {}
     for name, ptr in h1_books.items():
         h = ptr.GetValue()
@@ -324,10 +364,10 @@ def main():
             h_cutflow.SetBinContent(idx, c.GetPass())
 
     # ==============================================================================
-    # 8. Safe Hierarchical Atomic File Writing (EOS Safe)
+    # 11. Safe Hierarchical Atomic File Writing (EOS Safe)
     # ==============================================================================
     print(f"\n[*] Serializing histograms to atomic container: {tmp_path}")
-    if args.save_events:
+    if events_saved:
         tfile = ROOT.TFile(tmp_path, "UPDATE")
     else:
         tfile = ROOT.TFile(tmp_path, "RECREATE")
@@ -362,10 +402,10 @@ def main():
         os.remove(tmp_path)
         raise RuntimeError(f"Output file size is suspiciously small ({fsize} bytes). Aborting commit!")
 
-    shutil.move(tmp_path, args.output_file)
+    shutil.move(tmp_path, output_file)
     print(f"[✓] Successfully committed output ROOT file ({fsize / (1024*1024):.2f} MB):")
-    print(f"    --> {args.output_file}")
-    if args.save_events:
+    print(f"    --> {output_file}")
+    if save_events:
         print(f"[✓] Saved TTree '{out_tree_name}' with {n_clean_muons:,} events.")
     print(f"[✓] Extracted {len(hist_1d)} 1D histograms, {len(hist_2d)} 2D histograms, {len(profiles)} Profiles.")
     print(f"[✓] Total elapsed extraction time: {time.time() - t0_all:.2f} s")

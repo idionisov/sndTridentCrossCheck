@@ -43,6 +43,18 @@ double MuonCalibrationProcessor::calculateFiberDistance(sndRecoTrack* track, snd
     }
 }
 
+TVector3 MuonCalibrationProcessor::extrapolateToZ(sndRecoTrack* track, double z) const {
+    if (!track) return TVector3(0.0, 0.0, z);
+    TVector3 start = track->getStart();
+    double slopeX = track->getSlopeXZ();
+    double slopeY = track->getSlopeYZ();
+    return TVector3(
+        start.X() + slopeX * (z - start.Z()),
+        start.Y() + slopeY * (z - start.Z()),
+        z
+    );
+}
+
 MuonCalibrationMetrics MuonCalibrationProcessor::process(
     const TClonesArray* tracks,
     const TClonesArray* scifiHits,
@@ -52,17 +64,13 @@ MuonCalibrationMetrics MuonCalibrationProcessor::process(
     MuonCalibrationMetrics m;
 
     // -------------------------------------------------------------------------
-    // 1. Process Track Reconstruction (Distinguishing SciFi vs DS tracks)
+    // 1. Process Track Reconstruction (Hough Tracks: SciFi type 11, DS type 13)
     // -------------------------------------------------------------------------
-    sndRecoTrack* scifiKalmanTrack = nullptr;
-    sndRecoTrack* scifiHoughTrack  = nullptr;
-    sndRecoTrack* dsKalmanTrack    = nullptr;
-    sndRecoTrack* dsHoughTrack     = nullptr;
+    sndRecoTrack* scifiTrack = nullptr;
+    sndRecoTrack* dsTrack    = nullptr;
 
-    int n_scifi_kalman = 0;
-    int n_scifi_hough  = 0;
-    int n_ds_kalman    = 0;
-    int n_ds_hough     = 0;
+    int n_scifi_tracks = 0;
+    int n_ds_tracks    = 0;
 
     if (tracks) {
         m.n_tracks = tracks->GetEntries();
@@ -71,30 +79,29 @@ MuonCalibrationMetrics MuonCalibrationProcessor::process(
             if (!trk) continue;
 
             int trk_type = trk->getTrackType();
-            if (trk_type == 1) {
-                n_scifi_kalman++;
-                if (!scifiKalmanTrack && trk->getTrackFlag()) scifiKalmanTrack = trk;
-            } else if (trk_type == 11) {
-                n_scifi_hough++;
-                if (!scifiHoughTrack && trk->getTrackFlag()) scifiHoughTrack = trk;
-            } else if (trk_type == 3) {
-                n_ds_kalman++;
-                if (!dsKalmanTrack && trk->getTrackFlag()) dsKalmanTrack = trk;
-            } else if (trk_type == 13) {
-                n_ds_hough++;
-                if (!dsHoughTrack && trk->getTrackFlag()) dsHoughTrack = trk;
+            if (trk_type == fConfig.scifi_track_type) {
+                n_scifi_tracks++;
+                if (!scifiTrack || (!scifiTrack->getTrackFlag() && trk->getTrackFlag())) {
+                    scifiTrack = trk;
+                }
+            } else if (trk_type == fConfig.ds_track_type) {
+                n_ds_tracks++;
+                if (!dsTrack || (!dsTrack->getTrackFlag() && trk->getTrackFlag())) {
+                    dsTrack = trk;
+                }
             }
         }
     }
 
-    // Single physical SciFi track: prefer Kalman track count, fallback to Hough count
-    m.n_scifi_tracks = (n_scifi_kalman > 0) ? n_scifi_kalman : n_scifi_hough;
-    m.n_ds_tracks    = (n_ds_kalman > 0) ? n_ds_kalman : n_ds_hough;
+    m.n_scifi_tracks = n_scifi_tracks;
+    m.n_ds_tracks    = n_ds_tracks;
 
-    sndRecoTrack* scifiTrack = scifiKalmanTrack ? scifiKalmanTrack : scifiHoughTrack;
-    sndRecoTrack* dsTrack    = dsKalmanTrack ? dsKalmanTrack : dsHoughTrack;
+    // Requirement 1: Exactly 1 SciFi track (Hough transform type 11)
+    m.pass_cut_single_scifi_track = (m.n_scifi_tracks == 1 && scifiTrack != nullptr);
 
-    m.pass_cut_single_scifi_track = (m.n_scifi_tracks == 1);
+    // Requirement 2: At least 1 DS track (Hough transform type 13)
+    m.pass_cut_ds_track = (m.n_ds_tracks >= 1 && dsTrack != nullptr);
+
     if (scifiTrack) {
         m.track_flag     = scifiTrack->getTrackFlag();
         m.track_chi2     = scifiTrack->getChi2();
@@ -115,22 +122,63 @@ MuonCalibrationMetrics MuonCalibrationProcessor::process(
         m.track_stop_y   = stop.Y();
         m.track_stop_z   = stop.Z();
 
-        m.pass_cut_chi2 = (m.track_flag && m.track_chi2_ndf > 0.0f && m.track_chi2_ndf <= fConfig.chi2_max);
-        m.pass_cut_slope = (std::abs(m.track_slope_xz) <= fConfig.max_slope && 
-                            std::abs(m.track_slope_yz) <= fConfig.max_slope);
-        m.pass_cut_fiducial = isFiducial(start.X(), start.Y()) && isFiducial(stop.X(), stop.Y());
+        m.pass_cut_chi2_scifi  = (m.track_flag && m.track_chi2_ndf > 0.0f && m.track_chi2_ndf <= fConfig.chi2_max_scifi);
+        m.pass_cut_slope_scifi = (std::abs(m.track_slope_xz) < fConfig.max_slope && 
+                                  std::abs(m.track_slope_yz) < fConfig.max_slope);
+        m.pass_cut_fiducial    = isFiducial(start.X(), start.Y()) && isFiducial(stop.X(), stop.Y());
+    }
 
-        bool ds_match = true;
-        if (dsTrack) {
-            m.ds_track_slope_xz = dsTrack->getSlopeXZ();
-            m.ds_track_slope_yz = dsTrack->getSlopeYZ();
-            m.diff_slope_xz = std::abs(m.track_slope_xz - m.ds_track_slope_xz);
-            m.diff_slope_yz = std::abs(m.track_slope_yz - m.ds_track_slope_yz);
-            if (m.diff_slope_xz > fConfig.ds_match_slope_max || m.diff_slope_yz > fConfig.ds_match_slope_max) {
-                ds_match = false;
-            }
-        }
-        m.pass_cut_ds_match = ds_match;
+    if (dsTrack) {
+        m.ds_track_flag     = dsTrack->getTrackFlag();
+        m.ds_track_chi2     = dsTrack->getChi2();
+        m.ds_track_ndf      = dsTrack->getNdf();
+        m.ds_track_chi2_ndf = dsTrack->getChi2Ndf();
+        m.ds_track_type     = dsTrack->getTrackType();
+        m.ds_track_slope_xz = dsTrack->getSlopeXZ();
+        m.ds_track_slope_yz = dsTrack->getSlopeYZ();
+        m.ds_track_angle_xz = dsTrack->getAngleXZ();
+        m.ds_track_angle_yz = dsTrack->getAngleYZ();
+
+        m.pass_cut_chi2_ds  = (m.ds_track_flag && m.ds_track_chi2_ndf > 0.0f && m.ds_track_chi2_ndf <= fConfig.chi2_max_ds);
+        m.pass_cut_slope_ds = (std::abs(m.ds_track_slope_xz) < fConfig.max_slope && 
+                               std::abs(m.ds_track_slope_yz) < fConfig.max_slope);
+    }
+
+    // Separate chi2 and slope requirements:
+    m.pass_cut_chi2  = m.pass_cut_chi2_scifi && m.pass_cut_chi2_ds;
+    m.pass_cut_slope = m.pass_cut_slope_scifi && m.pass_cut_slope_ds;
+
+    // Extrapolation to fiducial plane at z = z_match (430.0 cm) and track matching
+    if (scifiTrack && dsTrack) {
+        TVector3 pt_sf = extrapolateToZ(scifiTrack, fConfig.z_match);
+        TVector3 pt_ds = extrapolateToZ(dsTrack, fConfig.z_match);
+
+        m.scifi_x_430 = pt_sf.X();
+        m.scifi_y_430 = pt_sf.Y();
+        m.ds_x_430    = pt_ds.X();
+        m.ds_y_430    = pt_ds.Y();
+
+        m.diff_x_430   = std::abs(m.scifi_x_430 - m.ds_x_430);
+        m.diff_y_430   = std::abs(m.scifi_y_430 - m.ds_y_430);
+        m.diff_pos_430 = std::sqrt(m.diff_x_430 * m.diff_x_430 + m.diff_y_430 * m.diff_y_430);
+
+        m.diff_slope_xz = std::abs(m.track_slope_xz - m.ds_track_slope_xz);
+        m.diff_slope_yz = std::abs(m.track_slope_yz - m.ds_track_slope_yz);
+        m.diff_angle_xz = std::abs(m.track_angle_xz - m.ds_track_angle_xz);
+        m.diff_angle_yz = std::abs(m.track_angle_yz - m.ds_track_angle_yz);
+        m.diff_angle_3d = std::sqrt(m.diff_angle_xz * m.diff_angle_xz + m.diff_angle_yz * m.diff_angle_yz);
+
+        // 1. Cross fiducial plane at z=430 cm
+        m.pass_cut_fiducial_430 = isFiducial(m.scifi_x_430, m.scifi_y_430) && isFiducial(m.ds_x_430, m.ds_y_430);
+
+        // 2. Position match within tolerance (<= 3.0 cm)
+        m.pass_cut_pos_match_430 = (m.diff_pos_430 <= fConfig.pos_match_max);
+
+        // 3. Angular match within tolerance (<= 0.015 rad)
+        m.pass_cut_angle_match = (m.diff_angle_xz <= fConfig.angle_match_max && m.diff_angle_yz <= fConfig.angle_match_max);
+
+        // Combined DS match requirement
+        m.pass_cut_ds_match = m.pass_cut_pos_match_430 && m.pass_cut_angle_match;
     }
 
     // -------------------------------------------------------------------------
@@ -295,16 +343,19 @@ MuonCalibrationMetrics MuonCalibrationProcessor::process(
     // -------------------------------------------------------------------------
     // 4. Final Clean Muon Selection Decision
     // -------------------------------------------------------------------------
+    // Hit count cuts are computed for offline monitoring but NOT applied in is_clean
     m.pass_cut_scifi_hits = (m.scifi_nhits >= fConfig.scifi_hits_min && 
                              m.scifi_nhits <= fConfig.scifi_hits_max);
     m.pass_cut_ds_hits    = (m.ds_nhits >= fConfig.ds_hits_min);
 
+    // Clean single muon selection based purely on SciFi and DS track kinematics & geometry:
+    // (Strictly without number of hits or QDC cuts)
     m.is_clean = m.pass_cut_single_scifi_track && 
+                 m.pass_cut_ds_track && 
                  m.pass_cut_chi2 && 
                  m.pass_cut_slope && 
-                 m.pass_cut_ds_match && 
-                 m.pass_cut_fiducial && 
-                 m.pass_cut_scifi_hits;
+                 m.pass_cut_fiducial_430 && 
+                 m.pass_cut_ds_match;
 
     return m;
 }

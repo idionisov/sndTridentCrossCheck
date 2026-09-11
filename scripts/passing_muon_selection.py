@@ -1203,8 +1203,15 @@ def main():
                         help="Scaling factor for collision data (default: 1.0, e.g. 100.0 if reconstruction ran on 1/100 random subsample)")
 
     # Configurable selection cuts
-    parser.add_argument("--chi2-max", type=float, default=10.0, help="Max track chi2/ndf (default: 10.0)")
+    parser.add_argument("--chi2-max", type=float, default=10.0, help="General track chi2/ndf upper limit")
+    parser.add_argument("--chi2-max-scifi", type=float, default=10.0, help="Max SciFi track chi2/ndf (default: 10.0)")
+    parser.add_argument("--chi2-max-ds", type=float, default=10.0, help="Max DS track chi2/ndf (default: 10.0)")
     parser.add_argument("--max-slope", type=float, default=0.05, help="Max angular slope (default: 0.05 rad)")
+    parser.add_argument("--z-match", type=float, default=430.0, help="Fiducial plane Z position [cm] (default: 430.0)")
+    parser.add_argument("--pos-match-max", type=float, default=3.0, help="Max distance at z_match between SF and DS (default: 3.0 cm)")
+    parser.add_argument("--angle-match-max", type=float, default=0.015, help="Max angle difference between SF and DS (default: 0.015 rad)")
+    parser.add_argument("--scifi-track-type", type=int, default=11, help="SciFi track type (default: 11 = SciFi Hough)")
+    parser.add_argument("--ds-track-type", type=int, default=13, help="DS track type (default: 13 = DS Hough)")
     parser.add_argument("--ds-match-slope", type=float, default=0.04, help="Max slope diff between SF and DS (default: 0.04 rad)")
     parser.add_argument("--fiducial-margin", type=float, default=1.5, help="Fiducial border margin in cm (default: 1.5)")
     parser.add_argument("--scifi-min", type=int, default=10, help="Min SciFi hits (default: 10)")
@@ -1242,11 +1249,12 @@ def main():
     print("Selection Criteria to Assess:")
     print(f"  1. EventHeader.isIP1()      : Collision Data Only (MC identical to Stage 0)")
     print(f"  2. SciFi Track Multiplicity : Exactly 1 Reconstructed SciFi Track")
-    print(f"  3. SciFi Track #chi2/ndf    : <= {args.chi2_max} (with trackFlag == True)")
-    print(f"  4. Max Angular Slope        : <= {args.max_slope} rad (~3 deg)")
-    print(f"  5. Fiducial Margin          : >= {args.fiducial_margin} cm from active borders")
-    print(f"  6. DS Track Slope Match     : |#Delta slope| <= {args.ds_match_slope} rad")
-    print(f"  7. SciFi Total Hits         : [{args.scifi_min}, {args.scifi_max}]")
+    print(f"  3. DS Track Requirement     : Reconstructed DS Track (Type {args.ds_track_type})")
+    print(f"  4. Track Fit Quality        : SciFi #chi2/ndf <= {args.chi2_max_scifi}, DS #chi2/ndf <= {args.chi2_max_ds}")
+    print(f"  5. Max Angular Slope        : < {args.max_slope} rad")
+    print(f"  6. Fiducial Plane at z=430  : Margin >= {args.fiducial_margin} cm at z = {args.z_match} cm")
+    print(f"  7. DS-SciFi Match at z=430  : #Delta R <= {args.pos_match_max} cm, #Delta#theta <= {args.angle_match_max} rad")
+    print(f"  [!] No hit multiplicity or QDC cuts applied")
     print("=" * 80)
 
     # 1. Enable Implicit Multi-Threading
@@ -1349,8 +1357,15 @@ def main():
 
     calib_cfg = ROOT.snd.trident.MuonCalibrationConfig()
     calib_cfg.chi2_max = args.chi2_max
+    calib_cfg.chi2_max_scifi = args.chi2_max_scifi
+    calib_cfg.chi2_max_ds = args.chi2_max_ds
     calib_cfg.max_slope = args.max_slope
     calib_cfg.fiducial_margin = args.fiducial_margin
+    calib_cfg.scifi_track_type = args.scifi_track_type
+    calib_cfg.ds_track_type = args.ds_track_type
+    calib_cfg.z_match = args.z_match
+    calib_cfg.pos_match_max = args.pos_match_max
+    calib_cfg.angle_match_max = args.angle_match_max
     calib_cfg.scifi_hits_min = args.scifi_min
     calib_cfg.scifi_hits_max = args.scifi_max
     calib_cfg.ds_hits_min = args.ds_min
@@ -1386,11 +1401,11 @@ def main():
         .Define("mu_energy", "truth.primary_muon_p > 0 ? std::sqrt(truth.primary_muon_p*truth.primary_muon_p + 0.105658*0.105658) : 0.0")
         .Define("c1_ip1",           "truth.is_in_acceptance")
         .Define("c2_one_scifi_trk", "c1_ip1 && reco.pass_cut_single_scifi_track")
-        .Define("c3_track_quality", "c2_one_scifi_trk && reco.pass_cut_chi2")
-        .Define("c4_angular_slope", "c3_track_quality && reco.pass_cut_slope")
-        .Define("c5_fiducial_vol",  "c4_angular_slope && reco.pass_cut_fiducial")
-        .Define("c6_ds_match",      "c5_fiducial_vol && reco.pass_cut_ds_match")
-        .Define("c7_scifi_hits",    "c6_ds_match && reco.pass_cut_scifi_hits")
+        .Define("c3_ds_track",      "c2_one_scifi_trk && reco.pass_cut_ds_track")
+        .Define("c4_track_quality", "c3_ds_track && reco.pass_cut_chi2")
+        .Define("c5_angular_slope", "c4_track_quality && reco.pass_cut_slope")
+        .Define("c6_fiducial_430",  "c5_angular_slope && reco.pass_cut_fiducial_430")
+        .Define("c7_ds_match",      "c6_fiducial_430 && reco.pass_cut_ds_match")
     )
 
     # 6. Book MC Histograms
@@ -1417,22 +1432,22 @@ def main():
         ("0. Detector Active", "truth.is_in_acceptance"),
         ("1. EventHeader.isIP1()", "c1_ip1"),
         ("2. N(SciFi Track) == 1", "c2_one_scifi_trk"),
-        ("3. Track Fit Quality", "c3_track_quality"),
-        ("4. Angular Slope Cut", "c4_angular_slope"),
-        ("5. Fiducial Boundary", "c5_fiducial_vol"),
-        ("6. DS Track Alignment", "c6_ds_match"),
-        ("7. SciFi Hits [10, 35]", "c7_scifi_hits"),
+        ("3. DS Track (Type 13)", "c3_ds_track"),
+        ("4. Track Fit Quality", "c4_track_quality"),
+        ("5. Angular Slope Cut", "c5_angular_slope"),
+        ("6. Fiducial Plane (z=430)", "c6_fiducial_430"),
+        ("7. DS Match at z=430", "c7_ds_match"),
     ]
 
     stage_short_titles = [
         "0. Active Detector",
         "1. EventHeader.isIP1()",
         "2. SciFi Track == 1",
-        "3. #chi^{2}/ndf #leq 10",
-        "4. Slope #leq 0.05",
-        "5. Fiducial #geq 1.5 cm",
-        "6. |#Delta slope| #leq 0.04",
-        "7. SciFi Hits [10, 35]",
+        "3. DS Track (Type 13)",
+        "4. #chi^{2}/ndf #leq 10",
+        "5. Slope < 0.05 rad",
+        "6. Fiducial (z=430)",
+        "7. DS Match (z=430)",
     ]
 
     stage_hist_ptrs_w = {}
@@ -1569,22 +1584,22 @@ struct IP1Filter {
             .Define("reco_us_hits",   "reco.us_nhits")
             .Define("c1_ip1",           "pass_is_ip1")
             .Define("c2_one_scifi_trk", "c1_ip1 && reco.pass_cut_single_scifi_track")
-            .Define("c3_track_quality", "c2_one_scifi_trk && reco.pass_cut_chi2")
-            .Define("c4_angular_slope", "c3_track_quality && reco.pass_cut_slope")
-            .Define("c5_fiducial_vol",  "c4_angular_slope && reco.pass_cut_fiducial")
-            .Define("c6_ds_match",      "c5_fiducial_vol && reco.pass_cut_ds_match")
-            .Define("c7_scifi_hits",    "c6_ds_match && reco.pass_cut_scifi_hits")
+            .Define("c3_ds_track",      "c2_one_scifi_trk && reco.pass_cut_ds_track")
+            .Define("c4_track_quality", "c3_ds_track && reco.pass_cut_chi2")
+            .Define("c5_angular_slope", "c4_track_quality && reco.pass_cut_slope")
+            .Define("c6_fiducial_430",  "c5_angular_slope && reco.pass_cut_fiducial_430")
+            .Define("c7_ds_match",      "c6_fiducial_430 && reco.pass_cut_ds_match")
         )
 
         data_stage_cuts = [
             ("0. Detector Active", ""),
             ("1. EventHeader.isIP1()", "c1_ip1"),
             ("2. N(SciFi Track) == 1", "c2_one_scifi_trk"),
-            ("3. Track Fit Quality", "c3_track_quality"),
-            ("4. Angular Slope Cut", "c4_angular_slope"),
-            ("5. Fiducial Boundary", "c5_fiducial_vol"),
-            ("6. DS Track Alignment", "c6_ds_match"),
-            ("7. SciFi Hits [10, 35]", "c7_scifi_hits"),
+            ("3. DS Track (Type 13)", "c3_ds_track"),
+            ("4. Track Fit Quality", "c4_track_quality"),
+            ("5. Angular Slope Cut", "c5_angular_slope"),
+            ("6. Fiducial Plane (z=430)", "c6_fiducial_430"),
+            ("7. DS Match at z=430", "c7_ds_match"),
         ]
 
         for s_idx, (s_name, c_expr) in enumerate(data_stage_cuts):
@@ -1644,7 +1659,7 @@ struct IP1Filter {
     count_all_tri = None
 
     if args.enable_tri and args.input_tri and str(args.input_tri).lower() not in ("none", ""):
-        if "*" in args.input_tri or "?" in args.input_tri:
+        if any(c in args.input_tri for c in ("*", "?", "[", "]")):
             tri_files = sorted(glob.glob(args.input_tri))
         elif os.path.exists(args.input_tri):
             tri_files = [args.input_tri]
@@ -1704,17 +1719,17 @@ struct IP1Filter {
                 .Define("mu_energy", "truth.primary_muon_p > 0 ? std::sqrt(truth.primary_muon_p*truth.primary_muon_p + 0.105658*0.105658) : 0.0")
                 .Define("c1_ip1",           "truth.is_in_acceptance")
                 .Define("c2_one_scifi_trk", "c1_ip1 && reco.pass_cut_single_scifi_track")
-                .Define("c3_track_quality", "c2_one_scifi_trk && reco.pass_cut_chi2")
-                .Define("c4_angular_slope", "c3_track_quality && reco.pass_cut_slope")
-                .Define("c5_fiducial_vol",  "c4_angular_slope && reco.pass_cut_fiducial")
-                .Define("c6_ds_match",      "c5_fiducial_vol && reco.pass_cut_ds_match")
-                .Define("c7_scifi_hits",    "c6_ds_match && reco.pass_cut_scifi_hits")
+                .Define("c3_ds_track",      "c2_one_scifi_trk && reco.pass_cut_ds_track")
+                .Define("c4_track_quality", "c3_ds_track && reco.pass_cut_chi2")
+                .Define("c5_angular_slope", "c4_track_quality && reco.pass_cut_slope")
+                .Define("c6_fiducial_430",  "c5_angular_slope && reco.pass_cut_fiducial_430")
+                .Define("c7_ds_match",      "c6_fiducial_430 && reco.pass_cut_ds_match")
             )
 
             h_tri_cat_all_w  = df_tri.Histo1D(("h_tri_cat_all_weighted", "All Trimuon Events by Category (Weighted);Category ID;Weighted Yield", 7, -0.5, 6.5), "cat_id", "weight")
             h_tri_cat_all_r  = df_tri.Histo1D(("h_tri_cat_all_raw", "All Trimuon Events by Category (Raw);Category ID;Raw Events", 7, -0.5, 6.5), "cat_id")
-            h_tri_cat_pass_w = df_tri.Filter("c7_scifi_hits").Histo1D(("h_tri_cat_pass_weighted", "Selected Trimuon Events (Weighted);Category ID;Weighted Yield", 7, -0.5, 6.5), "cat_id", "weight")
-            h_tri_cat_pass_r = df_tri.Filter("c7_scifi_hits").Histo1D(("h_tri_cat_pass_raw", "Selected Trimuon Events (Raw);Category ID;Raw Events", 7, -0.5, 6.5), "cat_id")
+            h_tri_cat_pass_w = df_tri.Filter("c7_ds_match").Histo1D(("h_tri_cat_pass_weighted", "Selected Trimuon Events (Weighted);Category ID;Weighted Yield", 7, -0.5, 6.5), "cat_id", "weight")
+            h_tri_cat_pass_r = df_tri.Filter("c7_ds_match").Histo1D(("h_tri_cat_pass_raw", "Selected Trimuon Events (Raw);Category ID;Raw Events", 7, -0.5, 6.5), "cat_id")
 
             count_all_tri = df_tri.Count()
 
@@ -1943,16 +1958,15 @@ struct IP1Filter {
             table_number=7
         )
 
-    # 11. Build 1D Cutflow Histograms & Superimposed Publication Canvases
     stage_axis_labels = [
         "#splitline{0. Active}{Detector Hits}",
         "#splitline{1. EventHeader}{.isIP1()}",
         "#splitline{2. SciFi Track}{Multiplicity == 1}",
-        f"#splitline{{3. Track Fit}}{{#chi^{{2}}/ndf #leq {args.chi2_max:g}}}",
-        f"#splitline{{4. Max Slope}}{{#leq {args.max_slope:g} rad}}",
-        f"#splitline{{5. Fiducial}}{{#geq {args.fiducial_margin:g} cm}}",
-        f"#splitline{{6. DS Match}}{{|#Delta slope| #leq {args.ds_match_slope:g}}}",
-        f"#splitline{{7. SciFi Hits}}{{[{args.scifi_min}, {args.scifi_max}]}}"
+        f"#splitline{{3. DS Track}}{{(Type {args.ds_track_type})}}",
+        f"#splitline{{4. Track Fit}}{{#chi^{{2}}/ndf #leq {args.chi2_max_scifi:g}}}",
+        f"#splitline{{5. Slope Cut}}{{< {args.max_slope:g} rad}}",
+        f"#splitline{{6. Fiducial}}{{(z={args.z_match:g} cm)}}",
+        f"#splitline{{7. DS Match}}{{#Delta R #leq {args.pos_match_max:g} cm}}"
     ]
 
     last_stage_name = cutflow_stages[-1][0]

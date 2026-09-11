@@ -1,0 +1,202 @@
+# ==============================================================================
+# Muon Calibration Configuration
+# ==============================================================================
+# Full execution parameters, cut pipeline, quality criteria,
+# and histogram/profile binning for clean single passing muon calibration.
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Job IO Configuration (argparse defaults)
+# ------------------------------------------------------------------------------
+job:
+  input_data: "/eos/user/i/idioniso/1_Data/Tracks/run_008329/sndsw_raw-*.root"
+  tree_name: ""                # Empty string triggers auto-detection (rawConv or cbmsim)
+  output_file: "plots/scifi_calibration_histograms.root"
+  max_events: 0                # 0 = process all events
+  num_threads: 8               # RDataFrame worker threads
+  save_events: true            # Save passing event tree to output ROOT file
+  save_calib_branches: false   # Also save calib.* scalar columns in output TTree
+  tree_output_name: ""         # Empty string defaults to input tree name
+
+# ------------------------------------------------------------------------------
+# 2. Physics & Detector Cut Parameters
+# ------------------------------------------------------------------------------
+parameters:
+  # Tracking systems and algorithm types
+  scifi_track_type: 11         # SciFi track type (11 = SciFi Hough transform)
+  ds_track_type: 13            # DS track type (13 = Downstream Hough transform)
+
+  # Track fit quality & kinematics
+  chi2_max: 10.0               # Fallback general chi2/ndf threshold
+  chi2_max_scifi: 10.0         # Upper limit on SciFi Hough track chi2/ndf
+  chi2_max_ds: 10.0            # Upper limit on DS Hough track chi2/ndf
+  max_slope: 0.05              # Max angular slope dx/dz, dy/dz (< 0.05 rad ~ 2.9 deg)
+
+  # Geometry & Extrapolation
+  z_match: 430.0               # Fiducial cutting plane between SciFi and DS [cm]
+  fiducial_margin: 1.5         # Safety margin from active detector envelope [cm]
+  pos_match_max: 3.0           # Max transverse distance at z_match (dR <= 3.0 cm)
+  angle_match_max: 0.015       # Max angular difference (|dTheta| <= 0.015 rad)
+  ds_match_slope_max: 0.04     # Max slope difference between SF and DS [rad]
+
+  # Optional hit multiplicity & threshold parameters
+  scifi_hits_min: 10           # Min total SciFi hits (clean MIP band)
+  scifi_hits_max: 35           # Max total SciFi hits (clean MIP band)
+  ds_hits_min: 2               # Min Downstream MuFilter hits (penetration)
+  scifi_threshold: 0.0         # Offline SciFi threshold in p.e./QDC (0.0 = hit.isValid())
+  max_station_hits: 15         # Max hits allowed in any single SciFi station
+
+# ------------------------------------------------------------------------------
+# 3. Cut Sequence Pipeline
+# ------------------------------------------------------------------------------
+# Defines which cuts are applied and in which order.
+# Set 'enabled: true' to apply a cut, or 'enabled: false' to bypass it.
+# To change the cut order, simply rearrange the entries in this list.
+# ------------------------------------------------------------------------------
+cuts:
+  pipeline:
+    - id: "ip1_bunch"
+      label: "Stage 0: IP1 Collision Bunch Crossing (Data Only)"
+      filter: "is_ip1"
+      enabled: true
+      requires_header: true
+      description: "Restricts real collision data to IP1 colliding bunch crossings."
+
+    # --- Active Track-Based Selection (No Hit or QDC Cuts) ---
+    - id: "single_scifi_track"
+      label: "Stage 1: Exactly 1 Reconstructed SciFi Track (Hough Type 11)"
+      filter: "calib.pass_cut_single_scifi_track"
+      enabled: true
+      description: "Requires exactly one reconstructed Hough track in the SciFi tracker."
+
+    - id: "ds_track"
+      label: "Stage 2: Reconstructed DS Track (Hough Type 13)"
+      filter: "calib.pass_cut_ds_track"
+      enabled: true
+      description: "Requires at least one reconstructed Hough track in the Downstream MuFilter."
+
+    - id: "chi2_quality"
+      label: "Stage 3: Track Fit Chi2/ndf (SF <= 10.0, DS <= 10.0)"
+      filter: "calib.pass_cut_chi2"
+      enabled: true
+      description: "Ensures fit convergence and quality for both SciFi and DS tracks."
+
+    - id: "angular_slope"
+      label: "Stage 4: Angular Slope < 0.05 rad"
+      filter: "calib.pass_cut_slope"
+      enabled: true
+      description: "Restricts tracks to near-normal TI18 collision line-of-sight."
+
+    - id: "fiducial_430"
+      label: "Stage 5: Fiducial Plane at z=430 cm (Margin >= 1.5 cm)"
+      filter: "calib.pass_cut_fiducial_430"
+      enabled: true
+      description: "Verifies both tracks intersect inside active boundaries with safety margin."
+
+    - id: "ds_match"
+      label: "Stage 6: DS-SciFi Match at z=430 cm (dR <= 3.0 cm, dTheta <= 0.015 rad)"
+      filter: "calib.pass_cut_ds_match"
+      enabled: true
+      description: "Demands spatial continuity and angular alignment across the interface."
+
+    # --- Optional & Legacy Cuts (Disabled by default to avoid biasing calibration) ---
+
+    - id: "scifi_hits_range"
+      label: "Legacy: SciFi Total Hits in [10, 35]"
+      filter: "calib.pass_cut_scifi_hits"
+      enabled: false
+      description: "Legacy hit multiplicity window (bypassed to avoid Landau sculpting)."
+
+    - id: "ds_hits_penetration"
+      label: "Optional: DS Penetration (DS Hits >= 2)"
+      filter: "calib.pass_cut_ds_hits"
+      enabled: false
+      description: "Requires at least 2 hits in Downstream MuFilter."
+
+    - id: "max_station_hits"
+      label: "Optional: Station Local Shower Cap (<= 15 hits/station)"
+      filter: "calib.scifi_nhits_st1 <= 15 && calib.scifi_nhits_st2 <= 15 && calib.scifi_nhits_st3 <= 15 && calib.scifi_nhits_st4 <= 15 && calib.scifi_nhits_st5 <= 15"
+      enabled: false
+      description: "Suppresses local EM/hadronic cascade formation without total hit cap."
+
+    - id: "scifi_stations_continuity"
+      label: "Optional: All 5 SciFi Stations Fired"
+      filter: "calib.scifi_stations_hit == 5"
+      enabled: false
+      description: "Topological continuity requirement across all 5 SciFi stations."
+
+    - id: "scifi_fiducial_envelope"
+      label: "Legacy: SciFi Station 1 and 5 Fiducial Margins"
+      filter: "calib.pass_cut_fiducial"
+      enabled: false
+      description: "Checks fiducial containment at SciFi Station 1 and Station 5."
+
+    - id: "ds_match_slope"
+      label: "Legacy: DS Slope Difference <= 0.04 rad"
+      filter: "calib.pass_cut_ds_match_slope"
+      enabled: false
+      description: "Legacy slope matching between SciFi and DS."
+
+# ------------------------------------------------------------------------------
+# 4. 1D Histogram Configurations
+# Format: [name, title, nbins, xmin, xmax, category]
+# ------------------------------------------------------------------------------
+histograms_1d:
+  # A. Core QDC Calibration Observables (Single MIP Standard Candle)
+  - ["hit_qdc", "SciFi Single Hit QDC (Clean Muon Track);Hit QDC [a.u.];Hits", 150, 0.0, 30.0, "calibration"]
+  - ["plane_qdc", "SciFi Plane Summed QDC (Clean Muon Track);Plane QDC [a.u.];Planes", 160, 0.0, 40.0, "calibration"]
+  - ["hit_distance", "Track Impact Distance to SiPM;Distance along Fiber [cm];Hits", 80, 0.0, 40.0, "attenuation"]
+  - ["plane_nhits", "SciFi Hits per Plane;Hits per Plane;Planes", 15, 0.0, 15.0, "tracking"]
+
+  # B. Track Reconstruction & Fit Quality Metrics
+  - ["track_chi2_ndf", "Track Fit #chi^{2}/ndf;#chi^{2}/ndf;Tracks", 150, 0.0, 15.0, "quality"]
+  - ["track_slope_xz", "Track Slope dx/dz;dx/dz;Tracks", 100, -0.06, 0.06, "kinematics"]
+  - ["track_slope_yz", "Track Slope dy/dz;dy/dz;Tracks", 100, -0.06, 0.06, "kinematics"]
+  - ["track_angle_xz", "Track Angle #theta_{xz};#theta_{xz} [rad];Tracks", 100, -0.06, 0.06, "kinematics"]
+  - ["track_angle_yz", "Track Angle #theta_{yz};#theta_{yz} [rad];Tracks", 100, -0.06, 0.06, "kinematics"]
+
+  # C. Spatial Containment & Fiducial Geometry
+  - ["track_start_x", "Track Extrapolation X at Station 1;X [cm];Tracks", 100, -50.0, -5.0, "geometry"]
+  - ["track_start_y", "Track Extrapolation Y at Station 1;Y [cm];Tracks", 100, 10.0, 60.0, "geometry"]
+  - ["track_stop_x", "Track Extrapolation X at Station 5;X [cm];Tracks", 100, -50.0, -5.0, "geometry"]
+  - ["track_stop_y", "Track Extrapolation Y at Station 5;Y [cm];Tracks", 100, 10.0, 60.0, "geometry"]
+
+  # D. SciFi Activity & Station Profiles
+  - ["scifi_nhits", "Total SciFi Hits (Clean Event);SciFi Hits;Tracks", 60, 0.0, 60.0, "activity"]
+  - ["scifi_sum_qdc", "Total SciFi Integrated QDC;Total QDC [a.u.];Tracks", 150, 0.0, 300.0, "activity"]
+  - ["scifi_mean_qdc", "SciFi Mean Hit QDC;Mean Hit QDC [a.u.];Tracks", 100, 0.0, 20.0, "activity"]
+  - ["scifi_stations_hit", "SciFi Stations Fired;Stations Fired (out of 5);Tracks", 6, 0.5, 6.5, "activity"]
+  - ["scifi_planes_hit", "SciFi Planes Fired;Planes Fired (out of 10);Tracks", 11, 0.5, 11.5, "activity"]
+
+  # E. MuFilter Downstream Penetration & Isolation
+  - ["ds_nhits", "Downstream MuFilter Hits;DS Hits;Tracks", 20, 0.0, 20.0, "penetration"]
+  - ["ds_stations_hit", "Downstream Stations Fired;DS Stations Fired (out of 4);Tracks", 5, 0.5, 5.5, "penetration"]
+  - ["ds_sum_qdc", "Downstream Integrated QDC;DS Total QDC [a.u.];Tracks", 100, 0.0, 200.0, "penetration"]
+  - ["veto_nhits", "Veto Station Hits;Veto Hits;Tracks", 10, 0.0, 10.0, "isolation"]
+  - ["us_nhits", "Upstream MuFilter Hits;US Hits;Tracks", 20, 0.0, 20.0, "isolation"]
+
+  # F. DS Track & Matching at z = 430 cm
+  - ["ds_track_chi2_ndf", "DS Track Fit #chi^{2}/ndf;#chi^{2}/ndf;Tracks", 100, 0.0, 15.0, "quality"]
+  - ["diff_pos_430", "DS-SciFi Spatial Distance at z=430 cm;#Delta R_{430} [cm];Tracks", 100, 0.0, 10.0, "matching"]
+  - ["diff_angle_xz", "DS-SciFi Angle Difference XZ;|#Delta#theta_{xz}| [rad];Tracks", 100, 0.0, 0.05, "matching"]
+  - ["diff_angle_yz", "DS-SciFi Angle Difference YZ;|#Delta#theta_{yz}| [rad];Tracks", 100, 0.0, 0.05, "matching"]
+
+# ------------------------------------------------------------------------------
+# 5. 2D Correlation Histogram Configurations
+# Format: [name, title, nx, xmin, xmax, ny, ymin, ymax, x_var, y_var, category]
+# ------------------------------------------------------------------------------
+histograms_2d:
+  - ["h2_hit_qdc_vs_distance", "Hit QDC vs Distance along Fiber;Distance to SiPM [cm];Hit QDC [a.u.]", 40, 0.0, 40.0, 100, 0.0, 30.0, "hit_distance", "hit_qdc", "attenuation"]
+  - ["h2_plane_qdc_vs_station", "Plane QDC vs Station;Station Index (1 to 5);Plane QDC [a.u.]", 5, 0.5, 5.5, 100, 0.0, 40.0, "plane_station", "plane_qdc", "longitudinal"]
+  - ["h2_slope_yz_vs_xz", "Track Angular Collimation;dx/dz;dy/dz", 80, -0.06, 0.06, 80, -0.06, 0.06, "track_slope_xz", "track_slope_yz", "kinematics"]
+  - ["h2_track_xy_station1", "Track Impact Position at Station 1;X [cm];Y [cm]", 80, -50.0, -5.0, 80, 10.0, 60.0, "track_start_x", "track_start_y", "geometry"]
+  - ["h2_ds_pos_match_430", "SciFi vs DS Track Separation at z=430 cm;#Delta X [cm];#Delta Y [cm]", 60, -6.0, 6.0, 60, -6.0, 6.0, "diff_x_430", "diff_y_430", "matching"]
+
+# ------------------------------------------------------------------------------
+# 6. TProfile Configurations (Attenuation & Longitudinal Profiles)
+# Format: [name, title, nbins_x, xmin, xmax, x_var, y_var, category]
+# ------------------------------------------------------------------------------
+profiles:
+  - ["prof_qdc_vs_distance", "Mean Hit QDC vs Distance along Fiber;Distance to SiPM [cm];<Hit QDC> [a.u.]", 40, 0.0, 40.0, "hit_distance", "hit_qdc", "attenuation"]
+  - ["prof_plane_qdc_vs_station", "Longitudinal Plane <QDC> Profile;Station (1 to 5);<Plane QDC> [a.u.]", 5, 0.5, 5.5, "plane_station", "plane_qdc", "longitudinal"]
+  - ["prof_plane_nhits_vs_station", "Longitudinal Plane <Hits> Profile;Station (1 to 5);<Hits per Plane>", 5, 0.5, 5.5, "plane_station", "plane_nhits", "longitudinal"]
