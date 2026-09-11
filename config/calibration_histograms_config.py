@@ -43,7 +43,7 @@ CALIB_CONFIGS_1D = [
     # --------------------------------------------------------------------------
     # D. SciFi Activity & Station Profiles
     # --------------------------------------------------------------------------
-    ("scifi_nhits", "Total SciFi Hits (Clean Event);SciFi Hits;Tracks", 35, 5, 40, "activity"),
+    ("scifi_nhits", "Total SciFi Hits (Clean Event);SciFi Hits;Tracks", 60, 0, 60, "activity"),
     ("scifi_sum_qdc", "Total SciFi Integrated QDC;Total QDC [a.u.];Tracks", 150, 0, 300, "activity"),
     ("scifi_mean_qdc", "SciFi Mean Hit QDC;Mean Hit QDC [a.u.];Tracks", 100, 0, 20, "activity"),
     ("scifi_stations_hit", "SciFi Stations Fired;Stations Fired (out of 5);Tracks", 6, 0.5, 6.5, "activity"),
