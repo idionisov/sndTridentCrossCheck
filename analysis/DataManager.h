@@ -84,6 +84,7 @@ namespace snd {
         // RDataFrame
         ROOT::RDataFrame GetDataFrame();
         ROOT::RDataFrame GetRDF() { return GetDataFrame(); }
+        ROOT::RDataFrame rdf() { return GetDataFrame(); }
         ROOT::RDF::RNode GetRNode(ULong64_t rangeLimit = 0);
 
         // Time & Duration Assessment via Full TChain Traversal

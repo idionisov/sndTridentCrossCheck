@@ -68,7 +68,7 @@ def process_single_file(
     data = DataManager(input_file, num_threads=num_threads)
     total_events = data.entries
     tree_name = data.tree_name
-    df = data.df()
+    df = data.rdf()
     if max_events is not None and max_events > 0:
         df = df.Filter(f"rdfentry_ < {max_events}")
         total_events = min(total_events, max_events)

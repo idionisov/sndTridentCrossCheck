@@ -7,6 +7,7 @@ set(ANALYSIS_HEADERS
   MuonCalibrationProcessor.h
   PassingMuonTruthProcessor.h
   DataManager.h
+  ProgressPrinter.h
 )
 
 set(ANALYSIS_SRCS
@@ -15,6 +16,7 @@ set(ANALYSIS_SRCS
   MuonCalibrationProcessor.cxx
   PassingMuonTruthProcessor.cxx
   DataManager.cxx
+  ProgressPrinter.cxx
 )
 
 # ROOT generate dictionary

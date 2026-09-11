@@ -17,6 +17,11 @@ job:
   save_events: true            # Save passing event tree to output ROOT file
   save_calib_branches: false   # Also save calib.* scalar columns in output TTree
   tree_output_name: ""         # Empty string defaults to input tree name
+  progress:
+    enabled: true              # Periodic progress reporting during event loop
+    every_seconds: 30.0        # Print progress every 30 seconds
+    every_events: 0            # Print every N events (0 = purely timer-based)
+    label: "SciFi Calib"       # Log prefix label
 
 # ------------------------------------------------------------------------------
 # 2. Physics & Detector Cut Parameters

@@ -17,6 +17,7 @@ A high-performance C++ and Python framework for **SND@LHC** data analysis, focus
   - [D. End-to-End Trident Reconstruction Pipeline](#d-end-to-end-trident-reconstruction-pipeline)
 - [4. Repository Architecture](#4-repository-architecture)
 - [5. Troubleshooting & FAQ](#5-troubleshooting--faq)
+- [6. Notes: Quick Data Exploration & Analysis Guide](notes/data_manager_exploration_and_analysis_guide.md)
 
 ---
 
@@ -157,7 +158,8 @@ sndMuTri/
 │   ├── MuonCalibrationProcessor.h / .cxx
 │   ├── DataManager.h / .cxx
 │   ├── TridentTruthProcessor.h / .cxx
-│   └── PassingMuonTruthProcessor.h / .cxx
+│   ├── PassingMuonTruthProcessor.h / .cxx
+│   └── ProgressPrinter.h / .cxx
 │
 ├── cuts/
 │   ├── tridentSelection.cxx
@@ -166,6 +168,9 @@ sndMuTri/
 ├── config/
 │   ├── scifi_calibration_config.yaml
 │   └── calibration_histograms_config.py
+│
+├── notes/
+│   └── data_manager_exploration_and_analysis_guide.md
 │
 ├── scripts/
 │   ├── extract_scifi_calibration_histograms.py
@@ -177,6 +182,7 @@ sndMuTri/
 │
 ├── snd/
 │   ├── data_manager.py
+│   ├── progress.py
 │   ├── truth_branches.py
 │   └── yield_summary.py
 │

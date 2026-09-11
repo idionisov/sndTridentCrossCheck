@@ -82,7 +82,7 @@ def main():
     has_precomputed = data.has_branch("mc_weight") and data.has_branch("proc_type")
 
     t0 = time.time()
-    df = data.df()
+    df = data.rdf()
 
     if has_precomputed:
         if data.has_branch("is_signal"):

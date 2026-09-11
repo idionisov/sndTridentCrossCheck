@@ -206,17 +206,119 @@ class DataManager:
     def get_chain(self) -> ROOT.TChain:
         return self._cpp.GetChain()
 
-    def df(self, range_limit: Optional[int] = None) -> ROOT.RDataFrame:
+    def rdf(
+        self,
+        range_limit: Optional[int] = None,
+        progress: bool = False,
+        every_seconds: float = 30.0,
+        every_events: int = 0,
+        progress_label: Optional[str] = None,
+    ) -> ROOT.RDataFrame:
+        """
+        Returns a high-performance ROOT RDataFrame connected to the dataset.
+        """
         dataframe = self._cpp.GetDataFrame()
         if range_limit is not None and range_limit > 0:
             dataframe = dataframe.Range(range_limit)
+        if progress:
+            from .progress import attach_progress_printer
+            total = range_limit if (range_limit is not None and range_limit > 0) else self.entries
+            label = progress_label if progress_label is not None else "DataManager"
+            dataframe = attach_progress_printer(
+                dataframe,
+                total_events=total,
+                every_seconds=every_seconds,
+                every_events=every_events,
+                label=label,
+            )
         return dataframe
 
-    def rdf(self, range_limit: Optional[int] = None) -> ROOT.RDataFrame:
-        return self.df(range_limit=range_limit)
+    def df(
+        self,
+        columns: Optional[Sequence[str]] = None,
+        range_limit: Optional[int] = None,
+        query: Optional[str] = None,
+        rdf: Optional[ROOT.RDataFrame] = None,
+        progress: bool = False,
+        every_seconds: float = 30.0,
+        progress_label: Optional[str] = None,
+    ) -> Any:
+        """
+        Converts dataset observables into a flattened Python pandas DataFrame.
+
+        Parameters:
+            columns: Optional list of branch or column names to extract.
+                     If None, extracts all known scalar and 1D vector columns.
+            range_limit: Optional entry limit (e.g. 5000).
+            query: Optional selection filter string (e.g. "reco_chi2 < 10").
+            rdf: Optional pre-configured ROOT RDataFrame node to extract from.
+                 If None, creates one via self.rdf(range_limit=range_limit).
+            progress: Enable 30-second progress logging during conversion.
+            every_seconds: Status update interval in seconds.
+            progress_label: Label prefix for progress reporter.
+
+        Returns:
+            pandas.DataFrame containing flat arrays of the requested columns.
+        """
+        import pandas as pd
+
+        active_rdf = rdf if rdf is not None else self.rdf(
+            range_limit=range_limit,
+            progress=progress,
+            every_seconds=every_seconds,
+            progress_label=progress_label or "DataManager.df",
+        )
+
+        if query is not None and len(query.strip()) > 0:
+            active_rdf = active_rdf.Filter(query)
+
+        if range_limit is not None and range_limit > 0 and rdf is not None:
+            active_rdf = active_rdf.Range(range_limit)
+
+        if columns is None:
+            known_jagged = {
+                "MCTrack", "ScifiPoint", "MuFilterPoint", "EmulsionDetPoint",
+                "Digi_ScifiHits", "Digi_ScifiHits2MCPoints",
+                "Digi_MuFilterHits", "Digi_MuFilterHits2MCPoints",
+                "EventHeader.", "truth", "fittedTracks", "Reco_MuonTracks",
+                "Cluster_Scifi", "Cluster_Mufi",
+            }
+            selected_cols = []
+            from .truth_branches import TRIDENT_ANALYSIS_COLUMNS
+            for c in TRIDENT_ANALYSIS_COLUMNS:
+                if self.has_branch(c):
+                    selected_cols.append(c)
+
+            for b in self.branch_names:
+                if b not in selected_cols and b not in known_jagged and "." not in b:
+                    selected_cols.append(b)
+        else:
+            selected_cols = list(columns)
+
+        if not selected_cols:
+            return pd.DataFrame()
+
+        np_dict = active_rdf.AsNumpy(selected_cols)
+
+        clean_dict = {}
+        for k, v in np_dict.items():
+            if isinstance(v, (list, tuple)) or hasattr(v, "__len__"):
+                if len(v) > 0 and hasattr(v[0], "__iter__") and not isinstance(v[0], (str, bytes)):
+                    clean_dict[k] = ["".join(str(ch) for ch in item) for item in v]
+                elif hasattr(v, "dtype") and v.dtype.kind in ['S', 'U', 'O', 'V']:
+                    clean_dict[k] = [
+                        x.decode("utf-8", errors="ignore") if isinstance(x, (bytes, bytearray)) else str(x)
+                        for x in v
+                    ]
+                else:
+                    clean_dict[k] = v
+            else:
+                clean_dict[k] = v
+
+        return pd.DataFrame(clean_dict)
 
     def get_rdataframe(self, range_limit: Optional[int] = None) -> ROOT.RDataFrame:
-        return self.df(range_limit=range_limit)
+        return self.rdf(range_limit=range_limit)
 
     @property
     def rdataframe(self) -> ROOT.RDataFrame:
@@ -353,7 +455,7 @@ class DataManager:
             "EventHeader.", "truth"
         }
 
-        df = self.df()
+        df = self.rdf()
 
         if query is not None and len(query.strip()) > 0:
             df = df.Filter(query)

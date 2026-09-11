@@ -1339,7 +1339,7 @@ def main():
     # Setup MC RDataFrame
     if "*" in resolved_mc_input or "?" in resolved_mc_input:
         mc_dm = DataManager(resolved_mc_input, tree_name=args.tree_mc, num_threads=args.num_threads)
-        df_mc = mc_dm.df()
+        df_mc = mc_dm.rdf()
     else:
         df_mc = ROOT.RDataFrame(args.tree_mc, resolved_mc_input)
 
@@ -1534,7 +1534,7 @@ def main():
     h_us_hits_data_ptr = None
 
     if args.input_data:
-        df_data = dm_data.df()
+        df_data = dm_data.rdf()
         if args.max_events > 0:
             if ROOT.IsImplicitMTEnabled():
                 df_data = df_data.Filter(f"rdfentry_ < {args.max_events}")

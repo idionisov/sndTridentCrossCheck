@@ -393,7 +393,7 @@ def create_superimposed_1d_canvas(
 
 def setup_dataframe(data: DataManager, stream_type: str, radius: float = 40.0, max_events: int = 0) -> ROOT.RDataFrame:
     """Configures RDataFrame with compiled C++ PreselectionProcessor and standardized observables."""
-    df = data.df()
+    df = data.rdf()
     if max_events > 0:
         if ROOT.IsImplicitMTEnabled():
             df = df.Filter(f"rdfentry_ < {max_events}")

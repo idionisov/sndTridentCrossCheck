@@ -30,7 +30,7 @@ import time
 import argparse
 import tempfile
 import shutil
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List, Tuple, Optional
 
 import ROOT
 ROOT.gROOT.SetBatch(True)
@@ -48,7 +48,7 @@ while _curr != "/" and _curr != os.path.dirname(_curr):
 if _repo_root not in sys.path:
     sys.path.insert(0, _repo_root)
 
-from snd import DataManager, load_trident_libraries
+from snd import DataManager, load_trident_libraries, add_progress_printer, ProgressPrinter
 from config.calibration_histograms_config import (
     load_scifi_calibration_config,
     DEFAULT_YAML_PATH,
@@ -81,17 +81,32 @@ def setup_calibration_dataframe(
     hist_configs_2d: List[Tuple],
     profile_configs: List[Tuple],
     max_events: int = 0,
-) -> Tuple[ROOT.RDataFrame, ROOT.snd.trident.MuonCalibrationProcessor, List[str]]:
+    progress_cfg: Optional[Dict[str, Any]] = None,
+) -> Tuple[ROOT.RDataFrame, ROOT.snd.trident.MuonCalibrationProcessor, List[str], Any]:
     """
     Configures multi-threaded RDataFrame with compiled C++ MuonCalibrationProcessor.
     Applies the ordered cut pipeline dynamically as configured in YAML.
     """
-    df = data.df()
+    df = data.rdf()
     if max_events > 0:
         if ROOT.IsImplicitMTEnabled():
             df = df.Filter(f"rdfentry_ < {max_events}")
         else:
             df = df.Range(max_events)
+
+    progress_printer = None
+    if progress_cfg and progress_cfg.get("enabled", True):
+        total_ev = max_events if max_events > 0 else data.entries
+        every_sec = float(progress_cfg.get("every_seconds", 30.0))
+        every_ev = int(progress_cfg.get("every_events", 0))
+        label = str(progress_cfg.get("label", "SciFi Calib"))
+        df, progress_printer = add_progress_printer(
+            df,
+            total_events=total_ev,
+            every_seconds=every_sec,
+            every_events=every_ev,
+            label=label,
+        )
 
     # 1. Resolve Track and Hit Branch Names dynamically
     track_branch = "Reco_MuonTracks" if data.has_branch("Reco_MuonTracks") else "fittedTracks"
@@ -162,7 +177,7 @@ def setup_calibration_dataframe(
             else:
                 df_clean = df_clean.Define(v_name, f"calib.{v_name}")
 
-    return df_clean, processor, applied_cut_labels
+    return df_clean, processor, applied_cut_labels, progress_printer
 
 
 def book_calibration_histograms(
@@ -218,6 +233,7 @@ def main():
     h1_cfg = [tuple(x) for x in cfg.get("histograms_1d", [])]
     h2_cfg = [tuple(x) for x in cfg.get("histograms_2d", [])]
     prof_cfg = [tuple(x) for x in cfg.get("profiles", [])]
+    progress_cfg = job_cfg.get("progress", {})
 
     # Job & IO parameters
     input_data = job_cfg.get("input_data", "/eos/user/i/idioniso/1_Data/Tracks/run_008329/sndsw_raw-*.root")
@@ -279,10 +295,11 @@ def main():
     print(f"[*] Resolved {data.num_files:,} files | Active tree: '{data.tree_name}'")
 
     # 6. Setup Calibration DataFrame and Dynamic Filter Pipeline
-    df_clean, processor, applied_cut_labels = setup_calibration_dataframe(
+    df_clean, processor, applied_cut_labels, progress_printer = setup_calibration_dataframe(
         data, calib_cfg, pipeline_cfg,
         h1_cfg, h2_cfg, prof_cfg,
-        max_events=max_events
+        max_events=max_events,
+        progress_cfg=progress_cfg
     )
 
     # 7. Prepare Atomic Temporary Container
@@ -302,6 +319,8 @@ def main():
     print("[*] RDataFrame computational graph booked. Executing multi-threaded event loop...")
     t_loop = time.time()
     n_clean_muons = count_book.GetValue()
+    if progress_printer:
+        progress_printer.PrintSummary()
     print(f"[✓] Event loop completed in {time.time() - t_loop:.2f} s")
     print(f"[✓] Clean single through-going muons selected: {n_clean_muons:,}")
 
