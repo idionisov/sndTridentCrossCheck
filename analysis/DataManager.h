@@ -152,6 +152,9 @@ namespace snd {
         static double CalculateLumiFromTree(TTree* tree, Long64_t start_ts = -1, Long64_t end_ts = -1);
         static double FetchLumi(int fillNumber, Long64_t start_ts = -1, Long64_t end_ts = -1, const std::string& lumiDir = "/eos/experiment/sndlhc/atlas_lumi");
 
+        // Static run-number helper: reads EventHeader.GetRunId() from entry 0 of a single file
+        static int ReadRunNumberFromTree(const std::string& fpath, const std::string& treeName);
+
     private:
         void Initialize(const std::vector<std::string>& sources,
                         const std::string& treeName,

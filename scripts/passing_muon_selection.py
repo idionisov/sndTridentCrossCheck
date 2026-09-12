@@ -31,7 +31,9 @@ import argparse
 import tempfile
 import shutil
 import glob
+import re
 from typing import Dict, Any, List, Tuple, Optional
+
 
 import ROOT
 ROOT.gROOT.SetBatch(True)
@@ -306,6 +308,7 @@ def build_superimposed_cutflow_canvas(
     h_data: Optional[ROOT.TH1D] = None,
     data_final_count: Optional[float] = None,
     header_right: Optional[str] = None,
+    header_left: Optional[str] = "#bf{SND@LHC} #font[52]{Internal}",
     legend_header: Optional[str] = None,
     mc_total_label: str = "PMU MC Total"
 ) -> ROOT.TCanvas:
@@ -446,8 +449,8 @@ def build_superimposed_cutflow_canvas(
     latex.SetNDC(True)
     latex.SetTextFont(62)
     latex.SetTextSize(0.038)
-    hdr_left = "#bf{SND@LHC} #font[52]{Internal}"
-    latex.DrawLatex(0.12, 0.938, hdr_left)
+    if header_left:
+        latex.DrawLatex(0.12, 0.938, header_left)
 
     latex.SetTextFont(42)
     latex.SetTextSize(0.028 if has_data else 0.030)
@@ -466,6 +469,7 @@ def build_trimuon_cutflow_canvas(
     is_weighted: bool = True,
     canvas_name: str = "c_cutflow_trimuon_superimposed_weighted",
     header_right: Optional[str] = None,
+    header_left: Optional[str] = "#bf{SND@LHC} #it{Internal}",
     legend_header: Optional[str] = None
 ) -> ROOT.TCanvas:
     """
@@ -558,7 +562,8 @@ def build_trimuon_cutflow_canvas(
     latex.SetNDC(True)
     latex.SetTextFont(62)
     latex.SetTextSize(0.036)
-    latex.DrawLatex(0.12, 0.935, "#bf{SND@LHC} #it{Internal}")
+    if header_left:
+        latex.DrawLatex(0.12, 0.935, header_left)
     latex.SetTextFont(42)
     latex.SetTextSize(0.030)
     latex.SetTextAlign(31)
@@ -1276,7 +1281,10 @@ def main():
         data_duration, data_lumi, dur_str, lumi_str = extract_duration_and_lumi(
             dm_data, args.data_duration, args.data_lumi
         )
-        data_run = dm_data.run_number or "N/A"
+        data_run = dm_data.run_number
+        if not data_run:
+            _rn_match = re.search(r"run_(\d+)", args.input_data)
+            data_run = int(_rn_match.group(1)) if _rn_match else "N/A"
         data_fill = dm_data.fill_number or "N/A"
         if dm_data.num_files <= 20:
             data_entries = dm_data.entries

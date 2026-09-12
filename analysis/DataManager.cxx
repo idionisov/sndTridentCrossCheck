@@ -386,6 +386,29 @@ namespace snd {
         return fill;
     }
 
+    int DataManager::ReadRunNumberFromTree(const std::string& fpath, const std::string& treeName) {
+        std::unique_ptr<TFile> f(TFile::Open(fpath.c_str(), "READ"));
+        if (!f || f->IsZombie()) return -1;
+
+        TTree* tree = dynamic_cast<TTree*>(f->Get(treeName.c_str()));
+        if (!tree || tree->GetEntries() <= 0) return -1;
+
+        tree->SetBranchStatus("*", 0);
+        tree->SetBranchStatus("EventHeader*", 1);
+
+        const char* bname = tree->GetBranch("EventHeader.") ? "EventHeader." : "EventHeader";
+        if (!tree->GetBranch(bname)) return -1;
+
+        SNDLHCEventHeader* header = nullptr;
+        tree->SetBranchAddress(bname, &header);
+
+        tree->GetEntry(0);
+        int run = (header && header->GetRunId() > 0)
+                  ? static_cast<int>(header->GetRunId())
+                  : -1;
+        return run;
+    }
+
     double DataManager::CalculateLumiFromTree(TTree* tree, Long64_t start_ts, Long64_t end_ts) {
         if (!tree || tree->GetEntries() <= 0) return 0.0;
 
@@ -686,16 +709,50 @@ namespace snd {
     }
 
     int DataManager::GetRunNumber() const {
+        // Tier 1: already cached
         if (fRunNumber > 0) {
             return fRunNumber;
         }
-        if (!fFiles.empty()) {
+
+        if (fFiles.empty()) {
+            return -1;
+        }
+
+        // Tier 2: fast filename parse (requires both run_NNNNNN and a chunk marker)
+        {
             long long r = -1, c = -1;
             if (ParseRunAndChunk(fFiles.front(), r, c) && r > 0) {
                 const_cast<DataManager*>(this)->fRunNumber = static_cast<int>(r);
                 return fRunNumber;
             }
         }
+
+        // Tier 3: EventHeader probe – start from the middle file and spiral outward.
+        // Using the middle rather than the first/last is intentional: when a fill
+        // spans multiple runs, the chronologically central files most reliably
+        // belong to the dominant (longest) run of interest.
+        if (!HasEventHeader()) {
+            return -1;
+        }
+
+        const std::size_t n = fFiles.size();
+        const std::ptrdiff_t mid = static_cast<std::ptrdiff_t>(n / 2);
+
+        // Visit indices in order: mid, mid-1, mid+1, mid-2, mid+2, ...
+        for (std::ptrdiff_t delta = 0; delta < static_cast<std::ptrdiff_t>(n); ++delta) {
+            for (int sign : {0, -1, 1}) {
+                if (sign == 0 && delta != 0) continue;   // only try mid+0 once (delta==0)
+                if (sign != 0 && delta == 0) continue;   // skip ±0 when delta==0
+                std::ptrdiff_t idx = mid + sign * delta;
+                if (idx < 0 || idx >= static_cast<std::ptrdiff_t>(n)) continue;
+                int run = ReadRunNumberFromTree(fFiles[static_cast<std::size_t>(idx)], fTreeName);
+                if (run > 0) {
+                    const_cast<DataManager*>(this)->fRunNumber = run;
+                    return fRunNumber;
+                }
+            }
+        }
+
         return -1;
     }
 
