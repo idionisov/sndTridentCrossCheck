@@ -1436,27 +1436,33 @@ def main():
 
     h_p_sig_pass= df_mc.Filter("cat_id == 1 && is_clean_reco").Histo1D(("h_p_signal_selected", "Selected Clean Muon Momentum;p [GeV/c];Weighted Muons", 100, 0, 3000), "mu_p", "weight")
 
+    # Master stage registry: stage_name -> (cut_expr, short_title, axis_line1, axis_line2)
+    # axis_line1 / axis_line2 are the two rows shown on the x-axis; ROOT renders "\n" as a
+    # line break for rotated TAxis bin labels, avoiding #splitline rendering artifacts.
+    _STAGE_DEFS = {
+        "0. Detector Active":       ("truth.is_in_acceptance",  "0. Active Detector",              "0. Active",             "Detector Hits"),
+        "1. EventHeader.isIP1()":   ("c1_ip1",                  "1. EventHeader.isIP1()",           "1. EventHeader",        ".isIP1()"),
+        "2. N(SciFi Track) == 1":   ("c2_one_scifi_trk",        "2. SciFi Track == 1",              "2. SciFi Track",        "Multiplicity == 1"),
+        "3. DS Track (Type 13)":    ("c3_ds_track",             f"3. DS Track (Type {args.ds_track_type})", "3. DS Track",   f"(Type {args.ds_track_type})"),
+        "4. Track Fit Quality":     ("c4_track_quality",        f"4. \u03c7\u00b2/ndf \u2264 {args.chi2_max_scifi:g}", "4. Track Fit",  f"\u03c7\u00b2/ndf \u2264 {args.chi2_max_scifi:g}"),
+        "5. Angular Slope Cut":     ("c5_angular_slope",        f"5. Slope < {args.max_slope:g} rad", "5. Slope Cut",        f"< {args.max_slope:g} rad"),
+        "6. Fiducial Plane (z=430)":("c6_fiducial_430",         f"6. Fiducial (z={args.z_match:g} cm)", "6. Fiducial",       f"(z={args.z_match:g} cm)"),
+        "7. DS Match at z=430":     ("c7_ds_match",             f"7. DS Match \u0394R \u2264 {args.pos_match_max:g} cm", "7. DS Match", f"\u0394R \u2264 {args.pos_match_max:g} cm"),
+    }
+
     cutflow_stages = [
-        ("0. Detector Active", "truth.is_in_acceptance"),
-        ("1. EventHeader.isIP1()", "c1_ip1"),
-        ("2. N(SciFi Track) == 1", "c2_one_scifi_trk"),
-        ("3. DS Track (Type 13)", "c3_ds_track"),
-        ("4. Track Fit Quality", "c4_track_quality"),
-        ("5. Angular Slope Cut", "c5_angular_slope"),
-        ("6. Fiducial Plane (z=430)", "c6_fiducial_430"),
-        ("7. DS Match at z=430", "c7_ds_match"),
+        (name, _STAGE_DEFS[name][0])
+        for name in _STAGE_DEFS
     ]
 
-    stage_short_titles = [
-        "0. Active Detector",
-        "1. EventHeader.isIP1()",
-        "2. SciFi Track == 1",
-        "3. DS Track (Type 13)",
-        "4. #chi^{2}/ndf #leq 10",
-        "5. Slope < 0.05 rad",
-        "6. Fiducial (z=430)",
-        "7. DS Match (z=430)",
+    # Derived from the active cutflow_stages — always in sync, no parallel list to maintain
+    stage_short_titles = [_STAGE_DEFS[name][1] for name, _ in cutflow_stages]
+    # Two-row axis labels: line1 + newline + line2, rendered correctly by ROOT on rotated bins
+    stage_axis_labels  = [
+        f"{_STAGE_DEFS[name][2]}\n{_STAGE_DEFS[name][3]}"
+        for name, _ in cutflow_stages
     ]
+
 
     stage_hist_ptrs_w = {}
     stage_hist_ptrs_r = {}
@@ -1966,16 +1972,6 @@ struct IP1Filter {
             table_number=7
         )
 
-    stage_axis_labels = [
-        "#splitline{0. Active}{Detector Hits}",
-        "#splitline{1. EventHeader}{.isIP1()}",
-        "#splitline{2. SciFi Track}{Multiplicity == 1}",
-        f"#splitline{{3. DS Track}}{{(Type {args.ds_track_type})}}",
-        f"#splitline{{4. Track Fit}}{{#chi^{{2}}/ndf #leq {args.chi2_max_scifi:g}}}",
-        f"#splitline{{5. Slope Cut}}{{< {args.max_slope:g} rad}}",
-        f"#splitline{{6. Fiducial}}{{(z={args.z_match:g} cm)}}",
-        f"#splitline{{7. DS Match}}{{#Delta R #leq {args.pos_match_max:g} cm}}"
-    ]
 
     last_stage_name = cutflow_stages[-1][0]
     y_title_w = "Events" if args.input_data else "FLUKA Weighted Yield / 10^{8} p-p"
