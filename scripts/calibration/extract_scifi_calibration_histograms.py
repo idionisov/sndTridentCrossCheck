@@ -1,29 +1,4 @@
 #!/usr/bin/env python3
-"""
-================================================================================
-SND@LHC SciFi Muon Calibration Histogram Extraction Engine
-================================================================================
-High-throughput calibration distribution extractor supporting 1D, 2D, and
-TProfile observables for clean single through-going muons in data and MC.
-
-All configuration (IO defaults, physics parameters, cut ordering and activation,
-and histogram binning) is driven by:
-  config/scifi_calibration_config.yaml
-
-Features:
-- Complete configuration driven by YAML config file.
-- Dynamic cut pipeline execution according to YAML configuration order and flags.
-- Multi-threaded event processing via ROOT RDataFrame and DataManager.
-- Selection of clean single muons using compiled C++ MuonCalibrationProcessor.
-- Books and fills all SciFi hit charge, plane sum, attenuation, and track metrics.
-- Saves raw histograms to ROOT file (Histograms/1D, Histograms/2D, Histograms/Profiles)
-  for downstream fitting and calibration studies in Python.
-- Safe hierarchical directory creation and atomic file writing (safe on EOS).
-
-Author: SND@LHC Collaboration
-================================================================================
-"""
-
 import os
 import sys
 import time

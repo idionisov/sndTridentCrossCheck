@@ -1,12 +1,4 @@
 #!/usr/bin/env python3
-"""
-calculate_trident_yields.py
----------------------------
-Estimate physical trident event yields
-(MuonToMuonPair, GammaToMuPair, Positron Annihilation)
-for a specified target integrated luminosity
-(e.g. 1.0 fb^-1 or 38.0 fb^-1).
-"""
 
 import os
 import sys

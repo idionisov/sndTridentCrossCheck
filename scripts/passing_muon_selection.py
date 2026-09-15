@@ -1,27 +1,4 @@
 #!/usr/bin/env python3
-"""
-================================================================================
-SND@LHC Passing Muon Selection & Truth Assessment Engine
-================================================================================
-Assesses the efficiency, background rejection, and sample purity of the clean
-single-muon calibration selection criteria on Geant4 Monte Carlo:
-
-Selection Criteria:
-  1. SciFi Track Multiplicity : Exactly 1 Reconstructed SciFi Track
-  2. SciFi Track chi2/ndf    : <= 10.0 (Kalman fit quality and flag)
-  3. Max Angular Slope        : <= 0.05 rad (~3 deg near-normal incidence)
-  4. DS Track Slope Match     : |Delta slope| <= 0.04 rad
-  5. Fiducial Margin          : >= 1.5 cm from active plane borders
-  6. SciFi Total Hits         : [10, 35] (Clean MIP band)
-  7. DS System Hits           : >= 2 (Downstream penetration requirement)
-
-Weights:
-  Always uses FLUKA importance-sampling generator weights:
-    double weight = ((ShipMCTrack*)MCTrack->At(0))->GetWeight();
-
-Author: SND@LHC Collaboration
-================================================================================
-"""
 
 import os
 import sys
@@ -143,7 +120,7 @@ CUTFLOW_STYLES = {
         "legend_label": "Stopping / Scatter",
         "title": "Stopping / Scattered Muon",
         "color": ROOT.kGray + 2,
-        "line_style": 5,      # long dash-dot
+        "line_style": 5,     # long dash-dot
         "line_width": 2,
         "marker_style": 25,   # open square
         "marker_size": 1.0,
@@ -166,11 +143,7 @@ def extract_duration_and_lumi(
     dur_override: Optional[float] = None,
     lumi_override: Optional[float] = None
 ) -> Tuple[float, float, str, str]:
-    """
-    Extracts duration (seconds) and integrated luminosity (fb^-1) from DataManager,
-    supporting short single chunks (via atlas_lumi tree interpolation) as well as full runs/fills.
-    """
-    # 1. Duration (fast boundary estimation first)
+
     if dur_override is not None and dur_override > 0:
         duration = float(dur_override)
     else:
@@ -243,9 +216,6 @@ def build_cutflow_histograms(
     y_title: Optional[str] = None,
     name_prefix: str = ""
 ) -> Dict[Any, ROOT.TH1D]:
-    """
-    Constructs 1D cutflow histograms for each event category and for Total Active.
-    """
     hists = {}
     mode = "weighted" if is_weighted else "raw"
     if y_title:
@@ -287,10 +257,6 @@ def build_cutflow_histograms(
 
 
 def scale_data_th1(h: Optional[ROOT.TH1], scale_factor: float) -> Optional[ROOT.TH1]:
-    """
-    Scales a collision data histogram by scale_factor (e.g. if reconstruction ran on a 1/N subsample).
-    Ensures ROOT Sumw2 is initialized so bin errors scale properly as S * sqrt(N_raw).
-    """
     if h is None or abs(scale_factor - 1.0) < 1e-9:
         return h
     if not h.GetSumw2N():
@@ -308,15 +274,10 @@ def build_superimposed_cutflow_canvas(
     h_data: Optional[ROOT.TH1D] = None,
     data_final_count: Optional[float] = None,
     header_right: Optional[str] = None,
-    header_left: Optional[str] = "#bf{SND@LHC} #font[52]{Internal}",
+    header_left: Optional[str] = "",
     legend_header: Optional[str] = None,
     mc_total_label: str = "PMU MC Total"
 ) -> ROOT.TCanvas:
-    """
-    Renders publication-quality superimposed cutflow TCanvas with log-y scale,
-    two-column legend, and standard experiment header. If collision data is provided,
-    plots real data alongside the scaled simulation.
-    """
     has_data = h_data is not None
     mode_str = "FLUKA Weighted" if is_weighted else "Raw Counts"
     if has_data:
@@ -334,7 +295,6 @@ def build_superimposed_cutflow_canvas(
 
     y_unit = "Events" if has_data else ("FLUKA Weighted Yield / 10^{8} p-p" if is_weighted else "Unweighted Simulated Events")
 
-    # Dynamic log-scale boundaries
     all_pos_vals = []
     for h in hists_dict.values():
         for b in range(1, h.GetNbinsX() + 1):
@@ -369,14 +329,12 @@ def build_superimposed_cutflow_canvas(
     frame.GetYaxis().SetTitleOffset(1.25)
     frame.Draw("AXIS")
 
-    # Draw order: reference curves first, signal on top
     draw_order = ["total", 5, 6, 4, 3, 2, 1]
     for k in draw_order:
         h = hists_dict[k]
         h.Draw("HIST SAME")
         h.Draw("P SAME")
 
-    # Draw Collision Data on top if present
     if has_data:
         h_data.SetLineColor(ROOT.kBlack)
         h_data.SetLineWidth(2)
@@ -400,7 +358,6 @@ def build_superimposed_cutflow_canvas(
         leg.SetHeader(legend_header)
 
     if has_data:
-        # Row 1: Collision Data | MC Total
         data_cnt_str = f"{int(round(data_final_count)):,}" if data_final_count is not None else ""
         data_lbl = f"Collision Data ({data_cnt_str})" if data_final_count is not None else "Collision Data"
         leg.AddEntry(h_data, data_lbl, "EP")
@@ -408,7 +365,6 @@ def build_superimposed_cutflow_canvas(
         fin_tot_str = fmt_w(fin_tot) if is_weighted else f"{int(fin_tot):,}"
         leg.AddEntry(hists_dict["total"], f"{mc_total_label} ({fin_tot_str})", "LP")
 
-        # Row 2-4: Signal | EM, Hadronic | MultiMu, Halo | Stopping
         cat_order = [1, 2, 3, 4, 5, 6]
         for k in cat_order:
             cfg = CUTFLOW_STYLES[k]
@@ -444,7 +400,6 @@ def build_superimposed_cutflow_canvas(
 
     leg.Draw()
 
-    # Experiment header labels (non-overlapping)
     latex = ROOT.TLatex()
     latex.SetNDC(True)
     latex.SetTextFont(62)
@@ -469,13 +424,9 @@ def build_trimuon_cutflow_canvas(
     is_weighted: bool = True,
     canvas_name: str = "c_cutflow_trimuon_superimposed_weighted",
     header_right: Optional[str] = None,
-    header_left: Optional[str] = "#bf{SND@LHC} #it{Internal}",
+    header_left: Optional[str] = "",
     legend_header: Optional[str] = None
 ) -> ROOT.TCanvas:
-    """
-    Renders publication-quality superimposed cutflow TCanvas comparing Trimuon Monte Carlo
-    with Collision Data (isolated from PMU MC to prevent visual overcrowding).
-    """
     has_data = h_data is not None
     mode_str = "Weighted Yield" if is_weighted else "Raw Counts"
     if has_data:
@@ -594,10 +545,6 @@ def build_multi_stage_canvas(
     extra_color: int = ROOT.kViolet + 1,
     extra_line_style: int = 7
 ) -> ROOT.TCanvas:
-    """
-    Renders an 8-panel (4x2) sequential evolution canvas displaying the hit
-    multiplicity distribution at each cut stage (Data vs Scaled MC).
-    """
     c = ROOT.TCanvas(canvas_name, canvas_title, 1400, 850)
     ROOT.SetOwnership(c, False)
     c.Divide(4, 2, 0.005, 0.005)
@@ -654,7 +601,6 @@ def build_multi_stage_canvas(
         frame.GetYaxis().SetTitleOffset(1.25)
         frame.Draw("AXIS")
 
-        # MC Total (Line + Vertical Error Bars)
         h_tot.SetStats(0)
         h_tot.SetLineColor(mc_color)
         h_tot.SetLineStyle(mc_line_style)
@@ -669,7 +615,6 @@ def build_multi_stage_canvas(
         h_tot_err.SetLineWidth(1)
         h_tot_err.Draw("E1 SAME")
 
-        # MC Extra component (e.g. Multi-Muon) - optional
         if h_ext is not None:
             h_ext.SetStats(0)
             h_ext.SetLineColor(extra_color)
@@ -677,7 +622,6 @@ def build_multi_stage_canvas(
             h_ext.SetLineWidth(2)
             h_ext.Draw("HIST SAME")
 
-        # MC Signal (Fill + Outline + Vertical Error Bars) - optional
         if h_sig is not None:
             h_sig.SetStats(0)
             h_sig.SetLineColor(ROOT.kAzure + 2)
@@ -693,7 +637,6 @@ def build_multi_stage_canvas(
             h_sig_err.SetLineWidth(1)
             h_sig_err.Draw("E1 SAME")
 
-        # Collision Data
         if h_dat:
             h_dat.SetStats(0)
             h_dat.SetLineColor(ROOT.kBlack)
@@ -702,7 +645,6 @@ def build_multi_stage_canvas(
             h_dat.SetMarkerColor(ROOT.kBlack)
             h_dat.Draw("E1 P SAME")
 
-        # Selection cut boundaries
         if cut_lines:
             for x_cut in cut_lines:
                 line = ROOT.TLine(x_cut, ymin, x_cut, ymax * 0.4)
@@ -745,10 +687,6 @@ def build_muon_energy_stages_canvas(
     hists_energy_all: List[ROOT.TH1D],
     header_right: Optional[str] = None
 ) -> ROOT.TCanvas:
-    """
-    Renders an 8-panel (4x2) sequential evolution canvas displaying the passing
-    muon energy spectrum at each cut stage in Monte Carlo.
-    """
     c = ROOT.TCanvas(canvas_name, canvas_title, 1400, 850)
     ROOT.SetOwnership(c, False)
     c.Divide(4, 2, 0.005, 0.005)
@@ -1448,7 +1386,7 @@ def main():
         "4. Track Fit Quality":     ("c4_track_quality",        f"4. chi2/ndf <= {args.chi2_max_scifi:g}", "4. Track Fit",  f"chi2/ndf <= {args.chi2_max_scifi:g}"),
         "5. Angular Slope Cut":     ("c5_angular_slope",        f"5. Slope < {args.max_slope:g} rad", "5. Slope Cut",        f"< {args.max_slope:g} rad"),
         "6. Fiducial Plane (z=430)":("c6_fiducial_430",         f"6. Fiducial (z={args.z_match:g} cm)", "6. Fiducial",       f"(z={args.z_match:g} cm)"),
-        "7. DS Match at z=430":     ("c7_ds_match",             f"7. DS Match \u0394R \u2264 {args.pos_match_max:g} cm", "7. DS Match", f"\u0394R \u2264 {args.pos_match_max:g} cm"),
+        "7. DS Match at z=430":     ("c7_ds_match",             f"7. DS Match dR <= {args.pos_match_max:g} cm", "7. DS Match", f"dR <= {args.pos_match_max:g} cm"),
     }
 
     cutflow_stages = [

@@ -1,26 +1,4 @@
 #!/usr/bin/env python3
-"""
-================================================================================
-SND@LHC Comprehensive Pre-Selection Observable & Canvas Generator
-================================================================================
-High-throughput pre-tracking distribution extractor supporting 1D, 2D, and
-TProfile observables across:
-1. Monte Carlo Trident Signal (Rock, Target, Muon System, Total Combined)
-2. Monte Carlo Trident Background (unboosted single-muon events)
-3. Passing Muon Simulation (optional, via '--pmu-input')
-4. Real Experimental Collision Data (optional, via '--data-input')
-
-Uses:
-- Compiled C++ metric extractor (snd::trident::PreselectionProcessor) in libtrident_analysis.so
-- Multi-threaded ROOT RDataFrame with in-memory execution and zero disk-spill
-- Okabe-Ito colorblind-safe, publication-grade visualization palette
-- Modular configuration file ('config/preselection_histograms_config.py')
-- Dual-pad TCanvas rendering with efficiency & rejection curves
-- Safe hierarchical directory creation and atomic file writing (safe on EOS)
-
-Author: SND@LHC Collaboration
-================================================================================
-"""
 
 import os
 import sys
