@@ -1444,7 +1444,8 @@ def main():
         "1. EventHeader.isIP1()":   ("c1_ip1",                  "1. EventHeader.isIP1()",           "1. EventHeader",        ".isIP1()"),
         "2. N(SciFi Track) == 1":   ("c2_one_scifi_trk",        "2. SciFi Track == 1",              "2. SciFi Track",        "Multiplicity == 1"),
         "3. DS Track (Type 13)":    ("c3_ds_track",             f"3. DS Track (Type {args.ds_track_type})", "3. DS Track",   f"(Type {args.ds_track_type})"),
-        "4. Track Fit Quality":     ("c4_track_quality",        f"4. \u03c7\u00b2/ndf \u2264 {args.chi2_max_scifi:g}", "4. Track Fit",  f"\u03c7\u00b2/ndf \u2264 {args.chi2_max_scifi:g}"),
+
+        "4. Track Fit Quality":     ("c4_track_quality",        f"4. chi2/ndf <= {args.chi2_max_scifi:g}", "4. Track Fit",  f"chi2/ndf <= {args.chi2_max_scifi:g}"),
         "5. Angular Slope Cut":     ("c5_angular_slope",        f"5. Slope < {args.max_slope:g} rad", "5. Slope Cut",        f"< {args.max_slope:g} rad"),
         "6. Fiducial Plane (z=430)":("c6_fiducial_430",         f"6. Fiducial (z={args.z_match:g} cm)", "6. Fiducial",       f"(z={args.z_match:g} cm)"),
         "7. DS Match at z=430":     ("c7_ds_match",             f"7. DS Match \u0394R \u2264 {args.pos_match_max:g} cm", "7. DS Match", f"\u0394R \u2264 {args.pos_match_max:g} cm"),
