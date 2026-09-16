@@ -351,10 +351,13 @@ namespace snd {
     }
 
     ROOT::RDataFrame DataManager::GetDataFrame() {
-        if (!fChain) {
-            throw std::runtime_error("Cannot create RDataFrame: TChain is null!");
+        if (!fFiles.empty()) {
+            return ROOT::RDataFrame(fTreeName, fFiles);
         }
-        return ROOT::RDataFrame(*fChain);
+        if (fChain) {
+            return ROOT::RDataFrame(*fChain);
+        }
+        throw std::runtime_error("Cannot create RDataFrame: No files or chain available!");
     }
 
     // ROOT::RDF::RNode is a wrapper to represent any node in an RDataFrame computation
