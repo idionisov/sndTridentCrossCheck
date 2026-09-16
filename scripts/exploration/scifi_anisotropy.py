@@ -12,7 +12,7 @@ f_out = ROOT.TFile("/eos/user/i/idioniso/sndMuTri/out/exploration/scifi_anisotro
 mc_path = "/eos/user/i/idioniso/1_Data/Monte_Carlo/passing_muons/protons2023/sndLHC.Ntuple-TGeant4-160urad_100e6pp_FlukaEcut10_digCPP_Trks.root"
 geo_path = "/eos/user/i/idioniso/1_Data/Monte_Carlo/passing_muons/protons2023/geofile_full.Ntuple-TGeant4.root"
 
-dm = DataManager(mc_path, geo_path=geo_path, init_geo=True, num_threads=8)
+dm = DataManager(mc_path, geo_path=geo_path, init_geo=True, num_threads=1)
 scifi_det = dm.scifi
 df = dm.rdf()
 
