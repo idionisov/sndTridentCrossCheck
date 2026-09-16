@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vector>
+#include <unordered_map>
 #include <string>
 #include <cmath>
 #include "TClonesArray.h"
@@ -27,16 +28,39 @@ struct IP1Filter {
 
 
 struct SciFiAnisotropyCalculator {
-    Scifi* fScifi{nullptr};
+    std::unordered_map<int, TVector3> fChannelPositions;
 
-    SciFiAnisotropyCalculator(Scifi* scifi = nullptr) : fScifi(scifi) {
-        if (!fScifi && gROOT && gROOT->GetListOfGlobals()) {
-            fScifi = dynamic_cast<Scifi*>(gROOT->GetListOfGlobals()->FindObject("Scifi"));
+    SciFiAnisotropyCalculator(Scifi* scifi = nullptr) {
+        if (!scifi && gROOT && gROOT->GetListOfGlobals()) {
+            scifi = dynamic_cast<Scifi*>(gROOT->GetListOfGlobals()->FindObject("Scifi"));
+        }
+        if (scifi) {
+            initCache(scifi);
+        }
+    }
+
+    void initCache(Scifi* scifi) {
+        TVector3 a, b;
+        fChannelPositions.reserve(16000);
+        for (int station = 1; station <= 5; ++station) {
+            for (int plane : {0, 100000}) {
+                for (int mat = 0; mat < 4; ++mat) {
+                    for (int sipm = 0; sipm < 4; ++sipm) {
+                        for (int ch = 0; ch < 128; ++ch) {
+                            int det_id = station * 1000000 + plane + mat * 10000 + sipm * 1000 + ch;
+                            try {
+                                scifi->GetSiPMPosition(det_id, a, b);
+                                fChannelPositions[det_id] = 0.5 * (a + b);
+                            } catch (...) {}
+                        }
+                    }
+                }
+            }
         }
     }
 
     double operator()(const TClonesArray& hits) const {
-        if (!fScifi) return -1.0;
+        if (fChannelPositions.empty()) return -1.0;
         const int n_hits = hits.GetEntries();
         if (n_hits < 3) return -1.0;
 
@@ -46,9 +70,10 @@ struct SciFiAnisotropyCalculator {
             auto* hit = static_cast<sndScifiHit*>(hits.At(i));
             if (!hit || !hit->isValid()) continue;
 
-            TVector3 a, b;
-            fScifi->GetSiPMPosition(hit->GetDetectorID(), a, b);
-            positions.push_back(0.5 * (a + b));
+            auto it = fChannelPositions.find(hit->GetDetectorID());
+            if (it != fChannelPositions.end()) {
+                positions.push_back(it->second);
+            }
         }
 
         if (positions.size() < 3) return -1.0;
