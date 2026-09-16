@@ -74,6 +74,11 @@ struct SciFiAnisotropyCalculator {
             if (it != fChannelPositions.end()) {
                 positions.push_back(it->second);
             }
+            else {
+                std::cerr << "Warning: Detector ID "
+                    << hit->GetDetectorID()
+                    << " missing from cache!\n";
+            }
         }
 
         if (positions.size() < 3) return -1.0;

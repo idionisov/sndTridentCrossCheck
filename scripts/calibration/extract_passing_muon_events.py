@@ -67,6 +67,18 @@ def parse_args() -> argparse.Namespace:
         help="Maximum track chi2/ndf (default: 5.0).",
     )
     parser.add_argument(
+        "--chi2-max-scifi",
+        type=float,
+        default=None,
+        help="Maximum SciFi track chi2/ndf (default: matches --chi2-max).",
+    )
+    parser.add_argument(
+        "--chi2-max-ds",
+        type=float,
+        default=None,
+        help="Maximum DS track chi2/ndf (default: matches --chi2-max).",
+    )
+    parser.add_argument(
         "--max-slope",
         type=float,
         default=0.05,
@@ -131,9 +143,12 @@ def main() -> None:
 
     calib_cfg = ROOT.snd.trident.MuonCalibrationConfig()
     calib_cfg.chi2_max = args.chi2_max
+    calib_cfg.chi2_max_scifi = args.chi2_max_scifi if args.chi2_max_scifi is not None else args.chi2_max
+    calib_cfg.chi2_max_ds = args.chi2_max_ds if args.chi2_max_ds is not None else args.chi2_max
     calib_cfg.max_slope = args.max_slope
     calib_cfg.fiducial_margin = args.fiducial_margin
     calib_proc = ROOT.snd.trident.MuonCalibrationProcessor(calib_cfg)
+    print(f"[*] Calibration Cuts: Chi2 Max (SciFi: {calib_cfg.chi2_max_scifi}, DS: {calib_cfg.chi2_max_ds}) | Max Slope: {calib_cfg.max_slope} rad")
 
     # 4. Phase 1: Fast Filter Scan with Selective Branch Activation
     print("\n[*] Phase 1: Scanning selection cuts with selective branch reading...")
