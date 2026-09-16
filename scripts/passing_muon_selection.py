@@ -17,7 +17,6 @@ ROOT.gROOT.SetBatch(True)
 ROOT.gErrorIgnoreLevel = ROOT.kWarning
 
 
-# Add project root to sys.path
 _script_dir = os.path.dirname(os.path.abspath(__file__))
 _repo_root = os.path.dirname(_script_dir) if os.path.basename(_script_dir) == "scripts" else _script_dir
 if _repo_root not in sys.path:
@@ -38,7 +37,7 @@ CATEGORY_NAMES = [
     "NoDetectorHit",
     "Clean_Passing_Muon",
     "Catastrophic_EM_Shower",
-    "Hadronic_Shower",
+    "Hadronic_Interaction",
     "MultiMuon",
     "Halo_Shower_NoMuon",
     "Stopping_Scattered_Muon"
@@ -48,7 +47,7 @@ CATEGORY_LABELS = {
     0: "No Detector Hit",
     1: "Clean Passing Muon (Signal)",
     2: "Catastrophic EM Shower",
-    3: "Hadronic Shower",
+    3: "Hadronic Interaction",
     4: "Multi-Muon Bundle",
     5: "Halo / Shower Only (No Muon)",
     6: "Stopping / Scattered Muon"
@@ -86,9 +85,9 @@ CUTFLOW_STYLES = {
         "marker_size": 1.0,
     },
     3: {
-        "key": "Hadronic_Shower",
-        "legend_label": "Hadronic Shower",
-        "title": "Hadronic Shower",
+        "key": "Hadronic_Interaction",
+        "legend_label": "Hadronic Int.",
+        "title": "Hadronic Interaction",
         "color": ROOT.kOrange + 7,
         "line_style": 7,      # dashed
         "line_width": 2,
@@ -997,7 +996,7 @@ def print_summary_tables(
         print("\n" + "=" * tot_width)
         print(f"{sec_3}. SEQUENTIAL CUTFLOW MATRIX: DATA vs SCALED {sample_tag}")
         print("=" * tot_width)
-        c_header = ["Cut Stage", d_col_title, "MC Signal", "EM Cascade", "Hadronic", "Multi-Mu", "Halo/NoMu", f"Total {sample_tag}"]
+        c_header = ["Cut Stage", d_col_title, "MC Signal", "EM Cascade", "Hadronic Int.", "Multi-Mu", "Halo/NoMu", f"Total {sample_tag}"]
         print(" | ".join(f"{h:^{w}}" for h, w in zip(c_header, c_widths)))
         print("-" * tot_width)
 
@@ -1026,7 +1025,7 @@ def print_summary_tables(
         print("3. SEQUENTIAL CUTFLOW MATRIX: WEIGHTED YIELD (RAW COUNTS)")
         print("=" * 104)
         c_widths = [26, 14, 14, 14, 14, 14, 14]
-        c_header = ["Cut Stage", "Signal", "EM Cascade", "Hadronic", "Multi-Mu", "Halo/NoMu", "Total Active"]
+        c_header = ["Cut Stage", "Signal", "EM Cascade", "Hadronic Int.", "Multi-Mu", "Halo/NoMu", "Total Active"]
         print(" | ".join(f"{h:^{w}}" for h, w in zip(c_header, c_widths)))
         print("-" * 104)
 
@@ -1168,6 +1167,8 @@ def main():
     # Truth definition parameters
     parser.add_argument("--shower-threshold", type=float, default=2.0,
                         help="Kinetic energy threshold for catastrophic secondary shower in GeV (default: 2.0 GeV)")
+    parser.add_argument("--hadronic-threshold", type=float, default=0.5,
+                        help="Kinetic / secondary energy threshold for hadronic interaction in GeV (default: 0.5 GeV)")
 
     args = parser.parse_args()
 
@@ -1298,6 +1299,7 @@ def main():
     # 4. Setup Processors
     truth_cfg = ROOT.snd.trident.PassingMuonTruthConfig()
     truth_cfg.shower_energy_threshold = args.shower_threshold
+    truth_cfg.hadronic_energy_threshold = args.hadronic_threshold
     truth_cfg.fiducial_margin = args.fiducial_margin
     truth_proc = ROOT.snd.trident.PassingMuonTruthProcessor(truth_cfg)
 
@@ -1363,11 +1365,11 @@ def main():
 
     h_chi2_sig  = df_mc.Filter("cat_id == 1 && c2_one_scifi_trk").Histo1D(("h_chi2_signal", "Track #chi^{2}/ndf (Signal);#chi^{2}/ndf;Weighted Tracks", 100, 0, 20), "reco_chi2_ndf", "weight")
     h_chi2_em   = df_mc.Filter("cat_id == 2 && c2_one_scifi_trk").Histo1D(("h_chi2_em_shower", "Track #chi^{2}/ndf (EM Cascade);#chi^{2}/ndf;Weighted Tracks", 100, 0, 20), "reco_chi2_ndf", "weight")
-    h_chi2_had  = df_mc.Filter("cat_id == 3 && c2_one_scifi_trk").Histo1D(("h_chi2_hadronic", "Track #chi^{2}/ndf (Hadronic);#chi^{2}/ndf;Weighted Tracks", 100, 0, 20), "reco_chi2_ndf", "weight")
+    h_chi2_had  = df_mc.Filter("cat_id == 3 && c2_one_scifi_trk").Histo1D(("h_chi2_hadronic", "Track #chi^{2}/ndf (Hadronic Int.);#chi^{2}/ndf;Weighted Tracks", 100, 0, 20), "reco_chi2_ndf", "weight")
 
     h_hits_sig  = df_mc.Filter("cat_id == 1 && c2_one_scifi_trk").Histo1D(("h_sf_hits_signal", "SciFi Hits (Signal);SciFi Hits;Weighted Events", 60, 0, 60), "reco_sf_hits", "weight")
     h_hits_em   = df_mc.Filter("cat_id == 2 && c2_one_scifi_trk").Histo1D(("h_sf_hits_em_shower", "SciFi Hits (EM Cascade);SciFi Hits;Weighted Events", 60, 0, 60), "reco_sf_hits", "weight")
-    h_hits_had  = df_mc.Filter("cat_id == 3 && c2_one_scifi_trk").Histo1D(("h_sf_hits_hadronic", "SciFi Hits (Hadronic);SciFi Hits;Weighted Events", 60, 0, 60), "reco_sf_hits", "weight")
+    h_hits_had  = df_mc.Filter("cat_id == 3 && c2_one_scifi_trk").Histo1D(("h_sf_hits_hadronic", "SciFi Hits (Hadronic Int.);SciFi Hits;Weighted Events", 60, 0, 60), "reco_sf_hits", "weight")
 
     h_veto_hits_sig = df_mc.Filter("cat_id == 1 && c2_one_scifi_trk").Histo1D(("h_veto_hits_signal", "Veto Hits (Signal);Veto Hits;Weighted Events", 16, -0.5, 15.5), "reco_veto_hits", "weight")
     h_us_hits_sig   = df_mc.Filter("cat_id == 1 && c2_one_scifi_trk").Histo1D(("h_us_hits_signal", "US Hits (Signal);US System Hits;Weighted Events", 31, -0.5, 30.5), "reco_us_hits", "weight")
@@ -1443,28 +1445,28 @@ def main():
         stage_sf_mc_tot_ptrs.append(df_s_mc.Histo1D((f"h_sf_hits_mc_tot_{s_tag}", f"SciFi Hits - {stage_name} (MC Total);SciFi Hits;Events", 71, -0.5, 70.5), "reco_sf_hits", "scaled_weight"))
         stage_sf_mc_sig_ptrs.append(df_s_mc.Filter("cat_id == 1").Histo1D((f"h_sf_hits_mc_sig_{s_tag}", f"SciFi Hits - {stage_name} (Signal);SciFi Hits;Events", 71, -0.5, 70.5), "reco_sf_hits", "scaled_weight"))
         stage_sf_mc_em_ptrs.append(df_s_mc.Filter("cat_id == 2").Histo1D((f"h_sf_hits_mc_em_{s_tag}", f"SciFi Hits - {stage_name} (EM Cascade);SciFi Hits;Events", 71, -0.5, 70.5), "reco_sf_hits", "scaled_weight"))
-        stage_sf_mc_had_ptrs.append(df_s_mc.Filter("cat_id == 3").Histo1D((f"h_sf_hits_mc_had_{s_tag}", f"SciFi Hits - {stage_name} (Hadronic);SciFi Hits;Events", 71, -0.5, 70.5), "reco_sf_hits", "scaled_weight"))
+        stage_sf_mc_had_ptrs.append(df_s_mc.Filter("cat_id == 3").Histo1D((f"h_sf_hits_mc_had_{s_tag}", f"SciFi Hits - {stage_name} (Hadronic Int.);SciFi Hits;Events", 71, -0.5, 70.5), "reco_sf_hits", "scaled_weight"))
         stage_sf_mc_raw_sig_ptrs.append(df_s_mc.Filter("cat_id == 1").Histo1D((f"h_sf_hits_mc_raw_sig_{s_tag}", f"SciFi Hits Raw - {stage_name} (Signal);SciFi Hits;Raw Events", 71, -0.5, 70.5), "reco_sf_hits"))
 
         # DS Hits (0 to 35)
         stage_ds_mc_tot_ptrs.append(df_s_mc.Histo1D((f"h_ds_hits_mc_tot_{s_tag}", f"DS Hits - {stage_name} (MC Total);DS System Hits;Events", 36, -0.5, 35.5), "reco_ds_hits", "scaled_weight"))
         stage_ds_mc_sig_ptrs.append(df_s_mc.Filter("cat_id == 1").Histo1D((f"h_ds_hits_mc_sig_{s_tag}", f"DS Hits - {stage_name} (Signal);DS System Hits;Events", 36, -0.5, 35.5), "reco_ds_hits", "scaled_weight"))
         stage_ds_mc_em_ptrs.append(df_s_mc.Filter("cat_id == 2").Histo1D((f"h_ds_hits_mc_em_{s_tag}", f"DS Hits - {stage_name} (EM Cascade);DS System Hits;Events", 36, -0.5, 35.5), "reco_ds_hits", "scaled_weight"))
-        stage_ds_mc_had_ptrs.append(df_s_mc.Filter("cat_id == 3").Histo1D((f"h_ds_hits_mc_had_{s_tag}", f"DS Hits - {stage_name} (Hadronic);DS System Hits;Events", 36, -0.5, 35.5), "reco_ds_hits", "scaled_weight"))
+        stage_ds_mc_had_ptrs.append(df_s_mc.Filter("cat_id == 3").Histo1D((f"h_ds_hits_mc_had_{s_tag}", f"DS Hits - {stage_name} (Hadronic Int.);DS System Hits;Events", 36, -0.5, 35.5), "reco_ds_hits", "scaled_weight"))
         stage_ds_mc_raw_sig_ptrs.append(df_s_mc.Filter("cat_id == 1").Histo1D((f"h_ds_hits_mc_raw_sig_{s_tag}", f"DS Hits Raw - {stage_name} (Signal);DS System Hits;Raw Events", 36, -0.5, 35.5), "reco_ds_hits"))
 
         # Veto Hits (0 to 15)
         stage_veto_mc_tot_ptrs.append(df_s_mc.Histo1D((f"h_veto_hits_mc_tot_{s_tag}", f"Veto Hits - {stage_name} (MC Total);Veto Hits;Events", 16, -0.5, 15.5), "reco_veto_hits", "scaled_weight"))
         stage_veto_mc_sig_ptrs.append(df_s_mc.Filter("cat_id == 1").Histo1D((f"h_veto_hits_mc_sig_{s_tag}", f"Veto Hits - {stage_name} (Signal);Veto Hits;Events", 16, -0.5, 15.5), "reco_veto_hits", "scaled_weight"))
         stage_veto_mc_em_ptrs.append(df_s_mc.Filter("cat_id == 2").Histo1D((f"h_veto_hits_mc_em_{s_tag}", f"Veto Hits - {stage_name} (EM Cascade);Veto Hits;Events", 16, -0.5, 15.5), "reco_veto_hits", "scaled_weight"))
-        stage_veto_mc_had_ptrs.append(df_s_mc.Filter("cat_id == 3").Histo1D((f"h_veto_hits_mc_had_{s_tag}", f"Veto Hits - {stage_name} (Hadronic);Veto Hits;Events", 16, -0.5, 15.5), "reco_veto_hits", "scaled_weight"))
+        stage_veto_mc_had_ptrs.append(df_s_mc.Filter("cat_id == 3").Histo1D((f"h_veto_hits_mc_had_{s_tag}", f"Veto Hits - {stage_name} (Hadronic Int.);Veto Hits;Events", 16, -0.5, 15.5), "reco_veto_hits", "scaled_weight"))
         stage_veto_mc_raw_sig_ptrs.append(df_s_mc.Filter("cat_id == 1").Histo1D((f"h_veto_hits_mc_raw_sig_{s_tag}", f"Veto Hits Raw - {stage_name} (Signal);Veto Hits;Raw Events", 16, -0.5, 15.5), "reco_veto_hits"))
 
         # US Hits (0 to 30)
         stage_us_mc_tot_ptrs.append(df_s_mc.Histo1D((f"h_us_hits_mc_tot_{s_tag}", f"US Hits - {stage_name} (MC Total);US System Hits;Events", 31, -0.5, 30.5), "reco_us_hits", "scaled_weight"))
         stage_us_mc_sig_ptrs.append(df_s_mc.Filter("cat_id == 1").Histo1D((f"h_us_hits_mc_sig_{s_tag}", f"US Hits - {stage_name} (Signal);US System Hits;Events", 31, -0.5, 30.5), "reco_us_hits", "scaled_weight"))
         stage_us_mc_em_ptrs.append(df_s_mc.Filter("cat_id == 2").Histo1D((f"h_us_hits_mc_em_{s_tag}", f"US Hits - {stage_name} (EM Cascade);US System Hits;Events", 31, -0.5, 30.5), "reco_us_hits", "scaled_weight"))
-        stage_us_mc_had_ptrs.append(df_s_mc.Filter("cat_id == 3").Histo1D((f"h_us_hits_mc_had_{s_tag}", f"US Hits - {stage_name} (Hadronic);US System Hits;Events", 31, -0.5, 30.5), "reco_us_hits", "scaled_weight"))
+        stage_us_mc_had_ptrs.append(df_s_mc.Filter("cat_id == 3").Histo1D((f"h_us_hits_mc_had_{s_tag}", f"US Hits - {stage_name} (Hadronic Int.);US System Hits;Events", 31, -0.5, 30.5), "reco_us_hits", "scaled_weight"))
         stage_us_mc_raw_sig_ptrs.append(df_s_mc.Filter("cat_id == 1").Histo1D((f"h_us_hits_mc_raw_sig_{s_tag}", f"US Hits Raw - {stage_name} (Signal);US System Hits;Raw Events", 31, -0.5, 30.5), "reco_us_hits"))
 
         # Muon Energy (0 to 2000 GeV, 100 bins)
@@ -1507,18 +1509,7 @@ def main():
         if args.require_ip1:
             header_branch_data = "EventHeader." if "EventHeader." in cols_data else "EventHeader"
             if header_branch_data in cols_data:
-                ROOT.gInterpreter.ProcessLine("""
-#ifndef SND_IP1_FILTER_DEFINED
-#define SND_IP1_FILTER_DEFINED
-#include "SNDLHCEventHeader.h"
-struct IP1Filter {
-    bool operator()(const SNDLHCEventHeader& h) const {
-        return const_cast<SNDLHCEventHeader&>(h).isIP1();
-    }
-};
-#endif
-""")
-                ip1_checker = ROOT.IP1Filter()
+                ip1_checker = ROOT.snd.trident.IP1Filter()
                 df_data = df_data.Define("pass_is_ip1", ip1_checker, [header_branch_data])
                 print(f"  * Configured EventHeader.isIP1() selection for collision data")
             else:

@@ -16,7 +16,8 @@ enum class MuonTruthCategory : int {
     kNoDetectorHit = 0,         // No activity in SciFi or MuFilter
     kCleanPassingMuon = 1,      // Exactly 1 through-going muon traversing SciFi into Downstream MuFilter (Signal)
     kCatastrophicEMShower = 2,  // Muon undergoing hard catastrophic EM cascade (E_sec > 2.0 GeV or N_pts > 150)
-    kHadronicShower = 3,        // Muon undergoing nuclear / hadronic interaction in detector
+    kHadronicInteraction = 3,   // Muon undergoing nuclear / hadronic interaction in detector
+    kHadronicShower = 3,        // Backward-compatible alias
     kMultiMuon = 4,             // Multiple muons traversing detector simultaneously
     kHaloShowerNoMuon = 5,      // Secondary shower products (e-, gamma, n) in detector without primary muon
     kStoppingScatteredMuon = 6  // Muon entering SciFi but stopping, decaying, or scattering out before DS
@@ -24,6 +25,7 @@ enum class MuonTruthCategory : int {
 
 struct PassingMuonTruthConfig {
     double shower_energy_threshold{2.0};    // 2.0 GeV secondary kinetic energy in tracker defining a catastrophic cascade
+    double hadronic_energy_threshold{0.5};  // 0.5 GeV secondary energy threshold defining a hadronic interaction
     int max_scifi_points_clean{150};        // Max SciFi points for single MIP (nominal is ~30-70)
     double fiducial_margin{1.5};            // Margin in cm from SciFi borders
     double tracker_z_min{260.0};            // Target/SciFi tracker entrance z in cm

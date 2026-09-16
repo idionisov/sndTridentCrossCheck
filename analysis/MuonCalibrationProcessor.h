@@ -15,8 +15,14 @@
 namespace snd::trident {
 
 struct IP1Filter {
+    bool operator()(const SNDLHCEventHeader& header) const {
+        return const_cast<SNDLHCEventHeader&>(header).isIP1();
+    }
     bool operator()(SNDLHCEventHeader& header) const {
         return header.isIP1();
+    }
+    bool operator()(const SNDLHCEventHeader* header) const {
+        return header ? const_cast<SNDLHCEventHeader*>(header)->isIP1() : false;
     }
 };
 

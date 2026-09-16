@@ -2,6 +2,12 @@
 #include <algorithm>
 #include <iostream>
 
+namespace {
+    inline bool isHadronicProcess(int procID) {
+        return (procID == 13 || (procID >= 23 && procID <= 27) || procID == 46);
+    }
+}
+
 namespace snd::trident {
 
 bool PassingMuonTruthProcessor::isFiducial(double x, double y) const {
@@ -46,7 +52,7 @@ PassingMuonTruthInfo PassingMuonTruthProcessor::process(
 
     info.is_in_acceptance = true;
 
-    // 1. Identify track IDs and particle species producing ScifiPoints
+    // identify track IDs and particle species producing ScifiPoints
     std::set<int> muon_trkids_sf;
     std::set<int> em_trkids_sf;
     std::set<int> hadron_trkids_sf;
@@ -69,24 +75,25 @@ PassingMuonTruthInfo PassingMuonTruthProcessor::process(
                     em_trkids_sf.insert(tid);
                     n_non_mu_pts++;
                 } else {
-                    hadron_trkids_sf.insert(tid);
+                    if (trk->GetP() > fConfig.hadronic_energy_threshold) {
+                        hadron_trkids_sf.insert(tid);
+                    }
                     n_non_mu_pts++;
                 }
             } else {
                 n_non_mu_pts++;
             }
         } else {
-            // Unindexed sub-threshold steps (Geant4 trackID < 0): associated with primary ionization
             n_mu_pts++;
         }
     }
 
-    info.n_muons_in_scifi       = static_cast<int>(muon_trkids_sf.size());
-    info.n_muon_scifi_points    = n_mu_pts;
-    info.n_non_muon_scifi_points= n_non_mu_pts;
-    info.non_muon_point_fraction= (n_sf_pts > 0) ? static_cast<double>(n_non_mu_pts) / n_sf_pts : 0.0;
+    info.n_muons_in_scifi        = static_cast<int>(muon_trkids_sf.size());
+    info.n_muon_scifi_points     = n_mu_pts;
+    info.n_non_muon_scifi_points = n_non_mu_pts;
+    info.non_muon_point_fraction = (n_sf_pts > 0) ? static_cast<double>(n_non_mu_pts) / n_sf_pts : 0.0;
 
-    // 2. Identify muons producing points in Downstream MuFilter (DS: system 3 or z > 430 cm)
+    // identify muons producing points in Downstream MuFilter (DS: system 3 or z > 430 cm)
     std::set<int> muon_trkids_ds;
     for (int i = 0; i < n_mf_pts; ++i) {
         auto* pt = static_cast<MuFilterPoint*>(mufiPoints->At(i));
@@ -169,22 +176,23 @@ PassingMuonTruthInfo PassingMuonTruthProcessor::process(
         auto* trk = static_cast<ShipMCTrack*>(mcTracks->At(i));
         if (!trk) continue;
 
-        if (trk->GetMotherId() == mu_id && trk->GetStartZ() >= 260.0 && trk->GetStartZ() <= 360.0) {
+        if (trk->GetMotherId() == mu_id &&
+            trk->GetStartZ() >= fConfig.tracker_z_min &&
+            trk->GetStartZ() <= fConfig.tracker_z_max)
+        {
             n_sec_det++;
             double p_sec = trk->GetP();
+            int procID = trk->GetProcID();
+
             if (p_sec > max_sec_e) {
                 max_sec_e = p_sec;
                 dom_proc  = trk->GetProcName().Data();
             }
 
-            std::string proc_str = trk->GetProcName().Data();
-            std::string proc_lower = proc_str;
-            std::transform(proc_lower.begin(), proc_lower.end(), proc_lower.begin(), ::tolower);
-
-            if (proc_lower.find("nuclear") != std::string::npos || 
-                proc_lower.find("hadron") != std::string::npos ||
-                proc_lower.find("inelastic") != std::string::npos) {
-                has_hadronic = true;
+            if (isHadronicProcess(procID)) {
+                if (p_sec > fConfig.hadronic_energy_threshold) {
+                    has_hadronic = true;
+                }
             } else if (p_sec > fConfig.shower_energy_threshold) {
                 has_hard_em = true;
             }
@@ -202,9 +210,9 @@ PassingMuonTruthInfo PassingMuonTruthProcessor::process(
 
     // Decision tree
     if (has_hadronic) {
-        info.category = MuonTruthCategory::kHadronicShower;
-        info.category_id = static_cast<int>(MuonTruthCategory::kHadronicShower);
-        info.category_name = "Hadronic_Shower";
+        info.category = MuonTruthCategory::kHadronicInteraction;
+        info.category_id = static_cast<int>(MuonTruthCategory::kHadronicInteraction);
+        info.category_name = "Hadronic_Interaction";
         info.is_signal = false;
     } else if (!reaches_ds) {
         info.category = MuonTruthCategory::kStoppingScatteredMuon;
