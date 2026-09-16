@@ -11,12 +11,76 @@
 #include "SNDLHCEventHeader.h"
 #include "TSeqCollection.h"
 #include "TObjArray.h"
+#include <algorithm>
+#include "TROOT.h"
+#include "TMatrixDSym.h"
+#include "TMatrixDSymEigen.h"
+#include "Scifi.h"
 
 namespace snd::trident {
 
 struct IP1Filter {
     bool operator()(const SNDLHCEventHeader& header) const {
         return const_cast<SNDLHCEventHeader&>(header).isIP1();
+    }
+};
+
+
+struct SciFiAnisotropyCalculator {
+    Scifi* fScifi{nullptr};
+
+    SciFiAnisotropyCalculator(Scifi* scifi = nullptr) : fScifi(scifi) {
+        if (!fScifi && gROOT && gROOT->GetListOfGlobals()) {
+            fScifi = dynamic_cast<Scifi*>(gROOT->GetListOfGlobals()->FindObject("Scifi"));
+        }
+    }
+
+    double operator()(const TClonesArray& hits) const {
+        if (!fScifi) return -1.0;
+        const int n_hits = hits.GetEntries();
+        if (n_hits < 3) return -1.0;
+
+        std::vector<TVector3> positions;
+        positions.reserve(n_hits);
+        for (int i = 0; i < n_hits; ++i) {
+            auto* hit = static_cast<sndScifiHit*>(hits.At(i));
+            if (!hit || !hit->isValid()) continue;
+
+            TVector3 a, b;
+            fScifi->GetSiPMPosition(hit->GetDetectorID(), a, b);
+            positions.push_back(0.5 * (a + b));
+        }
+
+        if (positions.size() < 3) return -1.0;
+
+        TVector3 mean(0., 0., 0.);
+        for (const auto& pos : positions) mean += pos;
+        mean *= (1.0 / positions.size());
+
+        TMatrixDSym cov(3);
+        cov.Zero();
+        for (const auto& pos : positions) {
+            const TVector3 d = pos - mean;
+            cov(0, 0) += d.X() * d.X();
+            cov(0, 1) += d.X() * d.Y();
+            cov(0, 2) += d.X() * d.Z();
+            cov(1, 1) += d.Y() * d.Y();
+            cov(1, 2) += d.Y() * d.Z();
+            cov(2, 2) += d.Z() * d.Z();
+        }
+        cov(1, 0) = cov(0, 1);
+        cov(2, 0) = cov(0, 2);
+        cov(2, 1) = cov(1, 2);
+        cov *= (1.0 / positions.size());
+
+        const TVectorD ev = TMatrixDSymEigen(cov).GetEigenValues();
+        std::vector<double> sorted = {ev[0], ev[1], ev[2]};
+        std::sort(sorted.begin(), sorted.end(), std::greater<double>());
+
+        const double tot_var = sorted[0] + sorted[1] + sorted[2];
+        if (tot_var <= 0.0) return -1.0;
+
+        return sorted[0] / tot_var;
     }
 };
 

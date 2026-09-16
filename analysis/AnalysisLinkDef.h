@@ -22,6 +22,7 @@
 #pragma link C++ struct snd::trident::PreselectionMetrics+;
 #pragma link C++ class snd::trident::PreselectionProcessor+;
 #pragma link C++ struct snd::trident::IP1Filter+;
+#pragma link C++ struct snd::trident::SciFiAnisotropyCalculator+;
 #pragma link C++ struct snd::trident::MuonCalibrationConfig+;
 #pragma link C++ struct snd::trident::MuonCalibrationMetrics+;
 #pragma link C++ class snd::trident::MuonCalibrationProcessor+;
