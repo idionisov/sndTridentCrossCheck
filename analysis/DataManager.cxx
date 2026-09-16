@@ -20,6 +20,7 @@
 #include <TKey.h>
 #include <TROOT.h>
 #include <TObjArray.h>
+#include <TDirectory.h>
 
 namespace snd {
 
@@ -277,6 +278,7 @@ namespace snd {
         const std::string& treeName,
         int numThreads
     ){
+        TDirectory::TContext dirContext;
         if (numThreads > 1) {
             if (!ROOT::IsImplicitMTEnabled()) {
                 ROOT::EnableImplicitMT(numThreads);
@@ -366,6 +368,7 @@ namespace snd {
     }
 
     int DataManager::ReadFillNumberFromTree(const std::string& fpath, const std::string& treeName) {
+        TDirectory::TContext dirContext;
         std::unique_ptr<TFile> f(TFile::Open(fpath.c_str(), "READ"));
         if (!f || f->IsZombie()) return -1;
 
@@ -387,6 +390,7 @@ namespace snd {
     }
 
     int DataManager::ReadRunNumberFromTree(const std::string& fpath, const std::string& treeName) {
+        TDirectory::TContext dirContext;
         std::unique_ptr<TFile> f(TFile::Open(fpath.c_str(), "READ"));
         if (!f || f->IsZombie()) return -1;
 
@@ -455,6 +459,7 @@ namespace snd {
 
     double DataManager::FetchLumi(int fillNumber, Long64_t start_ts, Long64_t end_ts, const std::string& lumiDir) {
         if (fillNumber <= 0) return 0.0;
+        TDirectory::TContext dirContext;
         char buf[512];
         snprintf(buf, sizeof(buf), "%s/fill_%06d.root", lumiDir.c_str(), fillNumber);
         std::unique_ptr<TFile> f(TFile::Open(buf, "READ"));
@@ -465,6 +470,7 @@ namespace snd {
     }
 
     static Long64_t ReadTimestampFromTree(const std::string& fpath, const std::string& treeName, Long64_t entryIdx) {
+        TDirectory::TContext dirContext;
         // std::unique_ptr to invoke destructor automatically when file goes out of scope
         std::unique_ptr<TFile> f(TFile::Open(fpath.c_str(), "READ"));
         if (!f || f->IsZombie()) return 0;
@@ -582,6 +588,7 @@ namespace snd {
         Long64_t tEnd = 0;
 
         if (fFiles.size() == 1) {
+            TDirectory::TContext dirContext;
             std::unique_ptr<TFile> f(TFile::Open(fFiles.front().c_str(), "READ"));
             if (f && !f->IsZombie()) {
                 TTree* tree = dynamic_cast<TTree*>(f->Get(fTreeName.c_str()));
@@ -800,6 +807,7 @@ namespace snd {
 
     std::string DataManager::GetLumiPath(const std::string& lumiDir) const {
         if (!fFiles.empty()) {
+            TDirectory::TContext dirContext;
             std::unique_ptr<TFile> f(TFile::Open(fFiles.front().c_str(), "READ"));
             if (f && !f->IsZombie()) {
                 if (f->GetListOfKeys() && f->GetListOfKeys()->Contains("atlas_lumi")) {
@@ -833,6 +841,7 @@ namespace snd {
             return 0.0;
         }
 
+        TDirectory::TContext dirContext;
         std::unique_ptr<TFile> f(TFile::Open(lumiPath.c_str(), "READ"));
         if (!f || f->IsZombie()) {
             if (isFullFill) {
@@ -937,6 +946,7 @@ namespace snd {
     }
 
     std::pair<Scifi*, MuFilter*> DataManager::InitGeometry(const std::string& geoPath, const std::string& csvFilePath) {
+        TDirectory::TContext dirContext;
         if (!geoPath.empty()) {
             fGeoPath = geoPath;
         } else if (fGeoPath.empty()) {
@@ -1029,10 +1039,12 @@ namespace snd {
     }
 
     std::pair<Scifi*, MuFilter*> DataManager::FetchGeometry(const std::string& geoPath) {
+        TDirectory::TContext dirContext;
         return snd::analysis_tools::GetGeometry(geoPath);
     }
 
     std::pair<Scifi*, MuFilter*> DataManager::FetchGeometry(int runNumber, const std::string& csvFilePath) {
+        TDirectory::TContext dirContext;
         return snd::analysis_tools::GetGeometry(runNumber, csvFilePath);
     }
 
@@ -1134,6 +1146,7 @@ namespace snd {
     }
 
     std::string DataManager::ResolveTreeName(const std::string& firstFile, const std::string& requestedTree) {
+        TDirectory::TContext dirContext;
         std::unique_ptr<TFile> f(TFile::Open(firstFile.c_str(), "READ"));
         if (!f || f->IsZombie()) {
             throw std::runtime_error("Could not open ROOT file: " + firstFile);
@@ -1164,6 +1177,7 @@ namespace snd {
     }
 
     std::unordered_set<std::string> DataManager::InspectBranches(const std::string& firstFile, const std::string& treeName) {
+        TDirectory::TContext dirContext;
         std::unordered_set<std::string> branches;
         std::unique_ptr<TFile> f(TFile::Open(firstFile.c_str(), "READ"));
         if (!f || f->IsZombie()) return branches;
@@ -1181,6 +1195,7 @@ namespace snd {
     void DataManager::CopyMetadata(const std::string& sourceFile,
                                 const std::string& targetFile,
                                 const std::vector<std::string>& excludeTrees) {
+        TDirectory::TContext dirContext;
         std::unique_ptr<TFile> fIn(TFile::Open(sourceFile.c_str(), "READ"));
         if (!fIn || fIn->IsZombie()) return;
 

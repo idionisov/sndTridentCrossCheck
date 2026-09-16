@@ -21,6 +21,7 @@ aniso_calc = ROOT.snd.trident.SciFiAnisotropyCalculator(scifi_det)
 
 df = (
     df
+    .Filter("Digi_ScifiHits.GetEntries() >= 3")
     .Define("truth", truth_proc, ["MCTrack", "ScifiPoint", "MuFilterPoint"])
     .Define("cat_id", "truth.category_id")
     .Define("cat_name", "truth.category_name")
@@ -79,5 +80,6 @@ for cat_id, label, color, style in categories:
 legend.Draw()
 canvas.Update()
 
+f_out.cd()
 canvas.Write()
 f_out.Close()
