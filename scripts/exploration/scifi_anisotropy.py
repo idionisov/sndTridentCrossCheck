@@ -8,7 +8,6 @@ ROOT.gStyle.SetOptStat(0)
 
 f_out = ROOT.TFile("/eos/user/i/idioniso/sndMuTri/out/exploration/scifi_anisotropy.root", "recreate")
 
-
 mc_path = "/eos/user/i/idioniso/1_Data/Monte_Carlo/passing_muons/protons2023/sndLHC.Ntuple-TGeant4-160urad_100e6pp_FlukaEcut10_digCPP_Trks.root"
 geo_path = "/eos/user/i/idioniso/1_Data/Monte_Carlo/passing_muons/protons2023/geofile_full.Ntuple-TGeant4.root"
 
@@ -17,17 +16,17 @@ scifi_det = dm.scifi
 df = dm.rdf()
 
 truth_cfg  = ROOT.snd.trident.PassingMuonTruthConfig()
-truth_proc = ROOT.snd.trident.PassingMuonTruthProcessor(truth_cfg)
-aniso_calc = ROOT.snd.trident.SciFiAnisotropyCalculator(scifi_det)
+truth_processor = ROOT.snd.trident.PassingMuonTruthProcessor(truth_cfg)
+scifi_anisotropy_calculator = ROOT.snd.trident.SciFiAnisotropyCalculator(scifi_det)
 
 df = (
     df
     .Filter("Digi_ScifiHits.GetEntries() >= 3")
-    .Define("truth", truth_proc, ["MCTrack", "ScifiPoint", "MuFilterPoint"])
+    .Define("truth", truth_processor, ["MCTrack", "ScifiPoint", "MuFilterPoint"])
     .Define("cat_id", "truth.category_id")
     .Define("cat_name", "truth.category_name")
     .Define("weight", "truth.mc_weight")
-    .Define("anisotropy", aniso_calc, ["Digi_ScifiHits"])
+    .Define("anisotropy", scifi_anisotropy_calculator, ["Digi_ScifiHits"])
     .Filter("anisotropy > 0")
 )
 
@@ -46,7 +45,6 @@ x_min, x_max = 0.40, 1.00
 hist_models = {}
 for cat_id, label, color, style, width in categories:
     h_name = f"h_sf_aniso_cat{cat_id}"
-    title = f"{label};sf spatial anisotropy #lambda_{{1}}/#Sigma#lambda;normalized"
     hist_models[cat_id] = df.Filter(f"cat_id == {cat_id}").Histo1D(
         (h_name, "", n_bins, x_min, x_max),
         "anisotropy", "weight"
