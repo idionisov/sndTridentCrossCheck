@@ -24,7 +24,7 @@ def parse_args() -> argparse.Namespace:
         "-d",
         "--input-data",
         type=str,
-        default=None,
+        default="/eos/user/i/idioniso/1_Data/Tracks/run_006640/muonReco_run6640_f0.0.0.root",
         help="Input collision data ROOT file path.",
     )
     parser.add_argument(
@@ -326,7 +326,7 @@ def main() -> None:
     h1_b_sf.Draw("HIST SAME")
     leg1_sf.AddEntry(h1_b_sf, f"MC Background (N = {int(h1_b_sf.GetEntries())})", "l")
 
-    if h_dt_sf:
+    if h_dt_sf is not None:
         h1_dt_sf = h_dt_sf.GetValue()
         h1_dt_sf.SetMarkerStyle(20)
         h1_dt_sf.SetMarkerSize(0.9)
@@ -374,7 +374,7 @@ def main() -> None:
     h1_b_ds.Draw("HIST SAME")
     leg1_ds.AddEntry(h1_b_ds, f"MC Background (N = {int(h1_b_ds.GetEntries())})", "l")
 
-    if h_dt_ds:
+    if h_dt_ds is not None:
         h1_dt_ds = h_dt_ds.GetValue()
         h1_dt_ds.SetMarkerStyle(20)
         h1_dt_ds.SetMarkerSize(0.9)
@@ -428,7 +428,7 @@ def main() -> None:
     h2_b_sf.Draw("HIST SAME")
     leg2_sf.AddEntry(h2_b_sf, f"MC Background (N = {int(h2_b_sf.GetEntries())})", "l")
 
-    if h_dt_sf_ndf:
+    if h_dt_sf_ndf is not None:
         h2_dt_sf = h_dt_sf_ndf.GetValue()
         h2_dt_sf.SetMarkerStyle(20)
         h2_dt_sf.SetMarkerSize(0.9)
@@ -476,7 +476,7 @@ def main() -> None:
     h2_b_ds.Draw("HIST SAME")
     leg2_ds.AddEntry(h2_b_ds, f"MC Background (N = {int(h2_b_ds.GetEntries())})", "l")
 
-    if h_dt_ds_ndf:
+    if h_dt_ds_ndf is not None:
         h2_dt_ds = h_dt_ds_ndf.GetValue()
         h2_dt_ds.SetMarkerStyle(20)
         h2_dt_ds.SetMarkerSize(0.9)
@@ -530,7 +530,7 @@ def main() -> None:
     h3_b_sf.Draw("HIST SAME")
     leg3_sf.AddEntry(h3_b_sf, f"MC Background (N = {int(h3_b_sf.GetEntries())})", "l")
 
-    if h_dt_sf_corr:
+    if h_dt_sf_corr is not None:
         h3_dt_sf = h_dt_sf_corr.GetValue()
         h3_dt_sf.SetMarkerStyle(20)
         h3_dt_sf.SetMarkerSize(0.9)
@@ -578,7 +578,7 @@ def main() -> None:
     h3_b_ds.Draw("HIST SAME")
     leg3_ds.AddEntry(h3_b_ds, f"MC Background (N = {int(h3_b_ds.GetEntries())})", "l")
 
-    if h_dt_ds_corr:
+    if h_dt_ds_corr is not None:
         h3_dt_ds = h_dt_ds_corr.GetValue()
         h3_dt_ds.SetMarkerStyle(20)
         h3_dt_ds.SetMarkerSize(0.9)
@@ -624,7 +624,7 @@ def main() -> None:
     h3_s_ds.Write("h_ds_chi2_corr_signal")
     h3_b_ds.Write("h_ds_chi2_corr_background")
 
-    if h_dt_sf:
+    if h_dt_sf is not None:
         h1_dt_sf.Write("h_data_scifi_chi2")
         h1_dt_ds.Write("h_data_ds_chi2")
         h2_dt_sf.Write("h_data_scifi_ndf")
