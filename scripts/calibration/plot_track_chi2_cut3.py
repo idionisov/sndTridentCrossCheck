@@ -9,9 +9,7 @@ from snd import DataManager, load_trident_libraries
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Plot SciFi and DS track chi2/ndf, NDF, and corrected chi2/(ndf-5) distributions after Cut 3."
-    )
+    parser = argparse.ArgumentParser()
     parser.add_argument(
         "--input",
         "-i",
@@ -24,8 +22,8 @@ def parse_args() -> argparse.Namespace:
         "-d",
         "--input-data",
         type=str,
-        default="/eos/user/i/idioniso/1_Data/Tracks/run_006640/muonReco_run6640_f0.0.0.root",
-        help="Input collision data ROOT file path.",
+        default="/eos/user/i/idioniso/1_Data/Tracks/run_006640/muonReco_run6640_f10?.*.root",
+        help="Input collision data ROOT file path or pattern.",
     )
     parser.add_argument(
         "--tree-name",
@@ -63,7 +61,7 @@ def parse_args() -> argparse.Namespace:
         "--num-threads",
         "-j",
         type=int,
-        default=1,
+        default=4,
         help="Number of worker threads.",
     )
     parser.add_argument(
@@ -109,14 +107,10 @@ def main() -> None:
     ROOT.gROOT.SetBatch(True)
     ROOT.gStyle.SetOptStat(0)
 
-    input_path = args.input
-    local_scratch = "/tmp/sndLHC.Ntuple-TGeant4-160urad_100e6pp_FlukaEcut10_digCPP_Trks.root"
-    if os.path.exists(local_scratch) and os.path.getsize(local_scratch) > 1024 * 1024 * 100:
-        input_path = local_scratch
-
+    threads = 1 if args.max_events > 0 else args.num_threads
     os.makedirs(args.output_dir, exist_ok=True)
 
-    dm_mc = DataManager(input_path, tree_name=args.tree_name, num_threads=args.num_threads)
+    dm_mc = DataManager(args.input, tree_name=args.tree_name, num_threads=threads)
     df_mc = dm_mc.rdf()
     if args.max_events > 0:
         df_mc = df_mc.Range(args.max_events)
@@ -128,14 +122,10 @@ def main() -> None:
 
     df_mc = (
         df_mc
-        .Filter("Digi_ScifiHits.GetEntries() >= 3")
         .Define("reco", calib_proc, ["Reco_MuonTracks", "Digi_ScifiHits", "Digi_MuFilterHits"])
         .Define("truth", truth_proc, ["MCTrack", "ScifiPoint", "MuFilterPoint"])
-        .Define("c1_ip1", "truth.is_in_acceptance")
-        .Define("c2_one_scifi_trk", "c1_ip1 && reco.pass_cut_single_scifi_track")
-        .Define("c3_ds_track", "c2_one_scifi_trk && reco.pass_cut_ds_track")
+        .Filter("reco.n_scifi_tracks >= 1 && reco.n_ds_tracks >= 1")
         .Define("is_signal", "truth.is_signal")
-        .Filter("c3_ds_track")
         .Define("scifi_chi2_ndf", "reco.track_chi2_ndf")
         .Define("ds_chi2_ndf", "reco.ds_track_chi2_ndf")
         .Define("scifi_ndf", "reco.track_ndf")
@@ -235,23 +225,16 @@ def main() -> None:
     h_dt_sf_corr = None
     h_dt_ds_corr = None
 
-    if args.data and os.path.exists(args.data):
-        dm_data = DataManager(args.data, tree_name=args.tree_data, num_threads=args.num_threads)
+    if args.data:
+        dm_data = DataManager(args.data, tree_name=args.tree_data, num_threads=threads)
         df_data = dm_data.rdf()
         if args.max_events > 0:
             df_data = df_data.Range(args.max_events)
-        cols_data = [str(c) for c in df_data.GetColumnNames()]
-        header_branch = "EventHeader." if "EventHeader." in cols_data else "EventHeader"
-        ip1_checker = ROOT.snd.trident.IP1Filter()
 
         df_data = (
             df_data
-            .Filter("Digi_ScifiHits.GetEntries() >= 3")
             .Define("reco", calib_proc, ["Reco_MuonTracks", "Digi_ScifiHits", "Digi_MuFilterHits"])
-            .Define("c1_ip1", ip1_checker, [header_branch])
-            .Define("c2_one_scifi_trk", "c1_ip1 && reco.pass_cut_single_scifi_track")
-            .Define("c3_ds_track", "c2_one_scifi_trk && reco.pass_cut_ds_track")
-            .Filter("c3_ds_track")
+            .Filter("reco.n_scifi_tracks >= 1 && reco.n_ds_tracks >= 1")
             .Define("scifi_chi2_ndf", "reco.track_chi2_ndf")
             .Define("ds_chi2_ndf", "reco.ds_track_chi2_ndf")
             .Define("scifi_ndf", "reco.track_ndf")
@@ -285,10 +268,7 @@ def main() -> None:
             "ds_chi2_corr"
         )
 
-    # -------------------------------------------------------------
-    # Canvas 1: Track chi2 / ndf
-    # -------------------------------------------------------------
-    c1 = ROOT.TCanvas("c_track_chi2_cut3", "Track Fit Quality after Cut 3", 1600, 700)
+    c1 = ROOT.TCanvas("c_track_chi2_cut3", "Track Fit Quality", 1600, 700)
     c1.Divide(2, 1)
 
     setup_pad(c1.cd(1))
@@ -299,7 +279,7 @@ def main() -> None:
     h1_sf.GetYaxis().SetTitleSize(0.045)
     h1_sf.GetXaxis().SetTitleOffset(1.1)
     h1_sf.GetYaxis().SetTitleOffset(1.3)
-    h1_sf.SetTitle("SciFi Track #chi^{2}/ndf (After Cut 3)")
+    h1_sf.SetTitle("SciFi Track #chi^{2}/ndf")
 
     max1_sf = h1_sf.GetMaximum()
     h1_sf.SetMaximum(max1_sf * 1.35 if max1_sf > 0 else 10.0)
@@ -347,7 +327,7 @@ def main() -> None:
     h1_ds.GetYaxis().SetTitleSize(0.045)
     h1_ds.GetXaxis().SetTitleOffset(1.1)
     h1_ds.GetYaxis().SetTitleOffset(1.3)
-    h1_ds.SetTitle("Downstream Track #chi^{2}/ndf (After Cut 3)")
+    h1_ds.SetTitle("Downstream Track #chi^{2}/ndf")
 
     max1_ds = h1_ds.GetMaximum()
     h1_ds.SetMaximum(max1_ds * 1.35 if max1_ds > 0 else 10.0)
@@ -387,10 +367,7 @@ def main() -> None:
 
     leg1_ds.Draw()
 
-    # -------------------------------------------------------------
-    # Canvas 2: Track NDF
-    # -------------------------------------------------------------
-    c2 = ROOT.TCanvas("c_track_ndf_cut3", "Track NDF after Cut 3", 1600, 700)
+    c2 = ROOT.TCanvas("c_track_ndf_cut3", "Track NDF", 1600, 700)
     c2.Divide(2, 1)
 
     setup_pad(c2.cd(1))
@@ -401,7 +378,7 @@ def main() -> None:
     h2_sf.GetYaxis().SetTitleSize(0.045)
     h2_sf.GetXaxis().SetTitleOffset(1.1)
     h2_sf.GetYaxis().SetTitleOffset(1.3)
-    h2_sf.SetTitle("SciFi Track NDF (After Cut 3)")
+    h2_sf.SetTitle("SciFi Track NDF")
 
     max2_sf = h2_sf.GetMaximum()
     h2_sf.SetMaximum(max2_sf * 1.35 if max2_sf > 0 else 10.0)
@@ -449,7 +426,7 @@ def main() -> None:
     h2_ds.GetYaxis().SetTitleSize(0.045)
     h2_ds.GetXaxis().SetTitleOffset(1.1)
     h2_ds.GetYaxis().SetTitleOffset(1.3)
-    h2_ds.SetTitle("Downstream Track NDF (After Cut 3)")
+    h2_ds.SetTitle("Downstream Track NDF")
 
     max2_ds = h2_ds.GetMaximum()
     h2_ds.SetMaximum(max2_ds * 1.35 if max2_ds > 0 else 10.0)
@@ -489,10 +466,7 @@ def main() -> None:
 
     leg2_ds.Draw()
 
-    # -------------------------------------------------------------
-    # Canvas 3: Corrected chi2 / (ndf - 5)
-    # -------------------------------------------------------------
-    c3 = ROOT.TCanvas("c_track_chi2_corr_cut3", "Track Corrected Fit Quality after Cut 3", 1600, 700)
+    c3 = ROOT.TCanvas("c_track_chi2_corr_cut3", "Track Corrected Fit Quality", 1600, 700)
     c3.Divide(2, 1)
 
     setup_pad(c3.cd(1))
@@ -503,7 +477,7 @@ def main() -> None:
     h3_sf.GetYaxis().SetTitleSize(0.045)
     h3_sf.GetXaxis().SetTitleOffset(1.1)
     h3_sf.GetYaxis().SetTitleOffset(1.3)
-    h3_sf.SetTitle("SciFi Track #chi^{2}/(ndf - 5) (After Cut 3)")
+    h3_sf.SetTitle("SciFi Track #chi^{2}/(ndf - 5)")
 
     max3_sf = h3_sf.GetMaximum()
     h3_sf.SetMaximum(max3_sf * 1.35 if max3_sf > 0 else 10.0)
@@ -551,7 +525,7 @@ def main() -> None:
     h3_ds.GetYaxis().SetTitleSize(0.045)
     h3_ds.GetXaxis().SetTitleOffset(1.1)
     h3_ds.GetYaxis().SetTitleOffset(1.3)
-    h3_ds.SetTitle("DS Track #chi^{2}/(ndf - 5) [ndf > 5] (After Cut 3)")
+    h3_ds.SetTitle("DS Track #chi^{2}/(ndf - 5) [ndf > 5]")
 
     max3_ds = h3_ds.GetMaximum()
     h3_ds.SetMaximum(max3_ds * 1.35 if max3_ds > 0 else 10.0)
@@ -634,9 +608,9 @@ def main() -> None:
 
     h2_chi2.GetValue().Write("h2_chi2_scifi_vs_ds")
 
-    c1.Write("c_track_chi2_cut3")
-    c2.Write("c_track_ndf_cut3")
-    c3.Write("c_track_chi2_corr_cut3")
+    c1.Write("c_track_chi2")
+    c2.Write("c_track_ndf")
+    c3.Write("c_track_chi2_corr")
     f_out.Close()
 
     print(f"Output multi-page PDF: {pdf_multi}")
