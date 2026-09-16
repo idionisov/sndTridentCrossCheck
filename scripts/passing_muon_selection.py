@@ -1145,9 +1145,9 @@ def main():
                         help="Scaling factor for collision data (default: 1.0, e.g. 100.0 if reconstruction ran on 1/100 random subsample)")
 
     # Configurable selection cuts
-    parser.add_argument("--chi2-max", type=float, default=10.0, help="General track chi2/ndf upper limit")
-    parser.add_argument("--chi2-max-scifi", type=float, default=10.0, help="Max SciFi track chi2/ndf (default: 10.0)")
-    parser.add_argument("--chi2-max-ds", type=float, default=10.0, help="Max DS track chi2/ndf (default: 10.0)")
+    parser.add_argument("--chi2-max", type=float, default=20.0, help="General track chi2/ndf upper limit")
+    parser.add_argument("--chi2-max-scifi", type=float, default=20.0, help="Max SciFi track chi2/ndf (default: 10.0)")
+    parser.add_argument("--chi2-max-ds", type=float, default=20.0, help="Max DS track chi2/ndf (default: 10.0)")
     parser.add_argument("--max-slope", type=float, default=0.05, help="Max angular slope (default: 0.05 rad)")
     parser.add_argument("--z-match", type=float, default=430.0, help="Fiducial plane Z position [cm] (default: 430.0)")
     parser.add_argument("--pos-match-max", type=float, default=3.0, help="Max distance at z_match between SF and DS (default: 3.0 cm)")
