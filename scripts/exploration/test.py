@@ -10,7 +10,7 @@ REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
-from snd import DataManager, load_trident_libraries
+from snd import load_trident_libraries, add_progress_printer
 
 # Load compiled C++ analysis libraries
 load_trident_libraries(REPO_ROOT)
@@ -18,7 +18,7 @@ load_trident_libraries(REPO_ROOT)
 ROOT.gROOT.SetBatch(True)
 ROOT.gStyle.SetOptStat(0)
 
-# Declare thread-safe C++ processor for RDataFrame
+# Declare fast, thread-safe C++ processor for RDataFrame
 ROOT.gInterpreter.Declare("""
 #include "TClonesArray.h"
 #include "sndCluster.h"
@@ -40,9 +40,11 @@ struct EventSummary {
     double n_tracks{0.0};
     std::vector<double> cluster_sizes;
     std::vector<double> cluster_qdcs;
+    std::vector<double> cluster_weights;
     std::vector<double> track_chi2;
     std::vector<double> track_slope_xz;
     std::vector<double> track_slope_yz;
+    std::vector<double> track_weights;
     std::vector<double> clean_hit_qdc;
     std::vector<double> clean_hit_dist;
     std::vector<double> clean_hit_weights;
@@ -81,6 +83,7 @@ EventSummary process_event(
         int n_cl = clusters->GetEntries();
         s.cluster_sizes.reserve(n_cl);
         s.cluster_qdcs.reserve(n_cl);
+        s.cluster_weights.reserve(n_cl);
         for (int i = 0; i < n_cl; ++i) {
             auto* cl = static_cast<sndCluster*>(clusters->At(i));
             if (!cl) continue;
@@ -93,6 +96,7 @@ EventSummary process_event(
                 if (it != hit_qdc_map.end()) qdc_sum += it->second;
             }
             s.cluster_qdcs.push_back(qdc_sum);
+            s.cluster_weights.push_back(event_weight);
         }
     }
 
@@ -117,6 +121,7 @@ EventSummary process_event(
                 s.track_chi2.push_back(static_cast<double>(c2));
                 s.track_slope_xz.push_back(static_cast<double>(trk->getSlopeXZ()));
                 s.track_slope_yz.push_back(static_cast<double>(trk->getSlopeYZ()));
+                s.track_weights.push_back(event_weight);
             }
         }
 
@@ -157,23 +162,29 @@ EventSummary process_event(
 } // namespace DigiRdf
 """)
 
-# Configuration: Datasets, Geometries, and Trees
+import fnmatch
+
+# Configuration: Datasets and Geometries
 FILES = {
     "Data": {
         "path": "/eos/user/i/idioniso/1_Data/Tracks/run_008329/sndsw_raw-*_muonReco.root",
-        "geo": "/eos/experiment/sndlhc/convertedData/physics/2023/geofile_sndlhc_TI18_V3_2023.root",
+        "alt_path": "/eos/user/i/idioniso/1_Data/Tracks/run_008329/sndsw_raw-1_1?_*.root",
+        "tree": "rawConv",
+        "avg_events_per_file": 27000,
         "color": ROOT.kBlack,
         "is_mc": False,
     },
     "SingleMuMC": {
         "path": "/eos/user/i/idioniso/1_Data/Monte_Carlo/passing_muons/protons2023/sndLHC.Ntuple-TGeant4-160urad_100e6pp_FlukaEcut10_digCPP_Trks.root",
-        "geo": "/eos/user/i/idioniso/1_Data/Monte_Carlo/passing_muons/protons2023/geofile_full.Ntuple-TGeant4.root",
+        "tree": "cbmsim",
+        "avg_events_per_file": 1213000,
         "color": ROOT.kBlue,
         "is_mc": True,
     },
     "ThreeMuMC": {
         "path": "/eos/user/i/idioniso/1_Data/Monte_Carlo/ThreeMuons/sndLHC.Ntuple-TGeant4_boost100LHC_-160urad_magfield_2022TCL6_muons_rock_2e8pr_filteredAtScoringPlane_digCPP-2??_trks.root",
-        "geo": "/eos/user/i/idioniso/1_Data/Monte_Carlo/ThreeMuons/geofile_full.Ntuple-TGeant4_boost100.0.root",
+        "tree": "cbmsim",
+        "avg_events_per_file": 18600,
         "color": ROOT.kRed,
         "is_mc": True,
     },
@@ -182,41 +193,102 @@ FILES = {
 DEFAULT_OUTPUT_PATH = "/eos/user/i/idioniso/sndMuTri/out/digi_validation_comparison.root"
 
 
+def resolve_files_fast(pattern_or_path, max_events=-1, avg_events=25000):
+    """
+    High-speed file resolver avoiding libc glob() hangs over EOS FUSE.
+    Uses os.scandir to list directory entries in milliseconds.
+    If max_events > 0, caps the file list to only what is required to reach
+    max_events (plus safety margin), avoiding massive multi-file chain traversals.
+    """
+    if os.path.isfile(pattern_or_path):
+        return [pattern_or_path]
+
+    dir_name = os.path.dirname(pattern_or_path)
+    file_pat = os.path.basename(pattern_or_path)
+
+    if not os.path.isdir(dir_name):
+        return []
+
+    matched = []
+    with os.scandir(dir_name) as it:
+        for entry in it:
+            if entry.is_file() and fnmatch.fnmatch(entry.name, file_pat):
+                matched.append(entry.path)
+
+    matched.sort()
+    if not matched:
+        return []
+
+    if max_events > 0:
+        files_needed = max(2, int(max_events / avg_events) + 3)
+        return matched[:files_needed]
+
+    return matched
+
+
+def build_tchain(cfg, max_events=-1):
+    """
+    Fast TChain builder using resolved exact paths.
+    Bypasses POSIX glob and prevents full-directory chain traversal over EOS.
+    """
+    avg_ev = cfg.get("avg_events_per_file", 25000)
+    files = resolve_files_fast(cfg["path"], max_events=max_events, avg_events=avg_ev)
+    if not files and "alt_path" in cfg:
+        files = resolve_files_fast(cfg["alt_path"], max_events=max_events, avg_events=avg_ev)
+
+    if not files:
+        raise RuntimeError(f"No files found matching {cfg['path']}")
+
+    tree_name = cfg.get("tree", "cbmsim")
+    chain = ROOT.TChain(tree_name)
+    for f in files:
+        chain.Add(f)
+
+    return chain, tree_name, len(files), cfg["path"]
+
+
 def analyze_sample_rdf(sample_name, cfg, num_threads=8, max_events=-1, weight_scale=40.0):
     print(f"\n=======================================================")
-    print(f"--> Initializing DataManager for {sample_name}...")
+    print(f"--> Initializing dataset for {sample_name}...")
     print(f"=======================================================")
 
     t0 = time.time()
-    data = DataManager(
-        source=cfg["path"],
-        geo_path=cfg["geo"],
-        num_threads=num_threads,
-        init_geo=False,
-    )
 
-    print(f"    Loaded {data.num_files} file(s) with tree '{data.tree_name}'. Total entries: {data.entries:,}")
-
-    # Create multi-threaded RDataFrame with automatic progress monitor
-    df = data.rdf(progress=True, every_seconds=10.0, progress_label=sample_name)
-
-    # Optional range filtering
-    if max_events > 0 and max_events < data.entries:
+    # 1. Enable ROOT multi-threading
+    if num_threads > 1:
+        if not ROOT.IsImplicitMTEnabled():
+            ROOT.EnableImplicitMT(num_threads)
+    else:
         if ROOT.IsImplicitMTEnabled():
-            df = df.Filter(f"rdfentry_ < {max_events}")
-        else:
-            df = df.Range(max_events)
-        print(f"    Filtered up to {max_events:,} events.")
+            ROOT.DisableImplicitMT()
 
-    # 1. Define event weight
+    # 2. Fast native TChain creation (bypasses slow POSIX glob on EOS)
+    chain, tree_name, n_files, used_path = build_tchain(cfg, max_events=max_events)
+    print(f"    Loaded tree '{tree_name}' from {n_files} file(s) matching '{used_path}'")
+
+    # 3. Create RDataFrame directly from TChain
+    df = ROOT.RDataFrame(chain)
+
+    # Range / Event filter
+    if max_events > 0:
+        df = df.Filter(f"rdfentry_ < {max_events}")
+        print(f"    Processing up to {max_events:,} events...")
+
+    # Attach thread-safe progress printer after filter
+    df, printer = add_progress_printer(df, total_events=max_events if max_events > 0 else 0, every_seconds=10.0, label=sample_name)
+
+    # 4. Check available branches safely
+    branch_names = set(b.GetName() for b in chain.GetListOfBranches())
+
+    # Define event weight
     if not cfg.get("is_mc", False) or sample_name == "Data":
         df = df.Define("weight", "1.0")
-    elif data.has_branch("mc_weight"):
+    elif "mc_weight" in branch_names:
         df = df.Define("weight", f"static_cast<double>(mc_weight) * {weight_scale}")
-    elif data.has_branch("MCEventHeader.") or data.has_branch("MCEventHeader"):
-        header_name = "MCEventHeader." if data.has_branch("MCEventHeader.") else "MCEventHeader"
+    elif "MCEventHeader." in branch_names or "MCEventHeader" in branch_names:
+        header_name = "MCEventHeader." if "MCEventHeader." in branch_names else "MCEventHeader"
         df = df.Define("weight", f"static_cast<double>({header_name}.GetWeight()) * {weight_scale}")
-    elif data.has_branch("MCTrack"):
+    elif "MCTrack" in branch_names:
         df = df.Define(
             "weight",
             f"(MCTrack.GetEntries() > 0 ? static_cast<double>(static_cast<ShipMCTrack*>(MCTrack.At(0))->GetWeight()) : 1.0) * {weight_scale}"
@@ -224,25 +296,41 @@ def analyze_sample_rdf(sample_name, cfg, num_threads=8, max_events=-1, weight_sc
     else:
         df = df.Define("weight", f"{weight_scale}")
 
-    # 2. Check branch presence and bind C++ processor
-    sf_col = "Digi_ScifiHits" if data.has_branch("Digi_ScifiHits") else "nullptr"
-    cl_col = "Cluster_Scifi" if data.has_branch("Cluster_Scifi") else "nullptr"
-    mf_col = "Digi_MuFilterHits" if data.has_branch("Digi_MuFilterHits") else ("Digi_MuFilterHit" if data.has_branch("Digi_MuFilterHit") else "nullptr")
-    tr_col = "Reco_MuonTracks" if data.has_branch("Reco_MuonTracks") else "nullptr"
+    # 5. Check branch presence and bind C++ processor
+    has_scifi = "Digi_ScifiHits" in branch_names
+    has_clusters = "Cluster_Scifi" in branch_names
+    has_mufi = ("Digi_MuFilterHits" in branch_names) or ("Digi_MuFilterHit" in branch_names)
+    has_tracks = "Reco_MuonTracks" in branch_names
 
-    cols = []
-    args_expr = []
-    for col_name in [sf_col, cl_col, mf_col, tr_col]:
-        if col_name != "nullptr":
-            args_expr.append(f"&{col_name}")
-            cols.append(col_name)
-        else:
-            args_expr.append("static_cast<const TClonesArray*>(nullptr)")
+    sf_arg = "&Digi_ScifiHits" if has_scifi else "static_cast<const TClonesArray*>(nullptr)"
+    cl_arg = "&Cluster_Scifi" if has_clusters else "static_cast<const TClonesArray*>(nullptr)"
+    mf_branch_name = "Digi_MuFilterHits" if "Digi_MuFilterHits" in branch_names else "Digi_MuFilterHit"
+    mf_arg = f"&{mf_branch_name}" if has_mufi else "static_cast<const TClonesArray*>(nullptr)"
+    tr_arg = "&Reco_MuonTracks" if has_tracks else "static_cast<const TClonesArray*>(nullptr)"
 
-    proc_call = f"DigiRdf::process_event({args_expr[0]}, {args_expr[1]}, {args_expr[2]}, {args_expr[3]}, weight)"
+    proc_call = f"DigiRdf::process_event({sf_arg}, {cl_arg}, {mf_arg}, {tr_arg}, weight)"
     df = df.Define("ev", proc_call)
 
-    # 3. Book Histograms and Profiles
+    # Flatten event struct members to first-class RDF columns
+    df = df.Define("clean_hit_qdc", "ev.clean_hit_qdc")
+    df = df.Define("clean_hit_weights", "ev.clean_hit_weights")
+    df = df.Define("clean_hit_dist", "ev.clean_hit_dist")
+    df = df.Define("cluster_qdcs", "ev.cluster_qdcs")
+    df = df.Define("cluster_sizes", "ev.cluster_sizes")
+    df = df.Define("cluster_weights", "ev.cluster_weights")
+    df = df.Define("n_scifi_st1", "ev.n_scifi_st1")
+    df = df.Define("n_scifi_hits", "ev.n_scifi_hits")
+    df = df.Define("n_mufi_hits", "ev.n_mufi_hits")
+    df = df.Define("n_tracks", "ev.n_tracks")
+    df = df.Define("track_chi2", "ev.track_chi2")
+    df = df.Define("track_slope_xz", "ev.track_slope_xz")
+    df = df.Define("track_slope_yz", "ev.track_slope_yz")
+    df = df.Define("track_weights", "ev.track_weights")
+    df = df.Define("station_numbers", "ev.station_numbers")
+    df = df.Define("station_hits", "ev.station_hits")
+    df = df.Define("station_weights", "ev.station_weights")
+
+    # 6. Book Histograms and Profiles
     models = {
         "qdc_single_hit": ROOT.RDF.TH1DModel(f"qdc_single_{sample_name}", f"Single Hit QDC ({sample_name});QDC [a.u.];Normalized Entries", 150, -10, 140),
         "cluster_qdc": ROOT.RDF.TH1DModel(f"cluster_qdc_{sample_name}", f"Total Cluster QDC ({sample_name});Cluster QDC [a.u.];Normalized Entries", 150, -10, 200),
@@ -259,18 +347,18 @@ def analyze_sample_rdf(sample_name, cfg, num_threads=8, max_events=-1, weight_sc
     }
 
     rdf_ptrs = {
-        "qdc_single_hit":    df.Histo1D(models["qdc_single_hit"], "ev.clean_hit_qdc", "ev.clean_hit_weights"),
-        "cluster_qdc":       df.Histo1D(models["cluster_qdc"], "ev.cluster_qdcs", "weight"),
-        "cluster_size":      df.Histo1D(models["cluster_size"], "ev.cluster_sizes", "weight"),
-        "nhits_st1":         df.Histo1D(models["nhits_st1"], "ev.n_scifi_st1", "weight"),
-        "nhits_total":       df.Histo1D(models["nhits_total"], "ev.n_scifi_hits", "weight"),
-        "qdc_vs_dist":       df.Profile1D(models["qdc_vs_dist"], "ev.clean_hit_dist", "ev.clean_hit_qdc", "ev.clean_hit_weights"),
-        "nhits_per_station": df.Profile1D(models["nhits_per_station"], "ev.station_numbers", "ev.station_hits", "ev.station_weights"),
-        "ntracks":           df.Histo1D(models["ntracks"], "ev.n_tracks", "weight"),
-        "track_chi2_ndf":    df.Histo1D(models["track_chi2_ndf"], "ev.track_chi2", "weight"),
-        "track_slope_xz":    df.Histo1D(models["track_slope_xz"], "ev.track_slope_xz", "weight"),
-        "track_slope_yz":    df.Histo1D(models["track_slope_yz"], "ev.track_slope_yz", "weight"),
-        "nhits_mufilter":    df.Histo1D(models["nhits_mufilter"], "ev.n_mufi_hits", "weight"),
+        "qdc_single_hit":    df.Histo1D(models["qdc_single_hit"], "clean_hit_qdc", "clean_hit_weights"),
+        "cluster_qdc":       df.Histo1D(models["cluster_qdc"], "cluster_qdcs", "cluster_weights"),
+        "cluster_size":      df.Histo1D(models["cluster_size"], "cluster_sizes", "cluster_weights"),
+        "nhits_st1":         df.Histo1D(models["nhits_st1"], "n_scifi_st1", "weight"),
+        "nhits_total":       df.Histo1D(models["nhits_total"], "n_scifi_hits", "weight"),
+        "qdc_vs_dist":       df.Profile1D(models["qdc_vs_dist"], "clean_hit_dist", "clean_hit_qdc", "clean_hit_weights"),
+        "nhits_per_station": df.Profile1D(models["nhits_per_station"], "station_numbers", "station_hits", "station_weights"),
+        "ntracks":           df.Histo1D(models["ntracks"], "n_tracks", "weight"),
+        "track_chi2_ndf":    df.Histo1D(models["track_chi2_ndf"], "track_chi2", "track_weights"),
+        "track_slope_xz":    df.Histo1D(models["track_slope_xz"], "track_slope_xz", "track_weights"),
+        "track_slope_yz":    df.Histo1D(models["track_slope_yz"], "track_slope_yz", "track_weights"),
+        "nhits_mufilter":    df.Histo1D(models["nhits_mufilter"], "n_mufi_hits", "weight"),
     }
 
     sum_w_ptr = df.Sum("weight")
@@ -339,7 +427,7 @@ def draw_pad(pad_obj, var, var_label, logy, norm, results, files_cfg):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="High-performance multi-threaded digitization validation using DataManager and RDataFrame.",
+        description="High-performance multi-threaded digitization validation using native ROOT RDataFrame.",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument("-j", "--threads", dest="num_threads", type=int, default=8, help="Number of worker threads")
