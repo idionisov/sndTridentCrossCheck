@@ -12,13 +12,13 @@ if REPO_ROOT not in sys.path:
 
 from snd import DataManager, load_trident_libraries
 
-# Load compiled C++ analysis libraries (DataManager, MuonCalibrationProcessor, etc.)
+# Load compiled C++ analysis libraries
 load_trident_libraries(REPO_ROOT)
 
 ROOT.gROOT.SetBatch(True)
 ROOT.gStyle.SetOptStat(0)
 
-# Declare C++ helper functions for RDataFrame
+# Declare thread-safe C++ processor for RDataFrame
 ROOT.gInterpreter.Declare("""
 #include "TClonesArray.h"
 #include "sndCluster.h"
@@ -26,83 +26,141 @@ ROOT.gInterpreter.Declare("""
 #include "sndRecoTrack.h"
 #include "MuFilterHit.h"
 #include "ShipMCTrack.h"
-#include "MuonCalibrationProcessor.h"
+#include "TVector3.h"
 #include <vector>
 #include <unordered_map>
+#include <cmath>
 
-namespace DigiRdfHelper {
-    std::vector<double> get_cluster_sizes(const TClonesArray& clusters) {
-        std::vector<double> sizes;
-        int n = clusters.GetEntries();
-        sizes.reserve(n);
-        for (int i = 0; i < n; ++i) {
-            auto* cl = static_cast<sndCluster*>(clusters.At(i));
-            if (cl) sizes.push_back(static_cast<double>(cl->GetN()));
+namespace DigiRdf {
+
+struct EventSummary {
+    double n_scifi_hits{0.0};
+    double n_scifi_st1{0.0};
+    double n_mufi_hits{0.0};
+    double n_tracks{0.0};
+    std::vector<double> cluster_sizes;
+    std::vector<double> cluster_qdcs;
+    std::vector<double> track_chi2;
+    std::vector<double> track_slope_xz;
+    std::vector<double> track_slope_yz;
+    std::vector<double> clean_hit_qdc;
+    std::vector<double> clean_hit_dist;
+    std::vector<double> clean_hit_weights;
+    std::vector<double> station_numbers{1.0, 2.0, 3.0, 4.0, 5.0};
+    std::vector<double> station_hits{0.0, 0.0, 0.0, 0.0, 0.0};
+    std::vector<double> station_weights{1.0, 1.0, 1.0, 1.0, 1.0};
+};
+
+EventSummary process_event(
+    const TClonesArray* scifiHits,
+    const TClonesArray* clusters,
+    const TClonesArray* mufiHits,
+    const TClonesArray* tracks,
+    double event_weight = 1.0
+) {
+    EventSummary s;
+    s.station_weights = {event_weight, event_weight, event_weight, event_weight, event_weight};
+
+    // 1. SciFi Hits
+    std::unordered_map<int, double> hit_qdc_map;
+    if (scifiHits) {
+        int n_sf = scifiHits->GetEntries();
+        for (int i = 0; i < n_sf; ++i) {
+            auto* h = static_cast<sndScifiHit*>(scifiHits->At(i));
+            if (!h || !h->isValid()) continue;
+            s.n_scifi_hits += 1.0;
+            int st = h->GetStation();
+            if (st == 1) s.n_scifi_st1 += 1.0;
+            if (st >= 1 && st <= 5) s.station_hits[st - 1] += 1.0;
+            hit_qdc_map[h->GetDetectorID()] = h->GetSignal(0);
         }
-        return sizes;
     }
 
-    std::vector<double> get_cluster_qdcs(const TClonesArray& clusters, const TClonesArray& scifiHits) {
-        std::vector<double> qdcs;
-        int n_cl = clusters.GetEntries();
-        qdcs.reserve(n_cl);
-
-        std::unordered_map<int, double> hit_qdc;
-        int n_hits = scifiHits.GetEntries();
-        for (int i = 0; i < n_hits; ++i) {
-            auto* h = static_cast<sndScifiHit*>(scifiHits.At(i));
-            if (h && h->isValid()) hit_qdc[h->GetDetectorID()] = h->GetSignal(0);
-        }
-
+    // 2. Clusters
+    if (clusters) {
+        int n_cl = clusters->GetEntries();
+        s.cluster_sizes.reserve(n_cl);
+        s.cluster_qdcs.reserve(n_cl);
         for (int i = 0; i < n_cl; ++i) {
-            auto* cl = static_cast<sndCluster*>(clusters.At(i));
+            auto* cl = static_cast<sndCluster*>(clusters->At(i));
             if (!cl) continue;
-            double sum_qdc = 0.0;
+            s.cluster_sizes.push_back(static_cast<double>(cl->GetN()));
+            double qdc_sum = 0.0;
             int first = cl->GetFirst();
             int n = cl->GetN();
             for (int ch = first; ch < first + n; ++ch) {
-                auto it = hit_qdc.find(ch);
-                if (it != hit_qdc.end()) sum_qdc += it->second;
+                auto it = hit_qdc_map.find(ch);
+                if (it != hit_qdc_map.end()) qdc_sum += it->second;
             }
-            qdcs.push_back(sum_qdc);
+            s.cluster_qdcs.push_back(qdc_sum);
         }
-        return qdcs;
     }
 
-    std::vector<double> get_clean_track_qdc(const snd::trident::MuonCalibrationMetrics& m) {
-        if (m.n_tracks == 1 && m.track_flag && m.track_chi2_ndf >= 0.0f && m.track_chi2_ndf < 2.0f) {
-            return m.hit_qdc;
+    // 3. MuFilter Hits
+    if (mufiHits) {
+        int n_mf = mufiHits->GetEntries();
+        for (int i = 0; i < n_mf; ++i) {
+            auto* h = static_cast<MuFilterHit*>(mufiHits->At(i));
+            if (h && h->isValid()) s.n_mufi_hits += 1.0;
         }
-        return {};
     }
 
-    std::vector<double> get_clean_track_dist(const snd::trident::MuonCalibrationMetrics& m) {
-        if (m.n_tracks == 1 && m.track_flag && m.track_chi2_ndf >= 0.0f && m.track_chi2_ndf < 2.0f) {
-            return m.hit_distance;
+    // 4. Tracks
+    if (tracks) {
+        int n_tr = tracks->GetEntries();
+        s.n_tracks = static_cast<double>(n_tr);
+        for (int i = 0; i < n_tr; ++i) {
+            auto* trk = static_cast<sndRecoTrack*>(tracks->At(i));
+            if (!trk || !trk->getTrackFlag()) continue;
+            float c2 = trk->getChi2Ndf();
+            if (c2 >= 0.0f) {
+                s.track_chi2.push_back(static_cast<double>(c2));
+                s.track_slope_xz.push_back(static_cast<double>(trk->getSlopeXZ()));
+                s.track_slope_yz.push_back(static_cast<double>(trk->getSlopeYZ()));
+            }
         }
-        return {};
+
+        // Clean single track response
+        if (n_tr == 1 && scifiHits) {
+            auto* trk = static_cast<sndRecoTrack*>(tracks->At(0));
+            if (trk && trk->getTrackFlag() && trk->getChi2Ndf() >= 0.0f && trk->getChi2Ndf() < 2.0f) {
+                TVector3 start = trk->getStart();
+                TVector3 mom   = trk->getTrackMom();
+                double pz = (std::abs(mom.Z()) > 1e-10) ? mom.Z() : 1e-10;
+
+                int n_sf = scifiHits->GetEntries();
+                for (int i = 0; i < n_sf; ++i) {
+                    auto* h = static_cast<sndScifiHit*>(scifiHits->At(i));
+                    if (!h || !h->isValid()) continue;
+                    double qdc = h->GetSignal(0);
+                    s.clean_hit_qdc.push_back(qdc);
+                    s.clean_hit_weights.push_back(event_weight);
+
+                    int st = h->GetStation();
+                    if (st < 1) st = 1;
+                    if (st > 5) st = 5;
+                    double z_st = 300.0 + (st - 1) * 8.5;
+                    double t = (z_st - start.Z()) / pz;
+                    double x_pos = start.X() + t * mom.X();
+                    double y_pos = start.Y() + t * mom.Y();
+
+                    double dist = h->isVertical() ? std::abs(54.5 - y_pos) : std::abs(-47.5 - x_pos);
+                    s.clean_hit_dist.push_back(dist);
+                }
+            }
+        }
     }
 
-    std::vector<double> get_station_numbers() {
-        return {1.0, 2.0, 3.0, 4.0, 5.0};
-    }
-
-    std::vector<double> get_station_hits(const snd::trident::MuonCalibrationMetrics& m) {
-        return {
-            static_cast<double>(m.scifi_nhits_st1),
-            static_cast<double>(m.scifi_nhits_st2),
-            static_cast<double>(m.scifi_nhits_st3),
-            static_cast<double>(m.scifi_nhits_st4),
-            static_cast<double>(m.scifi_nhits_st5)
-        };
-    }
+    return s;
 }
+
+} // namespace DigiRdf
 """)
 
 # Configuration: Datasets, Geometries, and Trees
 FILES = {
     "Data": {
-        "path": "/eos/user/i/idioniso/1_Data/Tracks/run_008329/sndsw_raw-1_1?_*.root",
+        "path": "/eos/user/i/idioniso/1_Data/Tracks/run_008329/sndsw_raw-*_muonReco.root",
         "geo": "/eos/experiment/sndlhc/convertedData/physics/2023/geofile_sndlhc_TI18_V3_2023.root",
         "color": ROOT.kBlack,
         "is_mc": False,
@@ -134,7 +192,7 @@ def analyze_sample_rdf(sample_name, cfg, num_threads=8, max_events=-1, weight_sc
         source=cfg["path"],
         geo_path=cfg["geo"],
         num_threads=num_threads,
-        init_geo=True,
+        init_geo=False,
     )
 
     print(f"    Loaded {data.num_files} file(s) with tree '{data.tree_name}'. Total entries: {data.entries:,}")
@@ -166,34 +224,25 @@ def analyze_sample_rdf(sample_name, cfg, num_threads=8, max_events=-1, weight_sc
     else:
         df = df.Define("weight", f"{weight_scale}")
 
-    # 2. Setup MuonCalibrationProcessor
-    track_branch = "Reco_MuonTracks" if data.has_branch("Reco_MuonTracks") else "fittedTracks"
-    sf_branch = "Digi_ScifiHits" if data.has_branch("Digi_ScifiHits") else "Digits_Scifi"
-    mf_branch = "Digi_MuFilterHits" if data.has_branch("Digi_MuFilterHits") else "Digits_MuFilter"
+    # 2. Check branch presence and bind C++ processor
+    sf_col = "Digi_ScifiHits" if data.has_branch("Digi_ScifiHits") else "nullptr"
+    cl_col = "Cluster_Scifi" if data.has_branch("Cluster_Scifi") else "nullptr"
+    mf_col = "Digi_MuFilterHits" if data.has_branch("Digi_MuFilterHits") else ("Digi_MuFilterHit" if data.has_branch("Digi_MuFilterHit") else "nullptr")
+    tr_col = "Reco_MuonTracks" if data.has_branch("Reco_MuonTracks") else "nullptr"
 
-    calib_cfg = ROOT.snd.trident.MuonCalibrationConfig()
-    processor = ROOT.snd.trident.MuonCalibrationProcessor(calib_cfg)
-    df = df.Define("calib", processor, [track_branch, sf_branch, mf_branch])
+    cols = []
+    args_expr = []
+    for col_name in [sf_col, cl_col, mf_col, tr_col]:
+        if col_name != "nullptr":
+            args_expr.append(f"&{col_name}")
+            cols.append(col_name)
+        else:
+            args_expr.append("static_cast<const TClonesArray*>(nullptr)")
 
-    # 3. Define derived columns for histograms
-    df = (
-        df
-        .Define("clean_hit_qdc",   "DigiRdfHelper::get_clean_track_qdc(calib)")
-        .Define("clean_hit_dist",  "DigiRdfHelper::get_clean_track_dist(calib)")
-        .Define("cluster_size",    "DigiRdfHelper::get_cluster_sizes(Cluster_Scifi)")
-        .Define("cluster_qdc",     f"DigiRdfHelper::get_cluster_qdcs(Cluster_Scifi, {sf_branch})")
-        .Define("st_numbers",      "DigiRdfHelper::get_station_numbers()")
-        .Define("st_hits",         "DigiRdfHelper::get_station_hits(calib)")
-        .Define("nhits_st1",       "static_cast<double>(calib.scifi_nhits_st1)")
-        .Define("nhits_total",     "static_cast<double>(calib.scifi_nhits)")
-        .Define("ntracks",         "static_cast<double>(calib.n_tracks)")
-        .Define("track_chi2_ndf",  "static_cast<double>(calib.track_chi2_ndf)")
-        .Define("track_slope_xz",  "static_cast<double>(calib.track_slope_xz)")
-        .Define("track_slope_yz",  "static_cast<double>(calib.track_slope_yz)")
-        .Define("nhits_mufilter",  "static_cast<double>(calib.mufi_nhits)")
-    )
+    proc_call = f"DigiRdf::process_event({args_expr[0]}, {args_expr[1]}, {args_expr[2]}, {args_expr[3]}, weight)"
+    df = df.Define("ev", proc_call)
 
-    # 4. Book RDataFrame Histograms and Profiles (Lazy execution)
+    # 3. Book Histograms and Profiles
     models = {
         "qdc_single_hit": ROOT.RDF.TH1DModel(f"qdc_single_{sample_name}", f"Single Hit QDC ({sample_name});QDC [a.u.];Normalized Entries", 150, -10, 140),
         "cluster_qdc": ROOT.RDF.TH1DModel(f"cluster_qdc_{sample_name}", f"Total Cluster QDC ({sample_name});Cluster QDC [a.u.];Normalized Entries", 150, -10, 200),
@@ -209,22 +258,19 @@ def analyze_sample_rdf(sample_name, cfg, num_threads=8, max_events=-1, weight_sc
         "nhits_mufilter": ROOT.RDF.TH1DModel(f"nhits_mufilter_{sample_name}", f"Total MuFilter Hits ({sample_name});# MuFilter Hits;Normalized Entries", 60, -0.5, 59.5),
     }
 
-    # Filter for valid tracks on track kinematic distributions
-    df_valid_trk = df.Filter("calib.track_flag && calib.track_chi2_ndf >= 0.0f")
-
     rdf_ptrs = {
-        "qdc_single_hit":    df.Histo1D(models["qdc_single_hit"], "clean_hit_qdc", "weight"),
-        "cluster_qdc":       df.Histo1D(models["cluster_qdc"], "cluster_qdc", "weight"),
-        "cluster_size":      df.Histo1D(models["cluster_size"], "cluster_size", "weight"),
-        "nhits_st1":         df.Histo1D(models["nhits_st1"], "nhits_st1", "weight"),
-        "nhits_total":       df.Histo1D(models["nhits_total"], "nhits_total", "weight"),
-        "qdc_vs_dist":       df.Profile1D(models["qdc_vs_dist"], "clean_hit_dist", "clean_hit_qdc", "weight"),
-        "nhits_per_station": df.Profile1D(models["nhits_per_station"], "st_numbers", "st_hits", "weight"),
-        "ntracks":           df.Histo1D(models["ntracks"], "ntracks", "weight"),
-        "track_chi2_ndf":    df_valid_trk.Histo1D(models["track_chi2_ndf"], "track_chi2_ndf", "weight"),
-        "track_slope_xz":    df_valid_trk.Histo1D(models["track_slope_xz"], "track_slope_xz", "weight"),
-        "track_slope_yz":    df_valid_trk.Histo1D(models["track_slope_yz"], "track_slope_yz", "weight"),
-        "nhits_mufilter":    df.Histo1D(models["nhits_mufilter"], "nhits_mufilter", "weight"),
+        "qdc_single_hit":    df.Histo1D(models["qdc_single_hit"], "ev.clean_hit_qdc", "ev.clean_hit_weights"),
+        "cluster_qdc":       df.Histo1D(models["cluster_qdc"], "ev.cluster_qdcs", "weight"),
+        "cluster_size":      df.Histo1D(models["cluster_size"], "ev.cluster_sizes", "weight"),
+        "nhits_st1":         df.Histo1D(models["nhits_st1"], "ev.n_scifi_st1", "weight"),
+        "nhits_total":       df.Histo1D(models["nhits_total"], "ev.n_scifi_hits", "weight"),
+        "qdc_vs_dist":       df.Profile1D(models["qdc_vs_dist"], "ev.clean_hit_dist", "ev.clean_hit_qdc", "ev.clean_hit_weights"),
+        "nhits_per_station": df.Profile1D(models["nhits_per_station"], "ev.station_numbers", "ev.station_hits", "ev.station_weights"),
+        "ntracks":           df.Histo1D(models["ntracks"], "ev.n_tracks", "weight"),
+        "track_chi2_ndf":    df.Histo1D(models["track_chi2_ndf"], "ev.track_chi2", "weight"),
+        "track_slope_xz":    df.Histo1D(models["track_slope_xz"], "ev.track_slope_xz", "weight"),
+        "track_slope_yz":    df.Histo1D(models["track_slope_yz"], "ev.track_slope_yz", "weight"),
+        "nhits_mufilter":    df.Histo1D(models["nhits_mufilter"], "ev.n_mufi_hits", "weight"),
     }
 
     sum_w_ptr = df.Sum("weight")
