@@ -163,27 +163,28 @@ class MuFilterAnisotropyCalculator : public BaseSpatialAnisotropyCalculator {
             if (fTargetSystem == -1)     fPositions.reserve(600);
             else if (fTargetSystem == 3) fPositions.reserve(500);
             else if (fTargetSystem == 2) fPositions.reserve(70);
-            else if (fTargetSystem == 1) fPositions.reserve(20);
+            else if (fTargetSystem == 1) fPositions.reserve(30);
 
-            // Veto
+            // Veto (Planes 0 and 1, 7 bars each: 10000..10006, 11000..11006; Plane 2 if present)
             if (fTargetSystem == 1 || fTargetSystem == -1) {
-                for (int p = 0; p < 2; ++p)
+                for (int p = 0; p < 3; ++p)
                     for (int b = 0; b < 7; ++b)
                         cacheChannel(10000 + p * 1000 + b);
             }
-            // US
+            // US (Stations 0 to 4, 10 bars each: 20000..24009)
             if (fTargetSystem == 2 || fTargetSystem == -1) {
-                for (int p = 0; p < 5; ++p)
+                for (int s = 0; s < 5; ++s)
                     for (int b = 0; b < 10; ++b)
-                        cacheChannel(20000 + p * 1000 + b);
+                        cacheChannel(20000 + s * 1000 + b);
             }
-            // DS
+            // DS (Stations 0-2: 60 hor [0..59] + 60 ver [60..119]; Station 3: 60 ver [60..119])
             if (fTargetSystem == 3 || fTargetSystem == -1) {
-                for (int s = 0; s < 4; ++s) {
-                    const int n_planes = (s < 3) ? 2 : 1;
-                    for (int p = 0; p < n_planes; ++p)
-                        for (int b = 0; b < 60; ++b)
-                            cacheChannel(30000 + s * 1000 + p * 100 + b);
+                for (int s = 0; s < 3; ++s) {
+                    for (int b = 0; b < 120; ++b)
+                        cacheChannel(30000 + s * 1000 + b);
+                }
+                for (int b = 60; b < 120; ++b) {
+                    cacheChannel(33000 + b);
                 }
             }
         }

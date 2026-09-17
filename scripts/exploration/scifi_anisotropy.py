@@ -20,6 +20,7 @@ truth_cfg  = ROOT.snd.trident.PassingMuonTruthConfig()
 truth_processor = ROOT.snd.trident.PassingMuonTruthProcessor(truth_cfg)
 scifi_anisotropy_calculator = ROOT.snd.trident.SciFiAnisotropyCalculator(scifi_det)
 us_anisotropy_calculator = ROOT.snd.trident.MuFilterAnisotropyCalculator(mufi_det, 2)
+ds_anisotropy_calculator = ROOT.snd.trident.MuFilterAnisotropyCalculator(mufi_det, 3)
 
 rdf = (
     rdf
@@ -29,6 +30,7 @@ rdf = (
     .Define("truth_mc_weight", "truth.mc_weight")
     .Define("anisotropy_sf", scifi_anisotropy_calculator, ["Digi_ScifiHits"])
     .Define("anisotropy_us", us_anisotropy_calculator, ["Digi_MuFilterHits"])
+    .Define("anisotropy_ds", ds_anisotropy_calculator, ["Digi_MuFilterHits"])
 )
 
 categories = [
@@ -41,7 +43,7 @@ categories = [
 ]
 
 
-hist_models = {"sf": {}, "us": {}}
+hist_models = {"sf": {}, "us": {}, "ds": {}}
 for cat_id, _, _, _, _ in categories:
     sub_rdf = rdf.Filter(f"truth_category_id == {cat_id}")
 
@@ -52,6 +54,10 @@ for cat_id, _, _, _, _ in categories:
     hist_models["us"][cat_id] = sub_rdf.Histo1D(
         (f"h_us_aniso_cat{cat_id}", "", 50, 0.0, 1.0),
         "anisotropy_us", "truth_mc_weight"
+    )
+    hist_models["ds"][cat_id] = sub_rdf.Histo1D(
+        (f"h_ds_aniso_cat{cat_id}", "", 50, 0.0, 1.0),
+        "anisotropy_ds", "truth_mc_weight"
     )
 
 def generate_anisotropy_canvas(subsystem_key, title_label, x_axis_title):
@@ -167,8 +173,12 @@ c_sf = generate_anisotropy_canvas(
 c_us = generate_anisotropy_canvas(
     "us", "Upstream", "US MuFilter Spatial Anisotropy Cut (#lambda_{1} / #Sigma#lambda > Cut)"
 )
+c_ds = generate_anisotropy_canvas(
+    "ds", "Downstream", "DS MuFilter Spatial Anisotropy Cut (#lambda_{1} / #Sigma#lambda > Cut)"
+)
 
 f_out.cd()
 c_sf.Write()
 c_us.Write()
+c_ds.Write()
 f_out.Close()
