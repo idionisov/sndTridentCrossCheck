@@ -7,7 +7,7 @@ from array import array
 import os
 import sys
 import time
-from typing import List, Tuple
+from typing import List
 
 import ROOT
 from snd import load_trident_libraries
@@ -58,37 +58,37 @@ def parse_args() -> argparse.Namespace:
         "--fiducial-margin",
         type=float,
         default=1.5,
-        help="SciFi transverse fiducial margin [cm] (default: 1.5).",
+        help="Fiducial margin inside SciFi boundaries [cm] (default: 1.5).",
     )
     parser.add_argument(
         "--chi2-max",
         type=float,
         default=5.0,
-        help="Maximum track chi2/ndf (default: 5.0).",
+        help="Global maximum track chi2/ndf (default: 5.0).",
     )
     parser.add_argument(
         "--chi2-max-scifi",
         type=float,
         default=None,
-        help="Maximum SciFi track chi2/ndf (default: matches --chi2-max).",
+        help="Maximum SciFi track chi2/ndf (default: inherits --chi2-max).",
     )
     parser.add_argument(
         "--chi2-max-ds",
         type=float,
         default=None,
-        help="Maximum DS track chi2/ndf (default: matches --chi2-max).",
+        help="Maximum Downstream track chi2/ndf (default: inherits --chi2-max).",
     )
     parser.add_argument(
         "--max-slope",
         type=float,
         default=0.05,
-        help="Maximum track angular slope in rad (default: 0.05).",
+        help="Maximum track slope in xz/yz relative to z-axis [rad] (default: 0.05).",
     )
     parser.add_argument(
         "--batch-size",
         type=int,
         default=25000,
-        help="Progress reporting interval in number of events (default: 25000).",
+        help="Progress report interval (default: 25,000 events).",
     )
     return parser.parse_args()
 
@@ -150,127 +150,11 @@ def main() -> None:
     calib_proc = ROOT.snd.trident.MuonCalibrationProcessor(calib_cfg)
     print(f"[*] Calibration Cuts: Chi2 Max (SciFi: {calib_cfg.chi2_max_scifi}, DS: {calib_cfg.chi2_max_ds}) | Max Slope: {calib_cfg.max_slope} rad")
 
-    # 4. Phase 1: Fast Filter Scan with Selective Branch Activation
-    print("\n[*] Phase 1: Scanning selection cuts with selective branch reading...")
-    t_in.SetBranchStatus("*", 0)
-    branches_active = [
-        "MCTrack", "ScifiPoint", "MuFilterPoint",
-        "Digi_ScifiHits", "Digi_MuFilterHits", "Reco_MuonTracks"
-    ]
-    for b in branches_active:
-        t_in.SetBranchStatus(b, 1)
-
-    # Cutflow counters
-    c_raw = 0
-    c_min_scifi = 0
-    c_ip1 = 0
-    c_single_trk = 0
-    c_ds_track = 0
-    c_chi2 = 0
-    c_slope = 0
-    c_fiducial = 0
-    c_ds_match = 0
-
-    passing_indices: List[int] = []
-    saved_truth_info: List[Tuple] = []
-    saved_reco_info: List[Tuple] = []
-
-    t_scan_start = time.time()
-    for i in range(n_to_process):
-        c_raw += 1
-        t_in.GetEntry(i)
-
-        if t_in.Digi_ScifiHits.GetEntries() < 3:
-            continue
-        c_min_scifi += 1
-
-        truth = truth_proc.process(t_in.MCTrack, t_in.ScifiPoint, t_in.MuFilterPoint)
-        if not truth.is_in_acceptance:
-            continue
-        c_ip1 += 1
-
-        reco = calib_proc.process(t_in.Reco_MuonTracks, t_in.Digi_ScifiHits, t_in.Digi_MuFilterHits)
-        if not reco.pass_cut_single_scifi_track:
-            continue
-        c_single_trk += 1
-
-        if not reco.pass_cut_ds_track:
-            continue
-        c_ds_track += 1
-
-        if not reco.pass_cut_chi2:
-            continue
-        c_chi2 += 1
-
-        if not reco.pass_cut_slope:
-            continue
-        c_slope += 1
-
-        if not reco.pass_cut_fiducial_430:
-            continue
-        c_fiducial += 1
-
-        if not reco.pass_cut_ds_match:
-            continue
-        c_ds_match += 1
-
-        passing_indices.append(i)
-        saved_truth_info.append((
-            int(truth.category_id),
-            str(truth.category_name),
-            int(truth.is_signal),
-            int(truth.is_in_acceptance),
-            int(truth.is_fiducial_truth),
-            float(truth.mc_weight),
-            int(truth.primary_muon_track_id),
-            int(truth.primary_muon_pdg),
-            float(truth.primary_muon_p),
-            float(truth.primary_muon_pt),
-            float(truth.primary_muon_pz),
-            float(truth.primary_muon_eta),
-            float(truth.primary_muon_start_x),
-            float(truth.primary_muon_start_y),
-            float(truth.primary_muon_start_z),
-            float(truth.primary_muon_slope_xz),
-            float(truth.primary_muon_slope_yz),
-            int(truth.n_muons_in_scifi),
-            int(truth.n_muons_in_ds),
-            int(truth.n_scifi_points),
-            int(truth.n_mufi_points),
-            int(truth.n_muon_scifi_points),
-            int(truth.n_non_muon_scifi_points),
-            float(truth.non_muon_point_fraction),
-            int(truth.n_secondaries_in_detector),
-            float(truth.max_secondary_energy),
-            str(truth.dominant_process),
-        ))
-        saved_reco_info.append((
-            int(reco.is_clean),
-            float(reco.track_chi2_ndf),
-            int(reco.scifi_nhits),
-            int(reco.ds_nhits),
-            int(reco.veto_nhits),
-            int(reco.us_nhits),
-            float(reco.track_slope_xz),
-            float(reco.track_slope_yz),
-            float(reco.track_start_x),
-            float(reco.track_start_y),
-            float(reco.track_start_z),
-        ))
-
-        if (i + 1) % args.batch_size == 0 or (i + 1) == n_to_process:
-            elapsed = time.time() - t_scan_start
-            rate = (i + 1) / elapsed if elapsed > 0 else 0
-            print(f"    --> Scanned {i + 1:>8,} / {n_to_process:,} events ({rate:>7.1f} evt/s) | Clean passing muons: {len(passing_indices):,}")
-
-    t_scan_elapsed = time.time() - t_scan_start
-    print(f"[✓] Phase 1 completed in {t_scan_elapsed:.2f} s. Found {len(passing_indices):,} clean passing events.")
-
-    # 5. Phase 2: Clone and write passing events
-    print("\n[*] Phase 2: Writing passing events and truth/reco branches...")
-    t_in.SetBranchStatus("*", 1)
-
+    # 4. Prepare Output File & CloneTree for Single-Pass Streaming
     f_out = ROOT.TFile.Open(args.output, "RECREATE")
+    if not f_out or f_out.IsZombie():
+        raise RuntimeError(f"Could not create output ROOT file: {args.output}")
+
     t_out = t_in.CloneTree(0)
 
     # Truth branch storage buffers
@@ -357,41 +241,152 @@ def main() -> None:
     t_out.Branch("reco_start_y",                b_reco_start_y,         "reco_start_y/F")
     t_out.Branch("reco_start_z",                b_reco_start_z,         "reco_start_z/F")
 
-    t_clone_start = time.time()
-    for idx, tr, rc in zip(passing_indices, saved_truth_info, saved_reco_info):
-        t_in.GetEntry(idx)
+    # Get specific branch pointers for fast staged reading
+    b_scifi_hits = t_in.GetBranch("Digi_ScifiHits")
+    b_mctrack    = t_in.GetBranch("MCTrack")
+    b_scifipoint = t_in.GetBranch("ScifiPoint")
+    b_mufipoint  = t_in.GetBranch("MuFilterPoint")
+    b_recotracks = t_in.GetBranch("Reco_MuonTracks")
+    b_mufihits   = t_in.GetBranch("Digi_MuFilterHits")
 
-        # Unpack truth values
-        (
-            b_truth_cat_id[0], cat_name_str, b_truth_is_signal[0], b_truth_in_acc[0],
-            b_truth_fid_truth[0], b_truth_weight[0], b_truth_mu_id[0], b_truth_mu_pdg[0],
-            b_truth_mu_p[0], b_truth_mu_pt[0], b_truth_mu_pz[0], b_truth_mu_eta[0],
-            b_truth_mu_x[0], b_truth_mu_y[0], b_truth_mu_z[0], b_truth_mu_sxz[0],
-            b_truth_mu_syz[0], b_truth_n_mu_sf[0], b_truth_n_mu_ds[0], b_truth_n_sf_pts[0],
-            b_truth_n_mf_pts[0], b_truth_n_mu_sf_pts[0], b_truth_n_nonmu_sf_pts[0],
-            b_truth_nonmu_frac[0], b_truth_n_sec[0], b_truth_max_sec_e[0], dom_proc_str
-        ) = tr
+    # Cutflow counters
+    c_raw = 0
+    c_min_scifi = 0
+    c_ip1 = 0
+    c_single_trk = 0
+    c_ds_track = 0
+    c_chi2 = 0
+    c_slope = 0
+    c_fiducial = 0
+    c_ds_match = 0
+    n_passing = 0
 
-        b_truth_cat_name.replace(0, ROOT.std.string.npos, cat_name_str)
-        b_truth_dom_proc.replace(0, ROOT.std.string.npos, dom_proc_str)
+    print("\n[*] Processing events in single-pass streaming mode...")
+    sys.stdout.flush()
 
-        # Unpack reco values
-        (
-            b_reco_clean[0], b_reco_chi2_ndf[0], b_reco_sf_nhits[0], b_reco_ds_nhits[0],
-            b_reco_veto_nhits[0], b_reco_us_nhits[0], b_reco_slope_xz[0], b_reco_slope_yz[0],
-            b_reco_start_x[0], b_reco_start_y[0], b_reco_start_z[0]
-        ) = rc
+    t_scan_start = time.time()
+    for i in range(n_to_process):
+        c_raw += 1
+
+        # Cut 0: SciFi hits >= 3
+        b_scifi_hits.GetEntry(i)
+        if t_in.Digi_ScifiHits.GetEntries() < 3:
+            continue
+        c_min_scifi += 1
+
+        # Cut 1: Acceptance (IP1 truth)
+        b_mctrack.GetEntry(i)
+        b_scifipoint.GetEntry(i)
+        b_mufipoint.GetEntry(i)
+        truth = truth_proc.process(t_in.MCTrack, t_in.ScifiPoint, t_in.MuFilterPoint)
+        if not truth.is_in_acceptance:
+            continue
+        c_ip1 += 1
+
+        # Reco cuts
+        b_recotracks.GetEntry(i)
+        b_mufihits.GetEntry(i)
+        reco = calib_proc.process(t_in.Reco_MuonTracks, t_in.Digi_ScifiHits, t_in.Digi_MuFilterHits)
+
+        # Cut 2: Single SciFi Track
+        if not reco.pass_cut_single_scifi_track:
+            continue
+        c_single_trk += 1
+
+        # Cut 3: DS Penetration Track
+        if not reco.pass_cut_ds_track:
+            continue
+        c_ds_track += 1
+
+        # Cut 4: Chi2 Quality Cut
+        if not reco.pass_cut_chi2:
+            continue
+        c_chi2 += 1
+
+        # Cut 5: Angular Slope Cut
+        if not reco.pass_cut_slope:
+            continue
+        c_slope += 1
+
+        # Cut 6: Fiducial plane 430
+        if not reco.pass_cut_fiducial_430:
+            continue
+        c_fiducial += 1
+
+        # Cut 7: SciFi - DS Matching
+        if not reco.pass_cut_ds_match:
+            continue
+        c_ds_match += 1
+
+        # -------------------------------------------------------------
+        # Event passed all cuts! Read all original branches for storage
+        # -------------------------------------------------------------
+        t_in.GetEntry(i)
+
+        # Populate truth branch buffers
+        b_truth_cat_id[0]         = int(truth.category_id)
+        b_truth_cat_name.replace(0, ROOT.std.string.npos, str(truth.category_name))
+        b_truth_is_signal[0]      = int(truth.is_signal)
+        b_truth_in_acc[0]         = int(truth.is_in_acceptance)
+        b_truth_fid_truth[0]      = int(truth.is_fiducial_truth)
+        b_truth_weight[0]         = float(truth.mc_weight)
+        b_truth_mu_id[0]          = int(truth.primary_muon_track_id)
+        b_truth_mu_pdg[0]         = int(truth.primary_muon_pdg)
+        b_truth_mu_p[0]           = float(truth.primary_muon_p)
+        b_truth_mu_pt[0]          = float(truth.primary_muon_pt)
+        b_truth_mu_pz[0]          = float(truth.primary_muon_pz)
+        b_truth_mu_eta[0]         = float(truth.primary_muon_eta)
+        b_truth_mu_x[0]           = float(truth.primary_muon_start_x)
+        b_truth_mu_y[0]           = float(truth.primary_muon_start_y)
+        b_truth_mu_z[0]           = float(truth.primary_muon_start_z)
+        b_truth_mu_sxz[0]         = float(truth.primary_muon_slope_xz)
+        b_truth_mu_syz[0]         = float(truth.primary_muon_slope_yz)
+        b_truth_n_mu_sf[0]        = int(truth.n_muons_in_scifi)
+        b_truth_n_mu_ds[0]        = int(truth.n_muons_in_ds)
+        b_truth_n_sf_pts[0]       = int(truth.n_scifi_points)
+        b_truth_n_mf_pts[0]       = int(truth.n_mufi_points)
+        b_truth_n_mu_sf_pts[0]    = int(truth.n_muon_scifi_points)
+        b_truth_n_nonmu_sf_pts[0] = int(truth.n_non_muon_scifi_points)
+        b_truth_nonmu_frac[0]     = float(truth.non_muon_point_fraction)
+        b_truth_n_sec[0]          = int(truth.n_secondaries_in_detector)
+        b_truth_max_sec_e[0]      = float(truth.max_secondary_energy)
+        b_truth_dom_proc.replace(0, ROOT.std.string.npos, str(truth.dominant_process))
+
+        # Populate reco branch buffers
+        b_reco_clean[0]           = int(reco.is_clean)
+        b_reco_chi2_ndf[0]        = float(reco.track_chi2_ndf)
+        b_reco_sf_nhits[0]        = int(reco.scifi_nhits)
+        b_reco_ds_nhits[0]        = int(reco.ds_nhits)
+        b_reco_veto_nhits[0]      = int(reco.veto_nhits)
+        b_reco_us_nhits[0]        = int(reco.us_nhits)
+        b_reco_slope_xz[0]        = float(reco.track_slope_xz)
+        b_reco_slope_yz[0]        = float(reco.track_slope_yz)
+        b_reco_start_x[0]         = float(reco.track_start_x)
+        b_reco_start_y[0]         = float(reco.track_start_y)
+        b_reco_start_z[0]         = float(reco.track_start_z)
 
         t_out.Fill()
+        n_passing += 1
 
-    t_out.Write()
+        if (i + 1) % args.batch_size == 0 or (i + 1) == n_to_process:
+            t_out.AutoSave("SaveSelf")
+            elapsed = time.time() - t_scan_start
+            rate = (i + 1) / elapsed if elapsed > 0 else 0
+            print(f"    --> Processed {i + 1:>8,} / {n_to_process:,} events ({rate:>7.1f} evt/s) | Clean passing muons: {n_passing:,}", flush=True)
+
+    t_scan_elapsed = time.time() - t_scan_start
+    print(f"\n[✓] Processing completed in {t_scan_elapsed:.2f} s. Extracted {n_passing:,} clean passing events.")
+
+    # 5. Flush and close output tree
+    print("[*] Writing output file to disk...")
+    sys.stdout.flush()
+    t_out.Write("", ROOT.TObject.kOverwrite)
     f_out.Close()
     f_in.Close()
 
-    t_clone_elapsed = time.time() - t_clone_start
     total_elapsed = time.time() - start_time
 
-    # 6. Print Cutflow Report
+    # 6. Cutflow Summary Table
     print("\n" + "=" * 76)
     print(" Passing Muon Selection Cutflow Summary")
     print("=" * 76)
@@ -419,9 +414,8 @@ def main() -> None:
             print(f"    Total Events Stored : {n_entries:,}")
             print(f"    Total Branches      : {n_branches} (all raw + 38 truth/reco branches)")
             print(f"    Output File Size    : {out_bytes / (1024 * 1024):.2f} MB")
-            print(f"    Phase 1 Scan Time   : {t_scan_elapsed:.2f} s ({n_to_process / t_scan_elapsed:.1f} evt/s)")
-            print(f"    Phase 2 Clone Time  : {t_clone_elapsed:.2f} s")
-            print(f"    Total Elapsed Time  : {total_elapsed:.2f} s")
+            print(f"    Average Processing Rate : {n_to_process / t_scan_elapsed:.1f} evt/s")
+            print(f"    Total Elapsed Time      : {total_elapsed:.2f} s")
     else:
         print(f"[!] Error: Output file {args.output} was not created.")
 
