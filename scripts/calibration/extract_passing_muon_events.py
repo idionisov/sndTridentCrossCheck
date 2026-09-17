@@ -63,7 +63,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--chi2-max",
         type=float,
-        default=5.0,
+        default=20.0,
         help="Global maximum track chi2/ndf (default: 5.0).",
     )
     parser.add_argument(
