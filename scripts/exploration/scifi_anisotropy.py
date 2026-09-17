@@ -13,21 +13,22 @@ geo_path = "/eos/user/i/idioniso/1_Data/Monte_Carlo/passing_muons/protons2023/ge
 
 dm = DataManager(mc_path, geo_path=geo_path, init_geo=True, num_threads=1)
 scifi_det = dm.scifi
-df = dm.rdf()
+mufi_det = dm.mufilter
+rdf = dm.rdf()
 
 truth_cfg  = ROOT.snd.trident.PassingMuonTruthConfig()
 truth_processor = ROOT.snd.trident.PassingMuonTruthProcessor(truth_cfg)
 scifi_anisotropy_calculator = ROOT.snd.trident.SciFiAnisotropyCalculator(scifi_det)
+us_anisotropy_calculator = ROOT.snd.trident.MuFilterAnisotropyCalculator(mufi_det, 2)
 
-df = (
-    df
-    .Filter("Digi_ScifiHits.GetEntries() >= 3")
+rdf = (
+    rdf
     .Define("truth", truth_processor, ["MCTrack", "ScifiPoint", "MuFilterPoint"])
-    .Define("cat_id", "truth.category_id")
-    .Define("cat_name", "truth.category_name")
-    .Define("weight", "truth.mc_weight")
-    .Define("anisotropy", scifi_anisotropy_calculator, ["Digi_ScifiHits"])
-    .Filter("anisotropy > 0")
+    .Define("truth_category_id", "truth.category_id")
+    .Define("truth_category_name", "truth.category_name")
+    .Define("truth_mc_weight", "truth.mc_weight")
+    .Define("anisotropy_sf", scifi_anisotropy_calculator, ["Digi_ScifiHits"])
+    .Define("anisotropy_us", us_anisotropy_calculator, ["Digi_MuFilterHits"])
 )
 
 categories = [
@@ -39,129 +40,135 @@ categories = [
     (6, "Stopping / Scattered Muon", ROOT.kMagenta + 2, 2, 2),
 ]
 
-n_bins = 35
-x_min, x_max = 0.40, 1.00
 
-hist_models = {}
-for cat_id, label, color, style, width in categories:
-    h_name = f"h_sf_aniso_cat{cat_id}"
-    hist_models[cat_id] = df.Filter(f"cat_id == {cat_id}").Histo1D(
-        (h_name, "", n_bins, x_min, x_max),
-        "anisotropy", "weight"
+hist_models = {"sf": {}, "us": {}}
+for cat_id, _, _, _, _ in categories:
+    sub_rdf = rdf.Filter(f"truth_category_id == {cat_id}")
+
+    hist_models["sf"][cat_id] = sub_rdf.Histo1D(
+        (f"h_sf_aniso_cat{cat_id}", "", 100, 0.0, 1.0),
+        "anisotropy_sf", "truth_mc_weight"
+    )
+    hist_models["us"][cat_id] = sub_rdf.Histo1D(
+        (f"h_us_aniso_cat{cat_id}", "", 50, 0.0, 1.0),
+        "anisotropy_us", "truth_mc_weight"
     )
 
-canvas = ROOT.TCanvas("c_aniso", "SciFi Spatial Anisotropy Exploration", 900, 950)
+def generate_anisotropy_canvas(subsystem_key, title_label, x_axis_title):
+    canvas = ROOT.TCanvas(f"c_aniso_{subsystem_key}", f"{title_label} Spatial Anisotropy", 900, 950)
 
-pad1 = ROOT.TPad("pad1", "Distribution", 0.0, 0.38, 1.0, 1.0)
-pad1.SetBottomMargin(0.02)
-pad1.SetTopMargin(0.08)
-pad1.SetLeftMargin(0.14)
-pad1.SetRightMargin(0.05)
-pad1.SetLogy(True)
-pad1.SetGridx(True)
-pad1.SetGridy(True)
-pad1.Draw()
+    pad1 = ROOT.TPad(f"pad1_{subsystem_key}", "Distribution", 0.0, 0.38, 1.0, 1.0)
+    pad1.SetBottomMargin(0.02)
+    pad1.SetTopMargin(0.08)
+    pad1.SetLeftMargin(0.14)
+    pad1.SetRightMargin(0.05)
+    pad1.SetLogy(True)
+    pad1.SetGridx(True)
+    pad1.SetGridy(True)
+    pad1.Draw()
 
-pad2 = ROOT.TPad("pad2", "Efficiency", 0.0, 0.0, 1.0, 0.38)
-pad2.SetTopMargin(0.03)
-pad2.SetBottomMargin(0.25)
-pad2.SetLeftMargin(0.14)
-pad2.SetRightMargin(0.05)
-pad2.SetGridx(True)
-pad2.SetGridy(True)
-pad2.Draw()
+    pad2 = ROOT.TPad(f"pad2_{subsystem_key}", "Efficiency", 0.0, 0.0, 1.0, 0.38)
+    pad2.SetTopMargin(0.03)
+    pad2.SetBottomMargin(0.25)
+    pad2.SetLeftMargin(0.14)
+    pad2.SetRightMargin(0.05)
+    pad2.SetGridx(True)
+    pad2.SetGridy(True)
+    pad2.Draw()
 
-h_norm = {}
-h_cum = {}
+    h_norm = {}
+    h_cum = {}
 
-for cat_id, label, color, style, width in categories:
-    h = hist_models[cat_id].GetValue()
-    if h.GetEntries() < 5:
-        continue
+    for cat_id, label, color, style, width in categories:
+        h = hist_models[subsystem_key][cat_id].GetValue()
+        if h.GetEntries() < 5:
+            continue
 
-    h_n = h.Clone(f"{h.GetName()}_norm")
-    if h_n.Integral() > 0:
-        h_n.Scale(1.0 / h_n.Integral())
-    h_n.SetLineColor(color)
-    h_n.SetLineStyle(style)
-    h_n.SetLineWidth(width)
-    h_norm[cat_id] = h_n
+        h_n = h.Clone(f"{h.GetName()}_norm")
+        if h_n.Integral() > 0:
+            h_n.Scale(1.0 / h_n.Integral())
+        h_n.SetLineColor(color)
+        h_n.SetLineStyle(style)
+        h_n.SetLineWidth(width)
+        h_norm[cat_id] = h_n
 
-    h_c = h.Clone(f"{h.GetName()}_cum")
-    total_w = h.Integral(0, h.GetNbinsX() + 1)
-    for b in range(1, h.GetNbinsX() + 1):
-        eff = h.Integral(b, h.GetNbinsX() + 1) / total_w if total_w > 0 else 0.0
-        h_c.SetBinContent(b, eff)
-        h_c.SetBinError(b, 0.0)
+        h_c = h.Clone(f"{h.GetName()}_cum")
+        total_w = h.Integral(0, h.GetNbinsX() + 1)
+        for b in range(1, h.GetNbinsX() + 1):
+            eff = h.Integral(b, h.GetNbinsX() + 1) / total_w if total_w > 0 else 0.0
+            h_c.SetBinContent(b, eff)
+            h_c.SetBinError(b, 0.0)
 
-    h_c.SetLineColor(color)
-    h_c.SetLineStyle(style)
-    h_c.SetLineWidth(width)
-    h_cum[cat_id] = h_c
+        h_c.SetLineColor(color)
+        h_c.SetLineStyle(style)
+        h_c.SetLineWidth(width)
+        h_cum[cat_id] = h_c
 
-pad1.cd()
+    pad1.cd()
+    legend = ROOT.TLegend(0.17, 0.55, 0.65, 0.89)
+    legend.SetBorderSize(0)
+    legend.SetFillStyle(0)
+    legend.SetTextFont(42)
+    legend.SetTextSize(0.040)
 
-legend = ROOT.TLegend(0.17, 0.55, 0.65, 0.89)
-legend.SetBorderSize(0)
-legend.SetFillStyle(0)
-legend.SetTextFont(42)
-legend.SetTextSize(0.040)
+    first = True
+    for cat_id, label, _, _, _ in categories:
+        if cat_id not in h_norm:
+            continue
+        h = h_norm[cat_id]
+        h.SetMaximum(2.0)
+        h.SetMinimum(5e-4)
+        h.GetYaxis().SetTitle("Normalized / bin")
+        h.GetYaxis().SetTitleSize(0.05)
+        h.GetYaxis().SetTitleOffset(1.25)
+        h.GetYaxis().SetLabelSize(0.042)
+        h.GetXaxis().SetLabelSize(0)
 
-first = True
-for cat_id, label, color, style, width in categories:
-    if cat_id not in h_norm:
-        continue
-    h = h_norm[cat_id]
-    h.SetMaximum(1.5)
-    h.SetMinimum(5e-4)
+        h.Draw("HIST" if first else "HIST SAME")
+        n_raw = int(hist_models[subsystem_key][cat_id].GetEntries())
+        legend.AddEntry(h, f"{label} (N = {n_raw})", "l")
+        first = False
 
-    h.GetYaxis().SetTitle("Normalized / bin")
-    h.GetYaxis().SetTitleSize(0.05)
-    h.GetYaxis().SetTitleOffset(1.25)
-    h.GetYaxis().SetLabelSize(0.042)
-    h.GetXaxis().SetLabelSize(0)  # Suppress X labels on top pad
+    legend.Draw()
 
-    draw_opt = "HIST" if first else "HIST SAME"
-    h.Draw(draw_opt)
-    n_raw = int(hist_models[cat_id].GetEntries())
-    legend.AddEntry(h, f"{label} (N = {n_raw})", "l")
-    first = False
+    pad2.cd()
+    first = True
+    for cat_id, _, _, _, _ in categories:
+        if cat_id not in h_cum:
+            continue
+        h = h_cum[cat_id]
+        h.SetMaximum(1.08)
+        h.SetMinimum(0.0)
+        h.GetXaxis().SetTitle(x_axis_title)
+        h.GetXaxis().SetTitleSize(0.08)
+        h.GetXaxis().SetTitleOffset(1.2)
+        h.GetXaxis().SetLabelSize(0.07)
+        h.GetYaxis().SetTitle("Efficiency (#geq Cut)")
+        h.GetYaxis().SetTitleSize(0.08)
+        h.GetYaxis().SetTitleOffset(0.78)
+        h.GetYaxis().SetLabelSize(0.07)
+        h.GetYaxis().SetNdivisions(505)
 
-legend.Draw()
+        h.Draw("HIST" if first else "HIST SAME")
+        first = False
 
-pad2.cd()
+    line = ROOT.TLine(0.0, 0.95, 1.0, 0.95)
+    line.SetLineColor(ROOT.kBlack)
+    line.SetLineStyle(7)
+    line.SetLineWidth(1)
+    line.Draw()
 
-first = True
-for cat_id, label, color, style, width in categories:
-    if cat_id not in h_cum:
-        continue
-    h = h_cum[cat_id]
-    h.SetMaximum(1.08)
-    h.SetMinimum(0.0)
+    canvas.Update()
+    return canvas
 
-    h.GetXaxis().SetTitle("SciFi Spatial Anisotropy Cut (#lambda_{1} / #Sigma#lambda > Cut)")
-    h.GetXaxis().SetTitleSize(0.08)
-    h.GetXaxis().SetTitleOffset(1.2)
-    h.GetXaxis().SetLabelSize(0.07)
-
-    h.GetYaxis().SetTitle("Efficiency (#geq Cut)")
-    h.GetYaxis().SetTitleSize(0.08)
-    h.GetYaxis().SetTitleOffset(0.78)
-    h.GetYaxis().SetLabelSize(0.07)
-    h.GetYaxis().SetNdivisions(505)
-
-    draw_opt = "HIST" if first else "HIST SAME"
-    h.Draw(draw_opt)
-    first = False
-
-line = ROOT.TLine(x_min, 0.95, x_max, 0.95)
-line.SetLineColor(ROOT.kBlack)
-line.SetLineStyle(7)
-line.SetLineWidth(1)
-line.Draw()
-
-canvas.Update()
+c_sf = generate_anisotropy_canvas(
+    "sf", "SciFi", "SciFi Spatial Anisotropy Cut (#lambda_{1} / #Sigma#lambda > Cut)"
+)
+c_us = generate_anisotropy_canvas(
+    "us", "Upstream", "US MuFilter Spatial Anisotropy Cut (#lambda_{1} / #Sigma#lambda > Cut)"
+)
 
 f_out.cd()
-canvas.Write()
+c_sf.Write()
+c_us.Write()
 f_out.Close()

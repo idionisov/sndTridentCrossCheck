@@ -17,6 +17,7 @@
 #include "TMatrixDSym.h"
 #include "TMatrixDSymEigen.h"
 #include "Scifi.h"
+#include "MuFilter.h"
 
 namespace snd::trident {
 
@@ -27,97 +28,223 @@ struct IP1Filter {
 };
 
 
-struct SciFiAnisotropyCalculator {
-    std::unordered_map<int, TVector3> fChannelPositions;
 
-    SciFiAnisotropyCalculator(Scifi* scifi = nullptr) {
-        if (!scifi && gROOT && gROOT->GetListOfGlobals()) {
-            scifi = dynamic_cast<Scifi*>(gROOT->GetListOfGlobals()->FindObject("Scifi"));
-        }
-        if (scifi) {
-            initCache(scifi);
-        }
-    }
+class BaseSpatialAnisotropyCalculator {
+    protected:
+        mutable std::unordered_map<int, TVector3> fPositions;
+        virtual void extractPositions(const TClonesArray& hits, std::vector<TVector3>& out_positions) const = 0;
 
-    void initCache(Scifi* scifi) {
-        TVector3 a, b;
-        fChannelPositions.reserve(16000);
-        for (int station = 1; station <= 5; ++station) {
-            for (int plane : {0, 100000}) {
-                for (int mat = 0; mat < 4; ++mat) {
-                    for (int sipm = 0; sipm < 4; ++sipm) {
-                        for (int ch = 0; ch < 128; ++ch) {
-                            int det_id = station * 1000000 + plane + mat * 10000 + sipm * 1000 + ch;
-                            try {
-                                scifi->GetSiPMPosition(det_id, a, b);
-                                fChannelPositions[det_id] = 0.5 * (a + b);
-                            } catch (...) {}
+    public:
+        virtual ~BaseSpatialAnisotropyCalculator() = default;
+
+        double calculateAnisotropy(const std::vector<TVector3>& positions) const {
+            if (positions.size() < 3) return -1.0;
+
+            TVector3 mean(0., 0., 0.);
+            for (const auto& pos : positions) mean += pos;
+            mean *= (1.0 / positions.size());
+
+            TMatrixDSym cov(3);
+            cov.Zero();
+            for (const auto& pos : positions) {
+                const TVector3 d = pos - mean;
+                cov(0, 0) += d.X() * d.X();
+                cov(0, 1) += d.X() * d.Y();
+                cov(0, 2) += d.X() * d.Z();
+                cov(1, 1) += d.Y() * d.Y();
+                cov(1, 2) += d.Y() * d.Z();
+                cov(2, 2) += d.Z() * d.Z();
+            }
+            cov(1, 0) = cov(0, 1);
+            cov(2, 0) = cov(0, 2);
+            cov(2, 1) = cov(1, 2);
+            cov *= (1.0 / positions.size());
+
+            const TVectorD ev = TMatrixDSymEigen(cov).GetEigenValues();
+            std::vector<double> sorted = {ev[0], ev[1], ev[2]};
+            std::sort(sorted.begin(), sorted.end(), std::greater<double>());
+
+            const double tot_var = sorted[0] + sorted[1] + sorted[2];
+            if (tot_var <= 0.0) return -1.0;
+
+            return sorted[0] / tot_var;
+        }
+
+        /// Functor call operator
+        double operator()(const TClonesArray& hits) const {
+            const int n_hits = hits.GetEntries();
+            if (n_hits < 3) return -1.0;
+
+            std::vector<TVector3> positions;
+            positions.reserve(n_hits);
+
+            extractPositions(hits, positions);
+            return calculateAnisotropy(positions);
+        }
+    };
+
+
+class SciFiAnisotropyCalculator : public BaseSpatialAnisotropyCalculator {
+    private:
+        Scifi* fScifiDet{nullptr};
+
+        void initCache() {
+            if (!fScifiDet) return;
+            TVector3 a, b;
+            fPositions.reserve(16000);
+
+            for (int station = 1; station <= 5; ++station) {
+                for (int plane : {0, 100000}) {
+                    for (int mat = 0; mat < 4; ++mat) {
+                        for (int sipm = 0; sipm < 4; ++sipm) {
+                            for (int ch = 0; ch < 128; ++ch) {
+                                int det_id = station * 1000000 + plane + mat * 10000 + sipm * 1000 + ch;
+                                try {
+                                    fScifiDet->GetSiPMPosition(det_id, a, b);
+                                    fPositions[det_id] = 0.5 * (a + b);
+                                } catch (...) {}
+                            }
                         }
                     }
                 }
             }
         }
-    }
 
-    double operator()(const TClonesArray& hits) const {
-        if (fChannelPositions.empty()) return -1.0;
-        const int n_hits = hits.GetEntries();
-        if (n_hits < 3) return -1.0;
+    protected:
+        void extractPositions(
+            const TClonesArray& hits,
+            std::vector<TVector3>& out_positions
+        ) const override {
+            const int n_hits = hits.GetEntries();
+            for (int i = 0; i < n_hits; ++i) {
+                auto* hit = static_cast<sndScifiHit*>(hits.At(i));
+                if (!hit || !hit->isValid()) continue;
 
-        std::vector<TVector3> positions;
-        positions.reserve(n_hits);
-        for (int i = 0; i < n_hits; ++i) {
-            auto* hit = static_cast<sndScifiHit*>(hits.At(i));
-            if (!hit || !hit->isValid()) continue;
-
-            auto it = fChannelPositions.find(hit->GetDetectorID());
-            if (it != fChannelPositions.end()) {
-                positions.push_back(it->second);
-            }
-            else {
-                std::cerr << "Warning: Detector ID "
-                    << hit->GetDetectorID()
-                    << " missing from cache!\n";
+                auto it = fPositions.find(hit->GetDetectorID());
+                if (it != fPositions.end()) {
+                    out_positions.push_back(it->second);
+                }
             }
         }
 
-        if (positions.size() < 3) return -1.0;
-
-        TVector3 mean(0., 0., 0.);
-        for (const auto& pos : positions) mean += pos;
-        mean *= (1.0 / positions.size());
-
-        TMatrixDSym cov(3);
-        cov.Zero();
-        for (const auto& pos : positions) {
-            const TVector3 d = pos - mean;
-            cov(0, 0) += d.X() * d.X();
-            cov(0, 1) += d.X() * d.Y();
-            cov(0, 2) += d.X() * d.Z();
-            cov(1, 1) += d.Y() * d.Y();
-            cov(1, 2) += d.Y() * d.Z();
-            cov(2, 2) += d.Z() * d.Z();
+    public:
+        SciFiAnisotropyCalculator(Scifi* scifi = nullptr) : fScifiDet(scifi) {
+            if (!fScifiDet && gROOT && gROOT->GetListOfGlobals()) {
+                fScifiDet = dynamic_cast<Scifi*>(gROOT->GetListOfGlobals()->FindObject("Scifi"));
+            }
+            if (fScifiDet) {
+                initCache();
+            }
         }
-        cov(1, 0) = cov(0, 1);
-        cov(2, 0) = cov(0, 2);
-        cov(2, 1) = cov(1, 2);
-        cov *= (1.0 / positions.size());
+    };
 
-        const TVectorD ev = TMatrixDSymEigen(cov).GetEigenValues();
-        std::vector<double> sorted = {ev[0], ev[1], ev[2]};
-        std::sort(sorted.begin(), sorted.end(), std::greater<double>());
 
-        const double tot_var = sorted[0] + sorted[1] + sorted[2];
-        if (tot_var <= 0.0) return -1.0;
 
-        return sorted[0] / tot_var;
-    }
-};
+
+class MuFilterAnisotropyCalculator : public BaseSpatialAnisotropyCalculator {
+    private:
+        MuFilter* fMuFilterDet{nullptr};
+        int fTargetSystem{2}; // 1 = Veto, 2 = US, 3 = DS, -1 = All
+
+        inline void cacheChannel(int det_id) const {
+            if (!fMuFilterDet) return;
+            if (fPositions.find(det_id) != fPositions.end()) return;
+
+            TVector3 L, R;
+            try {
+                fMuFilterDet->GetPosition(det_id, L, R);
+                fPositions[det_id] = 0.5 * (L + R);
+            } catch (...) {}
+        }
+
+        void initCache() {
+            if (!fMuFilterDet) return;
+
+            if (fTargetSystem == -1)     fPositions.reserve(600);
+            else if (fTargetSystem == 3) fPositions.reserve(500);
+            else if (fTargetSystem == 2) fPositions.reserve(70);
+            else if (fTargetSystem == 1) fPositions.reserve(20);
+
+            // Veto
+            if (fTargetSystem == 1 || fTargetSystem == -1) {
+                for (int p = 0; p < 2; ++p)
+                    for (int b = 0; b < 7; ++b)
+                        cacheChannel(10000 + p * 1000 + b);
+            }
+            // US
+            if (fTargetSystem == 2 || fTargetSystem == -1) {
+                for (int p = 0; p < 5; ++p)
+                    for (int b = 0; b < 10; ++b)
+                        cacheChannel(20000 + p * 1000 + b);
+            }
+            // DS
+            if (fTargetSystem == 3 || fTargetSystem == -1) {
+                for (int s = 0; s < 4; ++s) {
+                    const int n_planes = (s < 3) ? 2 : 1;
+                    for (int p = 0; p < n_planes; ++p)
+                        for (int b = 0; b < 60; ++b)
+                            cacheChannel(30000 + s * 1000 + p * 100 + b);
+                }
+            }
+        }
+
+    protected:
+        void extractPositions(
+            const TClonesArray& hits,
+            std::vector<TVector3>& out_positions
+        ) const override {
+            const int n_hits = hits.GetEntries();
+            for (int i = 0; i < n_hits; ++i) {
+                auto* hit = static_cast<MuFilterHit*>(hits.At(i));
+                if (!hit || !hit->isValid()) continue;
+
+                if (fTargetSystem != -1 && hit->GetSystem() != fTargetSystem) continue;
+
+                const int det_id = hit->GetDetectorID();
+                auto it = fPositions.find(det_id);
+
+                if (it != fPositions.end()) {
+                    out_positions.push_back(it->second);
+                } else if (fMuFilterDet) {
+                    cacheChannel(det_id);
+                    it = fPositions.find(det_id);
+                    if (it != fPositions.end()) {
+                        out_positions.push_back(it->second);
+                    }
+                }
+            }
+        }
+
+    public:
+        MuFilterAnisotropyCalculator(MuFilter* mufilter = nullptr, int target_system = 2)
+            : fMuFilterDet(mufilter), fTargetSystem(target_system)
+        {
+            if (!fMuFilterDet && gROOT && gROOT->GetListOfGlobals()) {
+                fMuFilterDet = dynamic_cast<MuFilter*>(
+                    gROOT->GetListOfGlobals()->FindObject("MuFilter")
+                );
+                if (!fMuFilterDet) {
+                    fMuFilterDet = dynamic_cast<MuFilter*>(
+                        gROOT->GetListOfGlobals()->FindObject("MuFi")
+                    );
+                }
+            }
+            if (fMuFilterDet) {
+                initCache();
+            }
+        }
+
+        void setTargetSystem(int target_system) {
+            fTargetSystem = target_system;
+            initCache();
+        }
+    };
+
 
 struct MuonCalibrationConfig {
-    double chi2_max{10.0};          // General / fallback chi2/ndf threshold
-    double chi2_max_scifi{10.0};    // SciFi track chi2/ndf upper limit
-    double chi2_max_ds{10.0};       // DS track chi2/ndf upper limit
+    double chi2_max{20.0};          // General / fallback chi2/ndf threshold
+    double chi2_max_scifi{20.0};    // SciFi track chi2/ndf upper limit
+    double chi2_max_ds{20.0};       // DS track chi2/ndf upper limit
     double max_slope{0.05};         // Max angular slope (< 0.05 rad)
     double fiducial_margin{1.5};    // cm margin from detector borders
     int scifi_track_type{11};       // SciFi track type (11 = SciFi Hough)
