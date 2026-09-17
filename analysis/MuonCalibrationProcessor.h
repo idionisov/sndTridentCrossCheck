@@ -245,7 +245,9 @@ struct MuonCalibrationMetrics {
     int ds_stations_hit{0};
     double ds_sum_qdc{0.0};
     int veto_nhits{0};
+    double veto_sum_qdc{0.0};
     int us_nhits{0};
+    double us_sum_qdc{0.0};
 
     // 7. Vector Observables for RDataFrame Histo1D / Histo2D / Profile1D
     std::vector<double> hit_qdc;

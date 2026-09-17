@@ -894,7 +894,6 @@ def print_summary_tables(
     sample_tag: str = "PMU MC",
     print_exposure: bool = True
 ):
-    """Prints comprehensive assessment, purity, rejection, and cutflow tables with FLUKA weights and Data comparison."""
     if data_meta and print_exposure:
         print("\n" + "=" * 80)
         print("COLLISION DATA EXPOSURE & PASSING MUON MC SCALING")
@@ -1054,7 +1053,6 @@ def print_trimuon_summary_table(
     lumi_str: str = "N/A",
     table_number: int = 7
 ):
-    """Prints a dedicated assessment table for Trimuon Monte Carlo sequential selection survival."""
     is_scaled_data = (raw_data_counts is not None and data_counts is not None and any(abs(data_counts.get(s[0], 0.0) - raw_data_counts.get(s[0], 0)) > 1e-3 for s in cutflow_stages))
     d_col_title = "Collision Data [Scaled (Raw)]" if is_scaled_data else "Collision Data"
     d_col_w = 30 if is_scaled_data else 18
@@ -1144,7 +1142,6 @@ def main():
     parser.add_argument("--data-scaling", "--data-scale", "--scale-data", dest="data_scaling", type=float, default=1.0,
                         help="Scaling factor for collision data (default: 1.0, e.g. 100.0 if reconstruction ran on 1/100 random subsample)")
 
-    # Configurable selection cuts
     parser.add_argument("--chi2-max", type=float, default=20.0, help="General track chi2/ndf upper limit")
     parser.add_argument("--chi2-max-scifi", type=float, default=20.0, help="Max SciFi track chi2/ndf (default: 10.0)")
     parser.add_argument("--chi2-max-ds", type=float, default=20.0, help="Max DS track chi2/ndf (default: 10.0)")

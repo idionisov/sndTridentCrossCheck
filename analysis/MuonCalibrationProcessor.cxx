@@ -323,17 +323,22 @@ MuonCalibrationMetrics MuonCalibrationProcessor::process(
             int st  = hit->GetPlane();  // station/plane index
 
             n_mf_valid++;
+            std::map<Int_t, Float_t> sigs = hit->GetAllSignals(true, true, false);
+            double hit_qdc = 0.0;
+            for (const auto& kv : sigs) {
+                hit_qdc += kv.second;
+            }
+
             if (sys == 1) {
                 m.veto_nhits++;
+                m.veto_sum_qdc += hit_qdc;
             } else if (sys == 2) {
                 m.us_nhits++;
+                m.us_sum_qdc += hit_qdc;
             } else if (sys == 3) {
                 m.ds_nhits++;
+                m.ds_sum_qdc += hit_qdc;
                 ds_stations.insert(st);
-                for (int ch = 0; ch < 16; ++ch) {
-                    double sig = hit->GetSignal(ch);
-                    if (sig > 0.0) m.ds_sum_qdc += sig;
-                }
             }
         }
         m.mufi_nhits = n_mf_valid;
