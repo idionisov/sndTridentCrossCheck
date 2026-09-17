@@ -1142,9 +1142,12 @@ def main():
     parser.add_argument("--data-scaling", "--data-scale", "--scale-data", dest="data_scaling", type=float, default=1.0,
                         help="Scaling factor for collision data (default: 1.0, e.g. 100.0 if reconstruction ran on 1/100 random subsample)")
 
-    parser.add_argument("--chi2-max", type=float, default=20.0, help="General track chi2/ndf upper limit")
-    parser.add_argument("--chi2-max-scifi", type=float, default=20.0, help="Max SciFi track chi2/ndf (default: 10.0)")
-    parser.add_argument("--chi2-max-ds", type=float, default=20.0, help="Max DS track chi2/ndf (default: 10.0)")
+    parser.add_argument("--chi2-max", type=float, default=None,
+                        help="General track chi2/ndf upper limit (sets both SciFi and DS if specified)")
+    parser.add_argument("--chi2-max-scifi", type=float, default=None,
+                        help="Max SciFi track chi2/ndf (default: 20.0 or --chi2-max)")
+    parser.add_argument("--chi2-max-ds", type=float, default=None,
+                        help="Max DS track chi2/ndf (default: 20.0 or --chi2-max)")
     parser.add_argument("--max-slope", type=float, default=0.05, help="Max angular slope (default: 0.05 rad)")
     parser.add_argument("--z-match", type=float, default=430.0, help="Fiducial plane Z position [cm] (default: 430.0)")
     parser.add_argument("--pos-match-max", type=float, default=3.0, help="Max distance at z_match between SF and DS (default: 3.0 cm)")
@@ -1168,6 +1171,19 @@ def main():
                         help="Kinetic / secondary energy threshold for hadronic interaction in GeV (default: 0.5 GeV)")
 
     args = parser.parse_args()
+
+    if args.chi2_max is not None:
+        if args.chi2_max_scifi is None:
+            args.chi2_max_scifi = args.chi2_max
+        if args.chi2_max_ds is None:
+            args.chi2_max_ds = args.chi2_max
+    else:
+        if args.chi2_max_scifi is None:
+            args.chi2_max_scifi = 20.0
+        if args.chi2_max_ds is None:
+            args.chi2_max_ds = 20.0
+    if args.chi2_max is None:
+        args.chi2_max = max(args.chi2_max_scifi, args.chi2_max_ds)
 
     if args.data_scaling <= 0:
         parser.error(f"--data-scaling must be strictly positive (> 0), got {args.data_scaling}")
@@ -1341,6 +1357,10 @@ def main():
         .Define("reco_ds_hits", "reco.ds_nhits")
         .Define("reco_veto_hits", "reco.veto_nhits")
         .Define("reco_us_hits", "reco.us_nhits")
+        .Define("reco_sf_qdc", "reco.scifi_sum_qdc")
+        .Define("reco_ds_qdc", "reco.ds_sum_qdc")
+        .Define("reco_veto_qdc", "reco.veto_sum_qdc")
+        .Define("reco_us_qdc", "reco.us_sum_qdc")
         .Define("scaled_weight", f"weight * {pmu_scale_factor:.10e}")
         .Define("mu_p", "truth.primary_muon_p")
         .Define("mu_energy", "truth.primary_muon_p > 0 ? std::sqrt(truth.primary_muon_p*truth.primary_muon_p + 0.105658*0.105658) : 0.0")
@@ -1371,6 +1391,13 @@ def main():
     h_veto_hits_sig = df_mc.Filter("cat_id == 1 && c2_one_scifi_trk").Histo1D(("h_veto_hits_signal", "Veto Hits (Signal);Veto Hits;Weighted Events", 16, -0.5, 15.5), "reco_veto_hits", "weight")
     h_us_hits_sig   = df_mc.Filter("cat_id == 1 && c2_one_scifi_trk").Histo1D(("h_us_hits_signal", "US Hits (Signal);US System Hits;Weighted Events", 31, -0.5, 30.5), "reco_us_hits", "weight")
 
+    h_sf_qdc_sig    = df_mc.Filter("cat_id == 1 && c2_one_scifi_trk").Histo1D(("h_sf_qdc_signal", "SciFi Total QDC (Signal);SciFi Total QDC [p.e.];Weighted Events", 100, 0, 500), "reco_sf_qdc", "weight")
+    h_sf_qdc_em     = df_mc.Filter("cat_id == 2 && c2_one_scifi_trk").Histo1D(("h_sf_qdc_em_shower", "SciFi Total QDC (EM Cascade);SciFi Total QDC [p.e.];Weighted Events", 100, 0, 500), "reco_sf_qdc", "weight")
+    h_sf_qdc_had    = df_mc.Filter("cat_id == 3 && c2_one_scifi_trk").Histo1D(("h_sf_qdc_hadronic", "SciFi Total QDC (Hadronic Int.);SciFi Total QDC [p.e.];Weighted Events", 100, 0, 500), "reco_sf_qdc", "weight")
+    h_ds_qdc_sig    = df_mc.Filter("cat_id == 1 && c2_one_scifi_trk").Histo1D(("h_ds_qdc_signal", "DS Total QDC (Signal);DS Total QDC [p.e.];Weighted Events", 100, 0, 5000), "reco_ds_qdc", "weight")
+    h_veto_qdc_sig  = df_mc.Filter("cat_id == 1 && c2_one_scifi_trk").Histo1D(("h_veto_qdc_signal", "Veto Total QDC (Signal);Veto Total QDC [p.e.];Weighted Events", 100, 0, 2000), "reco_veto_qdc", "weight")
+    h_us_qdc_sig    = df_mc.Filter("cat_id == 1 && c2_one_scifi_trk").Histo1D(("h_us_qdc_signal", "US Total QDC (Signal);US Total QDC [p.e.];Weighted Events", 100, 0, 4000), "reco_us_qdc", "weight")
+
     h_p_sig_pass= df_mc.Filter("cat_id == 1 && is_clean_reco").Histo1D(("h_p_signal_selected", "Selected Clean Muon Momentum;p [GeV/c];Weighted Muons", 100, 0, 3000), "mu_p", "weight")
 
     # Master stage registry: stage_name -> (cut_expr, short_title, axis_line1, axis_line2)
@@ -1382,7 +1409,7 @@ def main():
         "2. N(SciFi Track) == 1":   ("c2_one_scifi_trk",        "2. SciFi Track == 1",              "2. SciFi Track",        "Multiplicity == 1"),
         "3. DS Track (Type 13)":    ("c3_ds_track",             f"3. DS Track (Type {args.ds_track_type})", "3. DS Track",   f"(Type {args.ds_track_type})"),
 
-        "4. Track Fit Quality":     ("c4_track_quality",        f"4. chi2/ndf <= {args.chi2_max_scifi:g}", "4. Track Fit",  f"chi2/ndf <= {args.chi2_max_scifi:g}"),
+        "4. Track Fit Quality":     ("c4_track_quality",        f"4. #chi^{{2}}/ndf (SF<={args.chi2_max_scifi:g}, DS<={args.chi2_max_ds:g})", "4. Track Fit",  f"SF<={args.chi2_max_scifi:g}, DS<={args.chi2_max_ds:g}"),
         "5. Angular Slope Cut":     ("c5_angular_slope",        f"5. Slope < {args.max_slope:g} rad", "5. Slope Cut",        f"< {args.max_slope:g} rad"),
         "6. Fiducial Plane (z=430)":("c6_fiducial_430",         f"6. Fiducial (z={args.z_match:g} cm)", "6. Fiducial",       f"(z={args.z_match:g} cm)"),
         "7. DS Match at z=430":     ("c7_ds_match",             f"7. DS Match dR <= {args.pos_match_max:g} cm", "7. DS Match", f"dR <= {args.pos_match_max:g} cm"),
@@ -1428,6 +1455,30 @@ def main():
     stage_us_mc_had_ptrs = []
     stage_us_mc_raw_sig_ptrs = []
 
+    stage_sf_qdc_mc_tot_ptrs = []
+    stage_sf_qdc_mc_sig_ptrs = []
+    stage_sf_qdc_mc_em_ptrs  = []
+    stage_sf_qdc_mc_had_ptrs = []
+    stage_sf_qdc_mc_raw_sig_ptrs = []
+
+    stage_ds_qdc_mc_tot_ptrs = []
+    stage_ds_qdc_mc_sig_ptrs = []
+    stage_ds_qdc_mc_em_ptrs  = []
+    stage_ds_qdc_mc_had_ptrs = []
+    stage_ds_qdc_mc_raw_sig_ptrs = []
+
+    stage_veto_qdc_mc_tot_ptrs = []
+    stage_veto_qdc_mc_sig_ptrs = []
+    stage_veto_qdc_mc_em_ptrs  = []
+    stage_veto_qdc_mc_had_ptrs = []
+    stage_veto_qdc_mc_raw_sig_ptrs = []
+
+    stage_us_qdc_mc_tot_ptrs = []
+    stage_us_qdc_mc_sig_ptrs = []
+    stage_us_qdc_mc_em_ptrs  = []
+    stage_us_qdc_mc_had_ptrs = []
+    stage_us_qdc_mc_raw_sig_ptrs = []
+
     stage_energy_mc_sig_ptrs = []
     stage_energy_mc_all_ptrs = []
     stage_energy_mc_raw_sig_ptrs = []
@@ -1466,6 +1517,34 @@ def main():
         stage_us_mc_had_ptrs.append(df_s_mc.Filter("cat_id == 3").Histo1D((f"h_us_hits_mc_had_{s_tag}", f"US Hits - {stage_name} (Hadronic Int.);US System Hits;Events", 31, -0.5, 30.5), "reco_us_hits", "scaled_weight"))
         stage_us_mc_raw_sig_ptrs.append(df_s_mc.Filter("cat_id == 1").Histo1D((f"h_us_hits_mc_raw_sig_{s_tag}", f"US Hits Raw - {stage_name} (Signal);US System Hits;Raw Events", 31, -0.5, 30.5), "reco_us_hits"))
 
+        # SciFi QDC (0 to 500 p.e.)
+        stage_sf_qdc_mc_tot_ptrs.append(df_s_mc.Histo1D((f"h_sf_qdc_mc_tot_{s_tag}", f"SciFi QDC - {stage_name} (MC Total);SciFi Total QDC [p.e.];Events", 100, 0.0, 500.0), "reco_sf_qdc", "scaled_weight"))
+        stage_sf_qdc_mc_sig_ptrs.append(df_s_mc.Filter("cat_id == 1").Histo1D((f"h_sf_qdc_mc_sig_{s_tag}", f"SciFi QDC - {stage_name} (Signal);SciFi Total QDC [p.e.];Events", 100, 0.0, 500.0), "reco_sf_qdc", "scaled_weight"))
+        stage_sf_qdc_mc_em_ptrs.append(df_s_mc.Filter("cat_id == 2").Histo1D((f"h_sf_qdc_mc_em_{s_tag}", f"SciFi QDC - {stage_name} (EM Cascade);SciFi Total QDC [p.e.];Events", 100, 0.0, 500.0), "reco_sf_qdc", "scaled_weight"))
+        stage_sf_qdc_mc_had_ptrs.append(df_s_mc.Filter("cat_id == 3").Histo1D((f"h_sf_qdc_mc_had_{s_tag}", f"SciFi QDC - {stage_name} (Hadronic Int.);SciFi Total QDC [p.e.];Events", 100, 0.0, 500.0), "reco_sf_qdc", "scaled_weight"))
+        stage_sf_qdc_mc_raw_sig_ptrs.append(df_s_mc.Filter("cat_id == 1").Histo1D((f"h_sf_qdc_mc_raw_sig_{s_tag}", f"SciFi QDC Raw - {stage_name} (Signal);SciFi Total QDC [p.e.];Raw Events", 100, 0.0, 500.0), "reco_sf_qdc"))
+
+        # DS QDC (0 to 5000 p.e.)
+        stage_ds_qdc_mc_tot_ptrs.append(df_s_mc.Histo1D((f"h_ds_qdc_mc_tot_{s_tag}", f"DS QDC - {stage_name} (MC Total);DS Total QDC [p.e.];Events", 100, 0.0, 5000.0), "reco_ds_qdc", "scaled_weight"))
+        stage_ds_qdc_mc_sig_ptrs.append(df_s_mc.Filter("cat_id == 1").Histo1D((f"h_ds_qdc_mc_sig_{s_tag}", f"DS QDC - {stage_name} (Signal);DS Total QDC [p.e.];Events", 100, 0.0, 5000.0), "reco_ds_qdc", "scaled_weight"))
+        stage_ds_qdc_mc_em_ptrs.append(df_s_mc.Filter("cat_id == 2").Histo1D((f"h_ds_qdc_mc_em_{s_tag}", f"DS QDC - {stage_name} (EM Cascade);DS Total QDC [p.e.];Events", 100, 0.0, 5000.0), "reco_ds_qdc", "scaled_weight"))
+        stage_ds_qdc_mc_had_ptrs.append(df_s_mc.Filter("cat_id == 3").Histo1D((f"h_ds_qdc_mc_had_{s_tag}", f"DS QDC - {stage_name} (Hadronic Int.);DS Total QDC [p.e.];Events", 100, 0.0, 5000.0), "reco_ds_qdc", "scaled_weight"))
+        stage_ds_qdc_mc_raw_sig_ptrs.append(df_s_mc.Filter("cat_id == 1").Histo1D((f"h_ds_qdc_mc_raw_sig_{s_tag}", f"DS QDC Raw - {stage_name} (Signal);DS Total QDC [p.e.];Raw Events", 100, 0.0, 5000.0), "reco_ds_qdc"))
+
+        # Veto QDC (0 to 2000 p.e.)
+        stage_veto_qdc_mc_tot_ptrs.append(df_s_mc.Histo1D((f"h_veto_qdc_mc_tot_{s_tag}", f"Veto QDC - {stage_name} (MC Total);Veto Total QDC [p.e.];Events", 100, 0.0, 2000.0), "reco_veto_qdc", "scaled_weight"))
+        stage_veto_qdc_mc_sig_ptrs.append(df_s_mc.Filter("cat_id == 1").Histo1D((f"h_veto_qdc_mc_sig_{s_tag}", f"Veto QDC - {stage_name} (Signal);Veto Total QDC [p.e.];Events", 100, 0.0, 2000.0), "reco_veto_qdc", "scaled_weight"))
+        stage_veto_qdc_mc_em_ptrs.append(df_s_mc.Filter("cat_id == 2").Histo1D((f"h_veto_qdc_mc_em_{s_tag}", f"Veto QDC - {stage_name} (EM Cascade);Veto Total QDC [p.e.];Events", 100, 0.0, 2000.0), "reco_veto_qdc", "scaled_weight"))
+        stage_veto_qdc_mc_had_ptrs.append(df_s_mc.Filter("cat_id == 3").Histo1D((f"h_veto_qdc_mc_had_{s_tag}", f"Veto QDC - {stage_name} (Hadronic Int.);Veto Total QDC [p.e.];Events", 100, 0.0, 2000.0), "reco_veto_qdc", "scaled_weight"))
+        stage_veto_qdc_mc_raw_sig_ptrs.append(df_s_mc.Filter("cat_id == 1").Histo1D((f"h_veto_qdc_mc_raw_sig_{s_tag}", f"Veto QDC Raw - {stage_name} (Signal);Veto Total QDC [p.e.];Raw Events", 100, 0.0, 2000.0), "reco_veto_qdc"))
+
+        # US QDC (0 to 4000 p.e.)
+        stage_us_qdc_mc_tot_ptrs.append(df_s_mc.Histo1D((f"h_us_qdc_mc_tot_{s_tag}", f"US QDC - {stage_name} (MC Total);US Total QDC [p.e.];Events", 100, 0.0, 4000.0), "reco_us_qdc", "scaled_weight"))
+        stage_us_qdc_mc_sig_ptrs.append(df_s_mc.Filter("cat_id == 1").Histo1D((f"h_us_qdc_mc_sig_{s_tag}", f"US QDC - {stage_name} (Signal);US Total QDC [p.e.];Events", 100, 0.0, 4000.0), "reco_us_qdc", "scaled_weight"))
+        stage_us_qdc_mc_em_ptrs.append(df_s_mc.Filter("cat_id == 2").Histo1D((f"h_us_qdc_mc_em_{s_tag}", f"US QDC - {stage_name} (EM Cascade);US Total QDC [p.e.];Events", 100, 0.0, 4000.0), "reco_us_qdc", "scaled_weight"))
+        stage_us_qdc_mc_had_ptrs.append(df_s_mc.Filter("cat_id == 3").Histo1D((f"h_us_qdc_mc_had_{s_tag}", f"US QDC - {stage_name} (Hadronic Int.);US Total QDC [p.e.];Events", 100, 0.0, 4000.0), "reco_us_qdc", "scaled_weight"))
+        stage_us_qdc_mc_raw_sig_ptrs.append(df_s_mc.Filter("cat_id == 1").Histo1D((f"h_us_qdc_mc_raw_sig_{s_tag}", f"US QDC Raw - {stage_name} (Signal);US Total QDC [p.e.];Raw Events", 100, 0.0, 4000.0), "reco_us_qdc"))
+
         # Muon Energy (0 to 2000 GeV, 100 bins)
         stage_energy_mc_sig_ptrs.append(df_s_mc.Filter("cat_id == 1").Histo1D((f"h_muon_energy_sig_{s_tag}", f"Passing Muon Energy - {stage_name} (Signal);E_{{#mu}} [GeV];Events / 20 GeV", 100, 0.0, 2000.0), "mu_energy", "scaled_weight"))
         stage_energy_mc_all_ptrs.append(df_s_mc.Filter("truth.primary_muon_p > 0").Histo1D((f"h_muon_energy_all_{s_tag}", f"Passing Muon Energy - {stage_name} (All Passing Muons);E_{{#mu}} [GeV];Events / 20 GeV", 100, 0.0, 2000.0), "mu_energy", "scaled_weight"))
@@ -1479,11 +1558,19 @@ def main():
     stage_ds_data_ptrs = []
     stage_veto_data_ptrs = []
     stage_us_data_ptrs = []
+    stage_sf_qdc_data_ptrs = []
+    stage_ds_qdc_data_ptrs = []
+    stage_veto_qdc_data_ptrs = []
+    stage_us_qdc_data_ptrs = []
     h_chi2_data_ptr = None
     h_sf_hits_data_ptr = None
     h_ds_hits_data_ptr = None
     h_veto_hits_data_ptr = None
     h_us_hits_data_ptr = None
+    h_sf_qdc_data_ptr = None
+    h_ds_qdc_data_ptr = None
+    h_veto_qdc_data_ptr = None
+    h_us_qdc_data_ptr = None
 
     if args.input_data:
         df_data = dm_data.rdf()
@@ -1523,6 +1610,10 @@ def main():
             .Define("reco_ds_hits",  "reco.ds_nhits")
             .Define("reco_veto_hits", "reco.veto_nhits")
             .Define("reco_us_hits",   "reco.us_nhits")
+            .Define("reco_sf_qdc",   "reco.scifi_sum_qdc")
+            .Define("reco_ds_qdc",   "reco.ds_sum_qdc")
+            .Define("reco_veto_qdc", "reco.veto_sum_qdc")
+            .Define("reco_us_qdc",   "reco.us_sum_qdc")
             .Define("c1_ip1",           "pass_is_ip1")
             .Define("c2_one_scifi_trk", "c1_ip1 && reco.pass_cut_single_scifi_track")
             .Define("c3_ds_track",      "c2_one_scifi_trk && reco.pass_cut_ds_track")
@@ -1552,11 +1643,21 @@ def main():
             stage_veto_data_ptrs.append(df_s_data.Histo1D((f"h_veto_hits_data_{s_tag}", f"Veto Hits - {s_name} (Data);Veto Hits;Events", 16, -0.5, 15.5), "reco_veto_hits"))
             stage_us_data_ptrs.append(df_s_data.Histo1D((f"h_us_hits_data_{s_tag}", f"US Hits - {s_name} (Data);US System Hits;Events", 31, -0.5, 30.5), "reco_us_hits"))
 
+            stage_sf_qdc_data_ptrs.append(df_s_data.Histo1D((f"h_sf_qdc_data_{s_tag}", f"SciFi QDC - {s_name} (Data);SciFi Total QDC [p.e.];Events", 100, 0.0, 500.0), "reco_sf_qdc"))
+            stage_ds_qdc_data_ptrs.append(df_s_data.Histo1D((f"h_ds_qdc_data_{s_tag}", f"DS QDC - {s_name} (Data);DS Total QDC [p.e.];Events", 100, 0.0, 5000.0), "reco_ds_qdc"))
+            stage_veto_qdc_data_ptrs.append(df_s_data.Histo1D((f"h_veto_qdc_data_{s_tag}", f"Veto QDC - {s_name} (Data);Veto Total QDC [p.e.];Events", 100, 0.0, 2000.0), "reco_veto_qdc"))
+            stage_us_qdc_data_ptrs.append(df_s_data.Histo1D((f"h_us_qdc_data_{s_tag}", f"US QDC - {s_name} (Data);US Total QDC [p.e.];Events", 100, 0.0, 4000.0), "reco_us_qdc"))
+
         h_chi2_data_ptr = df_data.Filter("c2_one_scifi_trk").Histo1D(("h_chi2_data", "Track #chi^{2}/ndf (Data);#chi^{2}/ndf;Events", 100, 0, 20), "reco_chi2_ndf")
         h_sf_hits_data_ptr = df_data.Filter("c2_one_scifi_trk").Histo1D(("h_sf_hits_data", "SciFi Hits (Data);SciFi Hits;Events", 60, 0, 60), "reco_sf_hits")
         h_ds_hits_data_ptr = df_data.Filter("c2_one_scifi_trk").Histo1D(("h_ds_hits_data", "DS Hits (Data);DS Hits;Events", 40, 0, 40), "reco_ds_hits")
         h_veto_hits_data_ptr = df_data.Filter("c2_one_scifi_trk").Histo1D(("h_veto_hits_data", "Veto Hits (Data);Veto Hits;Events", 16, -0.5, 15.5), "reco_veto_hits")
         h_us_hits_data_ptr = df_data.Filter("c2_one_scifi_trk").Histo1D(("h_us_hits_data", "US Hits (Data);US Hits;Events", 31, -0.5, 30.5), "reco_us_hits")
+
+        h_sf_qdc_data_ptr = df_data.Filter("c2_one_scifi_trk").Histo1D(("h_sf_qdc_data", "SciFi Total QDC (Data);SciFi Total QDC [p.e.];Events", 100, 0, 500), "reco_sf_qdc")
+        h_ds_qdc_data_ptr = df_data.Filter("c2_one_scifi_trk").Histo1D(("h_ds_qdc_data", "DS Total QDC (Data);DS Total QDC [p.e.];Events", 100, 0, 5000), "reco_ds_qdc")
+        h_veto_qdc_data_ptr = df_data.Filter("c2_one_scifi_trk").Histo1D(("h_veto_qdc_data", "Veto Total QDC (Data);Veto Total QDC [p.e.];Events", 100, 0, 2000), "reco_veto_qdc")
+        h_us_qdc_data_ptr = df_data.Filter("c2_one_scifi_trk").Histo1D(("h_us_qdc_data", "US Total QDC (Data);US Total QDC [p.e.];Events", 100, 0, 4000), "reco_us_qdc")
 
     # 7b. Setup Trimuon Monte Carlo Graph & Histograms (if Trimuon MC enabled & provided)
     tri_files = []
@@ -1592,11 +1693,35 @@ def main():
     stage_us_tri_multimu_ptrs = []
     stage_us_tri_raw_ptrs = []
 
+    stage_sf_qdc_tri_tot_ptrs = []
+    stage_sf_qdc_tri_sig_ptrs = []
+    stage_sf_qdc_tri_multimu_ptrs = []
+    stage_sf_qdc_tri_raw_ptrs = []
+
+    stage_ds_qdc_tri_tot_ptrs = []
+    stage_ds_qdc_tri_sig_ptrs = []
+    stage_ds_qdc_tri_multimu_ptrs = []
+    stage_ds_qdc_tri_raw_ptrs = []
+
+    stage_veto_qdc_tri_tot_ptrs = []
+    stage_veto_qdc_tri_sig_ptrs = []
+    stage_veto_qdc_tri_multimu_ptrs = []
+    stage_veto_qdc_tri_raw_ptrs = []
+
+    stage_us_qdc_tri_tot_ptrs = []
+    stage_us_qdc_tri_sig_ptrs = []
+    stage_us_qdc_tri_multimu_ptrs = []
+    stage_us_qdc_tri_raw_ptrs = []
+
     h_chi2_tri_ptr = None
     h_sf_hits_tri_ptr = None
     h_ds_hits_tri_ptr = None
     h_veto_hits_tri_ptr = None
     h_us_hits_tri_ptr = None
+    h_sf_qdc_tri_ptr = None
+    h_ds_qdc_tri_ptr = None
+    h_veto_qdc_tri_ptr = None
+    h_us_qdc_tri_ptr = None
     count_all_tri = None
 
     if args.enable_tri and args.input_tri and str(args.input_tri).lower() not in ("none", ""):
@@ -1655,6 +1780,10 @@ def main():
                 .Define("reco_ds_hits",  "reco.ds_nhits")
                 .Define("reco_veto_hits", "reco.veto_nhits")
                 .Define("reco_us_hits",   "reco.us_nhits")
+                .Define("reco_sf_qdc",   "reco.scifi_sum_qdc")
+                .Define("reco_ds_qdc",   "reco.ds_sum_qdc")
+                .Define("reco_veto_qdc", "reco.veto_sum_qdc")
+                .Define("reco_us_qdc",   "reco.us_sum_qdc")
                 .Define("scaled_weight", f"weight * {scale_tri:.10e}")
                 .Define("mu_p", "truth.primary_muon_p")
                 .Define("mu_energy", "truth.primary_muon_p > 0 ? std::sqrt(truth.primary_muon_p*truth.primary_muon_p + 0.105658*0.105658) : 0.0")
@@ -1706,11 +1835,39 @@ def main():
                 stage_us_tri_multimu_ptrs.append(df_s_tri.Filter("cat_id == 4").Histo1D((f"h_us_hits_tri_multimu_{s_tag}", f"US Hits - {s_name} (Multi-#mu Bundle);US System Hits;Events", 31, -0.5, 30.5), "reco_us_hits", "scaled_weight"))
                 stage_us_tri_raw_ptrs.append(df_s_tri.Histo1D((f"h_us_hits_tri_raw_{s_tag}", f"US Hits Raw - {s_name} (Trimuon MC Total);US System Hits;Raw Events", 31, -0.5, 30.5), "reco_us_hits"))
 
+                # SciFi QDC (0 to 500 p.e.)
+                stage_sf_qdc_tri_tot_ptrs.append(df_s_tri.Histo1D((f"h_sf_qdc_tri_tot_{s_tag}", f"SciFi QDC - {s_name} (Trimuon MC Total);SciFi Total QDC [p.e.];Events", 100, 0.0, 500.0), "reco_sf_qdc", "scaled_weight"))
+                stage_sf_qdc_tri_sig_ptrs.append(df_s_tri.Filter("cat_id == 1").Histo1D((f"h_sf_qdc_tri_sig_{s_tag}", f"SciFi QDC - {s_name} (Clean Single #mu);SciFi Total QDC [p.e.];Events", 100, 0.0, 500.0), "reco_sf_qdc", "scaled_weight"))
+                stage_sf_qdc_tri_multimu_ptrs.append(df_s_tri.Filter("cat_id == 4").Histo1D((f"h_sf_qdc_tri_multimu_{s_tag}", f"SciFi QDC - {s_name} (Multi-#mu Bundle);SciFi Total QDC [p.e.];Events", 100, 0.0, 500.0), "reco_sf_qdc", "scaled_weight"))
+                stage_sf_qdc_tri_raw_ptrs.append(df_s_tri.Histo1D((f"h_sf_qdc_tri_raw_{s_tag}", f"SciFi QDC Raw - {s_name} (Trimuon MC Total);SciFi Total QDC [p.e.];Raw Events", 100, 0.0, 500.0), "reco_sf_qdc"))
+
+                # DS QDC (0 to 5000 p.e.)
+                stage_ds_qdc_tri_tot_ptrs.append(df_s_tri.Histo1D((f"h_ds_qdc_tri_tot_{s_tag}", f"DS QDC - {s_name} (Trimuon MC Total);DS Total QDC [p.e.];Events", 100, 0.0, 5000.0), "reco_ds_qdc", "scaled_weight"))
+                stage_ds_qdc_tri_sig_ptrs.append(df_s_tri.Filter("cat_id == 1").Histo1D((f"h_ds_qdc_tri_sig_{s_tag}", f"DS QDC - {s_name} (Clean Single #mu);DS Total QDC [p.e.];Events", 100, 0.0, 5000.0), "reco_ds_qdc", "scaled_weight"))
+                stage_ds_qdc_tri_multimu_ptrs.append(df_s_tri.Filter("cat_id == 4").Histo1D((f"h_ds_qdc_tri_multimu_{s_tag}", f"DS QDC - {s_name} (Multi-#mu Bundle);DS Total QDC [p.e.];Events", 100, 0.0, 5000.0), "reco_ds_qdc", "scaled_weight"))
+                stage_ds_qdc_tri_raw_ptrs.append(df_s_tri.Histo1D((f"h_ds_qdc_tri_raw_{s_tag}", f"DS QDC Raw - {s_name} (Trimuon MC Total);DS Total QDC [p.e.];Raw Events", 100, 0.0, 5000.0), "reco_ds_qdc"))
+
+                # Veto QDC (0 to 2000 p.e.)
+                stage_veto_qdc_tri_tot_ptrs.append(df_s_tri.Histo1D((f"h_veto_qdc_tri_tot_{s_tag}", f"Veto QDC - {s_name} (Trimuon MC Total);Veto Total QDC [p.e.];Events", 100, 0.0, 2000.0), "reco_veto_qdc", "scaled_weight"))
+                stage_veto_qdc_tri_sig_ptrs.append(df_s_tri.Filter("cat_id == 1").Histo1D((f"h_veto_qdc_tri_sig_{s_tag}", f"Veto QDC - {s_name} (Clean Single #mu);Veto Total QDC [p.e.];Events", 100, 0.0, 2000.0), "reco_veto_qdc", "scaled_weight"))
+                stage_veto_qdc_tri_multimu_ptrs.append(df_s_tri.Filter("cat_id == 4").Histo1D((f"h_veto_qdc_tri_multimu_{s_tag}", f"Veto QDC - {s_name} (Multi-#mu Bundle);Veto Total QDC [p.e.];Events", 100, 0.0, 2000.0), "reco_veto_qdc", "scaled_weight"))
+                stage_veto_qdc_tri_raw_ptrs.append(df_s_tri.Histo1D((f"h_veto_qdc_tri_raw_{s_tag}", f"Veto QDC Raw - {s_name} (Trimuon MC Total);Veto Total QDC [p.e.];Raw Events", 100, 0.0, 2000.0), "reco_veto_qdc"))
+
+                # US QDC (0 to 4000 p.e.)
+                stage_us_qdc_tri_tot_ptrs.append(df_s_tri.Histo1D((f"h_us_qdc_tri_tot_{s_tag}", f"US QDC - {s_name} (Trimuon MC Total);US Total QDC [p.e.];Events", 100, 0.0, 4000.0), "reco_us_qdc", "scaled_weight"))
+                stage_us_qdc_tri_sig_ptrs.append(df_s_tri.Filter("cat_id == 1").Histo1D((f"h_us_qdc_tri_sig_{s_tag}", f"US QDC - {s_name} (Clean Single #mu);US Total QDC [p.e.];Events", 100, 0.0, 4000.0), "reco_us_qdc", "scaled_weight"))
+                stage_us_qdc_tri_multimu_ptrs.append(df_s_tri.Filter("cat_id == 4").Histo1D((f"h_us_qdc_tri_multimu_{s_tag}", f"US QDC - {s_name} (Multi-#mu Bundle);US Total QDC [p.e.];Events", 100, 0.0, 4000.0), "reco_us_qdc", "scaled_weight"))
+                stage_us_qdc_tri_raw_ptrs.append(df_s_tri.Histo1D((f"h_us_qdc_tri_raw_{s_tag}", f"US QDC Raw - {s_name} (Trimuon MC Total);US Total QDC [p.e.];Raw Events", 100, 0.0, 4000.0), "reco_us_qdc"))
+
             h_chi2_tri_ptr = df_tri.Filter("c2_one_scifi_trk").Histo1D(("h_chi2_trimuon", "Track #chi^{2}/ndf (Trimuon MC);#chi^{2}/ndf;Events", 100, 0, 20), "reco_chi2_ndf", "scaled_weight")
             h_sf_hits_tri_ptr = df_tri.Filter("c2_one_scifi_trk").Histo1D(("h_sf_hits_trimuon", "SciFi Hits (Trimuon MC);SciFi Hits;Events", 60, 0, 60), "reco_sf_hits", "scaled_weight")
             h_ds_hits_tri_ptr = df_tri.Filter("c2_one_scifi_trk").Histo1D(("h_ds_hits_trimuon", "DS Hits (Trimuon MC);DS Hits;Events", 40, 0, 40), "reco_ds_hits", "scaled_weight")
             h_veto_hits_tri_ptr = df_tri.Filter("c2_one_scifi_trk").Histo1D(("h_veto_hits_trimuon", "Veto Hits (Trimuon MC);Veto Hits;Events", 16, -0.5, 15.5), "reco_veto_hits", "scaled_weight")
             h_us_hits_tri_ptr = df_tri.Filter("c2_one_scifi_trk").Histo1D(("h_us_hits_trimuon", "US Hits (Trimuon MC);US Hits;Events", 31, -0.5, 30.5), "reco_us_hits", "scaled_weight")
+            h_sf_qdc_tri_ptr = df_tri.Filter("c2_one_scifi_trk").Histo1D(("h_sf_qdc_trimuon", "SciFi Total QDC (Trimuon MC);SciFi Total QDC [p.e.];Events", 100, 0, 500), "reco_sf_qdc", "scaled_weight")
+            h_ds_qdc_tri_ptr = df_tri.Filter("c2_one_scifi_trk").Histo1D(("h_ds_qdc_trimuon", "DS Total QDC (Trimuon MC);DS Total QDC [p.e.];Events", 100, 0, 5000), "reco_ds_qdc", "scaled_weight")
+            h_veto_qdc_tri_ptr = df_tri.Filter("c2_one_scifi_trk").Histo1D(("h_veto_qdc_trimuon", "Veto Total QDC (Trimuon MC);Veto Total QDC [p.e.];Events", 100, 0, 2000), "reco_veto_qdc", "scaled_weight")
+            h_us_qdc_tri_ptr = df_tri.Filter("c2_one_scifi_trk").Histo1D(("h_us_qdc_trimuon", "US Total QDC (Trimuon MC);US Total QDC [p.e.];Events", 100, 0, 4000), "reco_us_qdc", "scaled_weight")
 
     # 8. Execute Computational Graph across worker threads
     print("[*] Executing RDataFrame computational graph across worker threads...")
@@ -1775,10 +1932,38 @@ def main():
     stage_energy_mc_all = [ptr.GetValue() for ptr in stage_energy_mc_all_ptrs]
     stage_energy_mc_raw_sig = [ptr.GetValue() for ptr in stage_energy_mc_raw_sig_ptrs]
 
-    stage_sf_data   = [scale_data_th1(ptr.GetValue(), args.data_scaling) for ptr in stage_sf_data_ptrs]   if args.input_data else None
-    stage_ds_data   = [scale_data_th1(ptr.GetValue(), args.data_scaling) for ptr in stage_ds_data_ptrs]   if args.input_data else None
-    stage_veto_data = [scale_data_th1(ptr.GetValue(), args.data_scaling) for ptr in stage_veto_data_ptrs] if args.input_data else None
-    stage_us_data   = [scale_data_th1(ptr.GetValue(), args.data_scaling) for ptr in stage_us_data_ptrs]   if args.input_data else None
+    stage_sf_qdc_mc_tot = [ptr.GetValue() for ptr in stage_sf_qdc_mc_tot_ptrs]
+    stage_sf_qdc_mc_sig = [ptr.GetValue() for ptr in stage_sf_qdc_mc_sig_ptrs]
+    stage_sf_qdc_mc_em  = [ptr.GetValue() for ptr in stage_sf_qdc_mc_em_ptrs]
+    stage_sf_qdc_mc_had = [ptr.GetValue() for ptr in stage_sf_qdc_mc_had_ptrs]
+    stage_sf_qdc_mc_raw_sig = [ptr.GetValue() for ptr in stage_sf_qdc_mc_raw_sig_ptrs]
+
+    stage_ds_qdc_mc_tot = [ptr.GetValue() for ptr in stage_ds_qdc_mc_tot_ptrs]
+    stage_ds_qdc_mc_sig = [ptr.GetValue() for ptr in stage_ds_qdc_mc_sig_ptrs]
+    stage_ds_qdc_mc_em  = [ptr.GetValue() for ptr in stage_ds_qdc_mc_em_ptrs]
+    stage_ds_qdc_mc_had = [ptr.GetValue() for ptr in stage_ds_qdc_mc_had_ptrs]
+    stage_ds_qdc_mc_raw_sig = [ptr.GetValue() for ptr in stage_ds_qdc_mc_raw_sig_ptrs]
+
+    stage_veto_qdc_mc_tot = [ptr.GetValue() for ptr in stage_veto_qdc_mc_tot_ptrs]
+    stage_veto_qdc_mc_sig = [ptr.GetValue() for ptr in stage_veto_qdc_mc_sig_ptrs]
+    stage_veto_qdc_mc_em  = [ptr.GetValue() for ptr in stage_veto_qdc_mc_em_ptrs]
+    stage_veto_qdc_mc_had = [ptr.GetValue() for ptr in stage_veto_qdc_mc_had_ptrs]
+    stage_veto_qdc_mc_raw_sig = [ptr.GetValue() for ptr in stage_veto_qdc_mc_raw_sig_ptrs]
+
+    stage_us_qdc_mc_tot = [ptr.GetValue() for ptr in stage_us_qdc_mc_tot_ptrs]
+    stage_us_qdc_mc_sig = [ptr.GetValue() for ptr in stage_us_qdc_mc_sig_ptrs]
+    stage_us_qdc_mc_em  = [ptr.GetValue() for ptr in stage_us_qdc_mc_em_ptrs]
+    stage_us_qdc_mc_had = [ptr.GetValue() for ptr in stage_us_qdc_mc_had_ptrs]
+    stage_us_qdc_mc_raw_sig = [ptr.GetValue() for ptr in stage_us_qdc_mc_raw_sig_ptrs]
+
+    stage_sf_data       = [scale_data_th1(ptr.GetValue(), args.data_scaling) for ptr in stage_sf_data_ptrs]       if args.input_data else None
+    stage_ds_data       = [scale_data_th1(ptr.GetValue(), args.data_scaling) for ptr in stage_ds_data_ptrs]       if args.input_data else None
+    stage_veto_data     = [scale_data_th1(ptr.GetValue(), args.data_scaling) for ptr in stage_veto_data_ptrs]     if args.input_data else None
+    stage_us_data       = [scale_data_th1(ptr.GetValue(), args.data_scaling) for ptr in stage_us_data_ptrs]       if args.input_data else None
+    stage_sf_qdc_data   = [scale_data_th1(ptr.GetValue(), args.data_scaling) for ptr in stage_sf_qdc_data_ptrs]   if args.input_data else None
+    stage_ds_qdc_data   = [scale_data_th1(ptr.GetValue(), args.data_scaling) for ptr in stage_ds_qdc_data_ptrs]   if args.input_data else None
+    stage_veto_qdc_data = [scale_data_th1(ptr.GetValue(), args.data_scaling) for ptr in stage_veto_qdc_data_ptrs] if args.input_data else None
+    stage_us_qdc_data   = [scale_data_th1(ptr.GetValue(), args.data_scaling) for ptr in stage_us_qdc_data_ptrs]   if args.input_data else None
 
     # Extract Data Results (if Data provided)
     raw_data_counts = None
@@ -1826,12 +2011,56 @@ def main():
     h_cutflow_tri_r = None
     c_cutflow_tri_w = None
     c_cutflow_tri_r = None
+    stage_sf_qdc_tri_tot = None
+    stage_sf_qdc_tri_sig = None
+    stage_sf_qdc_tri_multimu = None
+    stage_sf_qdc_tri_raw = None
+
+    stage_ds_qdc_tri_tot = None
+    stage_ds_qdc_tri_sig = None
+    stage_ds_qdc_tri_multimu = None
+    stage_ds_qdc_tri_raw = None
+
+    stage_veto_qdc_tri_tot = None
+    stage_veto_qdc_tri_sig = None
+    stage_veto_qdc_tri_multimu = None
+    stage_veto_qdc_tri_raw = None
+
+    stage_us_qdc_tri_tot = None
+    stage_us_qdc_tri_sig = None
+    stage_us_qdc_tri_multimu = None
+    stage_us_qdc_tri_raw = None
+
     c_sf_stages_tri = None
     c_ds_stages_tri = None
     c_veto_stages_tri = None
     c_us_stages_tri = None
 
+    c_sf_qdc_stages_tri = None
+    c_ds_qdc_stages_tri = None
+    c_veto_qdc_stages_tri = None
+    c_us_qdc_stages_tri = None
+
     if df_tri is not None:
+        stage_sf_qdc_tri_tot = [ptr.GetValue() for ptr in stage_sf_qdc_tri_tot_ptrs]
+        stage_sf_qdc_tri_sig = [ptr.GetValue() for ptr in stage_sf_qdc_tri_sig_ptrs]
+        stage_sf_qdc_tri_multimu = [ptr.GetValue() for ptr in stage_sf_qdc_tri_multimu_ptrs]
+        stage_sf_qdc_tri_raw = [ptr.GetValue() for ptr in stage_sf_qdc_tri_raw_ptrs]
+
+        stage_ds_qdc_tri_tot = [ptr.GetValue() for ptr in stage_ds_qdc_tri_tot_ptrs]
+        stage_ds_qdc_tri_sig = [ptr.GetValue() for ptr in stage_ds_qdc_tri_sig_ptrs]
+        stage_ds_qdc_tri_multimu = [ptr.GetValue() for ptr in stage_ds_qdc_tri_multimu_ptrs]
+        stage_ds_qdc_tri_raw = [ptr.GetValue() for ptr in stage_ds_qdc_tri_raw_ptrs]
+
+        stage_veto_qdc_tri_tot = [ptr.GetValue() for ptr in stage_veto_qdc_tri_tot_ptrs]
+        stage_veto_qdc_tri_sig = [ptr.GetValue() for ptr in stage_veto_qdc_tri_sig_ptrs]
+        stage_veto_qdc_tri_multimu = [ptr.GetValue() for ptr in stage_veto_qdc_tri_multimu_ptrs]
+        stage_veto_qdc_tri_raw = [ptr.GetValue() for ptr in stage_veto_qdc_tri_raw_ptrs]
+
+        stage_us_qdc_tri_tot = [ptr.GetValue() for ptr in stage_us_qdc_tri_tot_ptrs]
+        stage_us_qdc_tri_sig = [ptr.GetValue() for ptr in stage_us_qdc_tri_sig_ptrs]
+        stage_us_qdc_tri_multimu = [ptr.GetValue() for ptr in stage_us_qdc_tri_multimu_ptrs]
+        stage_us_qdc_tri_raw = [ptr.GetValue() for ptr in stage_us_qdc_tri_raw_ptrs]
         tri_counts_w = {s_name: float(ptr.GetValue()) for s_name, ptr in stage_tri_w_ptrs.items()}
         tri_counts_r = {s_name: int(ptr.GetValue()) for s_name, ptr in stage_tri_r_ptrs.items()}
 
@@ -1976,6 +2205,30 @@ def main():
         cut_lines=None, x_title="US System Hits", log_y=True,
         header_right=header_right_w
     )
+    c_sf_qdc_stages = build_multi_stage_canvas(
+        "c_scifi_qdc_stages", "SciFi Total QDC across Cut Stages",
+        stage_short_titles, stage_sf_qdc_mc_tot, stage_sf_qdc_mc_sig, stage_sf_qdc_data,
+        cut_lines=None, x_title="SciFi Total QDC [p.e.]", log_y=True,
+        header_right=header_right_w
+    )
+    c_ds_qdc_stages = build_multi_stage_canvas(
+        "c_ds_qdc_stages", "Downstream MuFilter Total QDC across Cut Stages",
+        stage_short_titles, stage_ds_qdc_mc_tot, stage_ds_qdc_mc_sig, stage_ds_qdc_data,
+        cut_lines=None, x_title="DS Total QDC [p.e.]", log_y=True,
+        header_right=header_right_w
+    )
+    c_veto_qdc_stages = build_multi_stage_canvas(
+        "c_veto_qdc_stages", "Veto Total QDC across Cut Stages",
+        stage_short_titles, stage_veto_qdc_mc_tot, stage_veto_qdc_mc_sig, stage_veto_qdc_data,
+        cut_lines=None, x_title="Veto Total QDC [p.e.]", log_y=True,
+        header_right=header_right_w
+    )
+    c_us_qdc_stages = build_multi_stage_canvas(
+        "c_us_qdc_stages", "Upstream MuFilter Total QDC across Cut Stages",
+        stage_short_titles, stage_us_qdc_mc_tot, stage_us_qdc_mc_sig, stage_us_qdc_data,
+        cut_lines=None, x_title="US Total QDC [p.e.]", log_y=True,
+        header_right=header_right_w
+    )
     c_energy_stages = build_muon_energy_stages_canvas(
         "c_muon_energy_stages", "Passing Muon Energy Distribution across Cut Stages",
         stage_short_titles, stage_energy_mc_sig, stage_energy_mc_all,
@@ -2070,6 +2323,50 @@ def main():
             mc_color=ROOT.kMagenta + 2, mc_line_style=1,
             sig_legend_label="Clean #mu (Truth)",
             hists_mc_extra=stage_us_tri_multimu,
+            extra_legend_label="Multi-#mu (Truth)",
+            extra_color=ROOT.kTeal + 2, extra_line_style=7
+        )
+        c_sf_qdc_stages_tri = build_multi_stage_canvas(
+            "c_scifi_qdc_stages_trimuon", "SciFi Total QDC across Cut Stages (Trimuon MC vs Data)",
+            stage_short_titles, stage_sf_qdc_tri_tot, stage_sf_qdc_tri_sig, stage_sf_qdc_data,
+            cut_lines=None, x_title="SciFi Total QDC [p.e.]", log_y=True,
+            header_right=header_right_tri_w, mc_legend_label="Trimuon MC Total",
+            mc_color=ROOT.kMagenta + 2, mc_line_style=1,
+            sig_legend_label="Clean #mu (Truth)",
+            hists_mc_extra=stage_sf_qdc_tri_multimu,
+            extra_legend_label="Multi-#mu (Truth)",
+            extra_color=ROOT.kTeal + 2, extra_line_style=7
+        )
+        c_ds_qdc_stages_tri = build_multi_stage_canvas(
+            "c_ds_qdc_stages_trimuon", "Downstream MuFilter Total QDC across Cut Stages (Trimuon MC vs Data)",
+            stage_short_titles, stage_ds_qdc_tri_tot, stage_ds_qdc_tri_sig, stage_ds_qdc_data,
+            cut_lines=None, x_title="DS Total QDC [p.e.]", log_y=True,
+            header_right=header_right_tri_w, mc_legend_label="Trimuon MC Total",
+            mc_color=ROOT.kMagenta + 2, mc_line_style=1,
+            sig_legend_label="Clean #mu (Truth)",
+            hists_mc_extra=stage_ds_qdc_tri_multimu,
+            extra_legend_label="Multi-#mu (Truth)",
+            extra_color=ROOT.kTeal + 2, extra_line_style=7
+        )
+        c_veto_qdc_stages_tri = build_multi_stage_canvas(
+            "c_veto_qdc_stages_trimuon", "Veto Total QDC across Cut Stages (Trimuon MC vs Data)",
+            stage_short_titles, stage_veto_qdc_tri_tot, stage_veto_qdc_tri_sig, stage_veto_qdc_data,
+            cut_lines=None, x_title="Veto Total QDC [p.e.]", log_y=True,
+            header_right=header_right_tri_w, mc_legend_label="Trimuon MC Total",
+            mc_color=ROOT.kMagenta + 2, mc_line_style=1,
+            sig_legend_label="Clean #mu (Truth)",
+            hists_mc_extra=stage_veto_qdc_tri_multimu,
+            extra_legend_label="Multi-#mu (Truth)",
+            extra_color=ROOT.kTeal + 2, extra_line_style=7
+        )
+        c_us_qdc_stages_tri = build_multi_stage_canvas(
+            "c_us_qdc_stages_trimuon", "Upstream MuFilter Total QDC across Cut Stages (Trimuon MC vs Data)",
+            stage_short_titles, stage_us_qdc_tri_tot, stage_us_qdc_tri_sig, stage_us_qdc_data,
+            cut_lines=None, x_title="US Total QDC [p.e.]", log_y=True,
+            header_right=header_right_tri_w, mc_legend_label="Trimuon MC Total",
+            mc_color=ROOT.kMagenta + 2, mc_line_style=1,
+            sig_legend_label="Clean #mu (Truth)",
+            hists_mc_extra=stage_us_qdc_tri_multimu,
             extra_legend_label="Multi-#mu (Truth)",
             extra_color=ROOT.kTeal + 2, extra_line_style=7
         )
@@ -2229,6 +2526,71 @@ def main():
             stage_us_tri_multimu[s_idx].Write(f"h_us_hits_tri_multimu_stage{s_idx}")
             stage_us_tri_raw[s_idx].Write(f"h_us_hits_tri_raw_stage{s_idx}")
 
+    # QDC Distributions directory
+    d_sf_qdc = get_or_create_dir(tfile, "QDCDistributions/SciFi_QDC")
+    d_sf_qdc.cd()
+    for s_idx in range(len(cutflow_stages)):
+        stage_sf_qdc_mc_tot[s_idx].Write(f"h_sf_qdc_mc_tot_stage{s_idx}")
+        stage_sf_qdc_mc_sig[s_idx].Write(f"h_sf_qdc_mc_sig_stage{s_idx}")
+        stage_sf_qdc_mc_em[s_idx].Write(f"h_sf_qdc_mc_em_stage{s_idx}")
+        stage_sf_qdc_mc_had[s_idx].Write(f"h_sf_qdc_mc_had_stage{s_idx}")
+        stage_sf_qdc_mc_raw_sig[s_idx].Write(f"h_sf_qdc_mc_raw_sig_stage{s_idx}")
+        if stage_sf_qdc_data:
+            stage_sf_qdc_data[s_idx].Write(f"h_sf_qdc_data_stage{s_idx}")
+        if stage_sf_qdc_tri_tot:
+            stage_sf_qdc_tri_tot[s_idx].Write(f"h_sf_qdc_tri_tot_stage{s_idx}")
+            stage_sf_qdc_tri_sig[s_idx].Write(f"h_sf_qdc_tri_sig_stage{s_idx}")
+            stage_sf_qdc_tri_multimu[s_idx].Write(f"h_sf_qdc_tri_multimu_stage{s_idx}")
+            stage_sf_qdc_tri_raw[s_idx].Write(f"h_sf_qdc_tri_raw_stage{s_idx}")
+
+    d_ds_qdc = get_or_create_dir(tfile, "QDCDistributions/DS_QDC")
+    d_ds_qdc.cd()
+    for s_idx in range(len(cutflow_stages)):
+        stage_ds_qdc_mc_tot[s_idx].Write(f"h_ds_qdc_mc_tot_stage{s_idx}")
+        stage_ds_qdc_mc_sig[s_idx].Write(f"h_ds_qdc_mc_sig_stage{s_idx}")
+        stage_ds_qdc_mc_em[s_idx].Write(f"h_ds_qdc_mc_em_stage{s_idx}")
+        stage_ds_qdc_mc_had[s_idx].Write(f"h_ds_qdc_mc_had_stage{s_idx}")
+        stage_ds_qdc_mc_raw_sig[s_idx].Write(f"h_ds_qdc_mc_raw_sig_stage{s_idx}")
+        if stage_ds_qdc_data:
+            stage_ds_qdc_data[s_idx].Write(f"h_ds_qdc_data_stage{s_idx}")
+        if stage_ds_qdc_tri_tot:
+            stage_ds_qdc_tri_tot[s_idx].Write(f"h_ds_qdc_tri_tot_stage{s_idx}")
+            stage_ds_qdc_tri_sig[s_idx].Write(f"h_ds_qdc_tri_sig_stage{s_idx}")
+            stage_ds_qdc_tri_multimu[s_idx].Write(f"h_ds_qdc_tri_multimu_stage{s_idx}")
+            stage_ds_qdc_tri_raw[s_idx].Write(f"h_ds_qdc_tri_raw_stage{s_idx}")
+
+    d_veto_qdc = get_or_create_dir(tfile, "QDCDistributions/Veto_QDC")
+    d_veto_qdc.cd()
+    for s_idx in range(len(cutflow_stages)):
+        stage_veto_qdc_mc_tot[s_idx].Write(f"h_veto_qdc_mc_tot_stage{s_idx}")
+        stage_veto_qdc_mc_sig[s_idx].Write(f"h_veto_qdc_mc_sig_stage{s_idx}")
+        stage_veto_qdc_mc_em[s_idx].Write(f"h_veto_qdc_mc_em_stage{s_idx}")
+        stage_veto_qdc_mc_had[s_idx].Write(f"h_veto_qdc_mc_had_stage{s_idx}")
+        stage_veto_qdc_mc_raw_sig[s_idx].Write(f"h_veto_qdc_mc_raw_sig_stage{s_idx}")
+        if stage_veto_qdc_data:
+            stage_veto_qdc_data[s_idx].Write(f"h_veto_qdc_data_stage{s_idx}")
+        if stage_veto_qdc_tri_tot:
+            stage_veto_qdc_tri_tot[s_idx].Write(f"h_veto_qdc_tri_tot_stage{s_idx}")
+            stage_veto_qdc_tri_sig[s_idx].Write(f"h_veto_qdc_tri_sig_stage{s_idx}")
+            stage_veto_qdc_tri_multimu[s_idx].Write(f"h_veto_qdc_tri_multimu_stage{s_idx}")
+            stage_veto_qdc_tri_raw[s_idx].Write(f"h_veto_qdc_tri_raw_stage{s_idx}")
+
+    d_us_qdc = get_or_create_dir(tfile, "QDCDistributions/US_QDC")
+    d_us_qdc.cd()
+    for s_idx in range(len(cutflow_stages)):
+        stage_us_qdc_mc_tot[s_idx].Write(f"h_us_qdc_mc_tot_stage{s_idx}")
+        stage_us_qdc_mc_sig[s_idx].Write(f"h_us_qdc_mc_sig_stage{s_idx}")
+        stage_us_qdc_mc_em[s_idx].Write(f"h_us_qdc_mc_em_stage{s_idx}")
+        stage_us_qdc_mc_had[s_idx].Write(f"h_us_qdc_mc_had_stage{s_idx}")
+        stage_us_qdc_mc_raw_sig[s_idx].Write(f"h_us_qdc_mc_raw_sig_stage{s_idx}")
+        if stage_us_qdc_data:
+            stage_us_qdc_data[s_idx].Write(f"h_us_qdc_data_stage{s_idx}")
+        if stage_us_qdc_tri_tot:
+            stage_us_qdc_tri_tot[s_idx].Write(f"h_us_qdc_tri_tot_stage{s_idx}")
+            stage_us_qdc_tri_sig[s_idx].Write(f"h_us_qdc_tri_sig_stage{s_idx}")
+            stage_us_qdc_tri_multimu[s_idx].Write(f"h_us_qdc_tri_multimu_stage{s_idx}")
+            stage_us_qdc_tri_raw[s_idx].Write(f"h_us_qdc_tri_raw_stage{s_idx}")
+
     # Muon Energy directory
     d_e = get_or_create_dir(tfile, "MuonEnergy")
     d_e.cd()
@@ -2246,6 +2608,10 @@ def main():
     c_ds_stages.Write()
     c_veto_stages.Write()
     c_us_stages.Write()
+    c_sf_qdc_stages.Write()
+    c_ds_qdc_stages.Write()
+    c_veto_qdc_stages.Write()
+    c_us_qdc_stages.Write()
     c_energy_stages.Write()
     c_energy_overlay.Write()
     if c_cutflow_tri_w is not None:
@@ -2255,6 +2621,10 @@ def main():
         c_ds_stages_tri.Write()
         c_veto_stages_tri.Write()
         c_us_stages_tri.Write()
+        c_sf_qdc_stages_tri.Write()
+        c_ds_qdc_stages_tri.Write()
+        c_veto_qdc_stages_tri.Write()
+        c_us_qdc_stages_tri.Write()
 
     # Diagnostic distributions
     d_diag = get_or_create_dir(tfile, "Diagnostics")
@@ -2267,6 +2637,12 @@ def main():
     h_hits_had.GetValue().Write("h_sf_hits_hadronic")
     h_veto_hits_sig.GetValue().Write("h_veto_hits_signal")
     h_us_hits_sig.GetValue().Write("h_us_hits_signal")
+    h_sf_qdc_sig.GetValue().Write("h_sf_qdc_signal")
+    h_sf_qdc_em.GetValue().Write("h_sf_qdc_em_shower")
+    h_sf_qdc_had.GetValue().Write("h_sf_qdc_hadronic")
+    h_ds_qdc_sig.GetValue().Write("h_ds_qdc_signal")
+    h_veto_qdc_sig.GetValue().Write("h_veto_qdc_signal")
+    h_us_qdc_sig.GetValue().Write("h_us_qdc_signal")
     h_p_sig_pass.GetValue().Write("h_p_signal_selected")
 
     if h_chi2_data_ptr is not None:
@@ -2279,6 +2655,14 @@ def main():
         scale_data_th1(h_veto_hits_data_ptr.GetValue(), args.data_scaling).Write("h_veto_hits_data")
     if h_us_hits_data_ptr is not None:
         scale_data_th1(h_us_hits_data_ptr.GetValue(), args.data_scaling).Write("h_us_hits_data")
+    if h_sf_qdc_data_ptr is not None:
+        scale_data_th1(h_sf_qdc_data_ptr.GetValue(), args.data_scaling).Write("h_sf_qdc_data")
+    if h_ds_qdc_data_ptr is not None:
+        scale_data_th1(h_ds_qdc_data_ptr.GetValue(), args.data_scaling).Write("h_ds_qdc_data")
+    if h_veto_qdc_data_ptr is not None:
+        scale_data_th1(h_veto_qdc_data_ptr.GetValue(), args.data_scaling).Write("h_veto_qdc_data")
+    if h_us_qdc_data_ptr is not None:
+        scale_data_th1(h_us_qdc_data_ptr.GetValue(), args.data_scaling).Write("h_us_qdc_data")
 
     if h_chi2_tri_ptr is not None:
         h_chi2_tri_ptr.GetValue().Write("h_chi2_trimuon")
@@ -2290,6 +2674,14 @@ def main():
         h_veto_hits_tri_ptr.GetValue().Write("h_veto_hits_trimuon")
     if h_us_hits_tri_ptr is not None:
         h_us_hits_tri_ptr.GetValue().Write("h_us_hits_trimuon")
+    if h_sf_qdc_tri_ptr is not None:
+        h_sf_qdc_tri_ptr.GetValue().Write("h_sf_qdc_trimuon")
+    if h_ds_qdc_tri_ptr is not None:
+        h_ds_qdc_tri_ptr.GetValue().Write("h_ds_qdc_trimuon")
+    if h_veto_qdc_tri_ptr is not None:
+        h_veto_qdc_tri_ptr.GetValue().Write("h_veto_qdc_trimuon")
+    if h_us_qdc_tri_ptr is not None:
+        h_us_qdc_tri_ptr.GetValue().Write("h_us_qdc_trimuon")
 
     tfile.Flush()
     tfile.Close()
@@ -2329,6 +2721,24 @@ def main():
     c_veto_stages.SaveAs(pdf_veto)
     c_us_stages.SaveAs(png_us)
     c_us_stages.SaveAs(pdf_us)
+
+    png_sf_qdc = f"{out_base}_scifi_qdc_stages.png"
+    pdf_sf_qdc = f"{out_base}_scifi_qdc_stages.pdf"
+    png_ds_qdc = f"{out_base}_ds_qdc_stages.png"
+    pdf_ds_qdc = f"{out_base}_ds_qdc_stages.pdf"
+    png_veto_qdc = f"{out_base}_veto_qdc_stages.png"
+    pdf_veto_qdc = f"{out_base}_veto_qdc_stages.pdf"
+    png_us_qdc = f"{out_base}_us_qdc_stages.png"
+    pdf_us_qdc = f"{out_base}_us_qdc_stages.pdf"
+
+    c_sf_qdc_stages.SaveAs(png_sf_qdc)
+    c_sf_qdc_stages.SaveAs(pdf_sf_qdc)
+    c_ds_qdc_stages.SaveAs(png_ds_qdc)
+    c_ds_qdc_stages.SaveAs(pdf_ds_qdc)
+    c_veto_qdc_stages.SaveAs(png_veto_qdc)
+    c_veto_qdc_stages.SaveAs(pdf_veto_qdc)
+    c_us_qdc_stages.SaveAs(png_us_qdc)
+    c_us_qdc_stages.SaveAs(pdf_us_qdc)
     c_energy_stages.SaveAs(png_e_stages)
     c_energy_stages.SaveAs(pdf_e_stages)
     c_energy_overlay.SaveAs(png_e_over)
@@ -2363,6 +2773,24 @@ def main():
         c_us_stages_tri.SaveAs(png_us_tri)
         c_us_stages_tri.SaveAs(pdf_us_tri)
 
+        png_sf_qdc_tri = f"{out_base}_scifi_qdc_stages_trimuon.png"
+        pdf_sf_qdc_tri = f"{out_base}_scifi_qdc_stages_trimuon.pdf"
+        png_ds_qdc_tri = f"{out_base}_ds_qdc_stages_trimuon.png"
+        pdf_ds_qdc_tri = f"{out_base}_ds_qdc_stages_trimuon.pdf"
+        png_veto_qdc_tri = f"{out_base}_veto_qdc_stages_trimuon.png"
+        pdf_veto_qdc_tri = f"{out_base}_veto_qdc_stages_trimuon.pdf"
+        png_us_qdc_tri = f"{out_base}_us_qdc_stages_trimuon.png"
+        pdf_us_qdc_tri = f"{out_base}_us_qdc_stages_trimuon.pdf"
+
+        c_sf_qdc_stages_tri.SaveAs(png_sf_qdc_tri)
+        c_sf_qdc_stages_tri.SaveAs(pdf_sf_qdc_tri)
+        c_ds_qdc_stages_tri.SaveAs(png_ds_qdc_tri)
+        c_ds_qdc_stages_tri.SaveAs(pdf_ds_qdc_tri)
+        c_veto_qdc_stages_tri.SaveAs(png_veto_qdc_tri)
+        c_veto_qdc_stages_tri.SaveAs(pdf_veto_qdc_tri)
+        c_us_qdc_stages_tri.SaveAs(png_us_qdc_tri)
+        c_us_qdc_stages_tri.SaveAs(pdf_us_qdc_tri)
+
     print(f"[✓] Successfully exported publication graphics:")
     print(f"    --> {png_w}")
     print(f"    --> {pdf_w}")
@@ -2376,6 +2804,14 @@ def main():
     print(f"    --> {pdf_veto}")
     print(f"    --> {png_us}")
     print(f"    --> {pdf_us}")
+    print(f"    --> {png_sf_qdc}")
+    print(f"    --> {pdf_sf_qdc}")
+    print(f"    --> {png_ds_qdc}")
+    print(f"    --> {pdf_ds_qdc}")
+    print(f"    --> {png_veto_qdc}")
+    print(f"    --> {pdf_veto_qdc}")
+    print(f"    --> {png_us_qdc}")
+    print(f"    --> {pdf_us_qdc}")
     print(f"    --> {png_e_stages}")
     print(f"    --> {pdf_e_stages}")
     print(f"    --> {png_e_over}")
@@ -2393,6 +2829,14 @@ def main():
         print(f"    --> {pdf_veto_tri}")
         print(f"    --> {png_us_tri}")
         print(f"    --> {pdf_us_tri}")
+        print(f"    --> {png_sf_qdc_tri}")
+        print(f"    --> {pdf_sf_qdc_tri}")
+        print(f"    --> {png_ds_qdc_tri}")
+        print(f"    --> {pdf_ds_qdc_tri}")
+        print(f"    --> {png_veto_qdc_tri}")
+        print(f"    --> {pdf_veto_qdc_tri}")
+        print(f"    --> {png_us_qdc_tri}")
+        print(f"    --> {pdf_us_qdc_tri}")
 
     fsize_mb = os.path.getsize(args.output_file) / (1024 * 1024)
     print(f"[✓] Successfully committed output ROOT file ({fsize_mb:.2f} MB):")
