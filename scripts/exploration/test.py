@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import sys
+import time
 import argparse
 import numpy as np
 import ROOT
@@ -10,12 +11,6 @@ import SndlhcGeo
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
-
-try:
-    from snd import load_trident_libraries
-    load_trident_libraries(REPO_ROOT)
-except Exception as e:
-    print(f"Notice: could not load trident C++ libraries ({e})")
 
 ROOT.gROOT.SetBatch(True)
 ROOT.gStyle.SetOptStat(0)
@@ -64,45 +59,24 @@ def extrapolate_track_to_z(track, z):
     )
 
 
-def extract_event_weight(chain, sample_name, cfg, weight_scale, truth_processor=None):
+def extract_event_weight(chain, sample_name, cfg, weight_scale, has_mc_weight, has_event_header, has_mctrack):
     """
-    Extract the physical event weight consistent with summarize_trident_yields.py:
+    Extract physical event weight:
     - Data: weight = 1.0
-    - Precomputed mc_weight: mc_weight * weight_scale
-    - truth_info struct: scaledWeight
-    - TridentTruthProcessor on MCTrack: scaledWeight (or mcWeight * weight_scale)
-    - MCEventHeader / MCTrack[0]: generator weight * weight_scale
+    - mc_weight branch: mc_weight * weight_scale
+    - MCEventHeader: generator weight * weight_scale
+    - MCTrack[0]: generator weight * weight_scale
     """
     if not cfg.get("is_mc", False) or sample_name == "Data":
         return 1.0
 
-    # 1. Check precomputed mc_weight branch
-    if hasattr(chain, "mc_weight"):
+    if has_mc_weight:
         try:
             return float(chain.mc_weight) * weight_scale
         except Exception:
             pass
 
-    # 2. Check truth_info branch
-    if hasattr(chain, "truth_info"):
-        try:
-            return float(chain.truth_info.scaledWeight)
-        except Exception:
-            pass
-
-    # 3. For ThreeMuMC, evaluate truth processor on MCTrack if candidate exists
-    if sample_name == "ThreeMuMC" and truth_processor is not None and hasattr(chain, "MCTrack"):
-        try:
-            truth = truth_processor.process(chain.MCTrack)
-            if truth.hasCandidate:
-                return float(truth.scaledWeight)
-            elif truth.mcWeight > 0:
-                return float(truth.mcWeight) * weight_scale
-        except Exception:
-            pass
-
-    # 4. Fallback to MCEventHeader weight
-    if hasattr(chain, "MCEventHeader"):
+    if has_event_header:
         try:
             w = float(chain.MCEventHeader.GetWeight())
             if w > 0:
@@ -110,19 +84,19 @@ def extract_event_weight(chain, sample_name, cfg, weight_scale, truth_processor=
         except Exception:
             pass
 
-    # 5. Fallback to primary track generator weight (standard for PassingMuon MC)
-    if hasattr(chain, "MCTrack") and chain.MCTrack.GetEntries() > 0:
+    if has_mctrack:
         try:
-            w = float(chain.MCTrack[0].GetWeight())
-            if w > 0:
-                return w * weight_scale
+            if chain.MCTrack.GetEntries() > 0:
+                w = float(chain.MCTrack[0].GetWeight())
+                if w > 0:
+                    return w * weight_scale
         except Exception:
             pass
 
     return 1.0 * weight_scale
 
 
-def analyze_sample(sample_name, cfg, max_events=50000, weight_scale=40.0, target_z_range=(260.0, 355.0)):
+def analyze_sample(sample_name, cfg, max_events=50000, weight_scale=40.0):
     print(f"--> Processing {sample_name}...")
 
     # Load geometry
@@ -135,21 +109,26 @@ def analyze_sample(sample_name, cfg, max_events=50000, weight_scale=40.0, target
     n_files = chain.Add(cfg["path"])
     print(f"    Loaded tree '{tree_name}' from {n_files} file(s) matching '{cfg['path']}'")
 
-    # Set up TridentTruthProcessor for ThreeMuMC if MCTrack is used
-    truth_processor = None
-    if sample_name == "ThreeMuMC":
+    # Optimize I/O: disable unused heavy branches (e.g. EmulsionDetPoint, ScifiPoint, etc.)
+    chain.SetBranchStatus("*", 0)
+    for b_pat in [
+        "Digi_ScifiHits*",
+        "Cluster_Scifi*",
+        "Digi_MuFilterHits*",
+        "Reco_MuonTracks*",
+        "mc_weight*",
+        "MCEventHeader*",
+        "MCTrack*",
+    ]:
         try:
-            config = ROOT.snd.trident.TridentTruthConfig()
-            config.targetZMin = target_z_range[0]
-            config.targetZMax = target_z_range[1]
-            config.weightScale = weight_scale
-            config.zMin = -99999.0
-            config.zMax = 99999.0
-            config.useFiducial = False
-            config.processMask = 7
-            truth_processor = ROOT.snd.trident.TridentTruthProcessor(config)
-        except Exception as e:
-            print(f"    Note: TridentTruthProcessor not available ({e}), using branch weights.")
+            chain.SetBranchStatus(b_pat, 1)
+        except Exception:
+            pass
+
+    has_mc_weight = bool(chain.GetBranch("mc_weight"))
+    has_event_header = bool(chain.GetBranch("MCEventHeader.") or chain.GetBranch("MCEventHeader"))
+    has_mctrack = bool(chain.GetBranch("MCTrack"))
+    print(f"    Branch flags: mc_weight={has_mc_weight}, MCEventHeader={has_event_header}, MCTrack={has_mctrack}")
 
     # Book Histograms
     hists = {
@@ -226,14 +205,22 @@ def analyze_sample(sample_name, cfg, max_events=50000, weight_scale=40.0, target
     A, B = ROOT.TVector3(), ROOT.TVector3()
     total_entries = chain.GetEntries()
     n_ev = min(max_events, total_entries)
-    print(f"    Processing {n_ev} / {total_entries} events with mc_weight...")
+    print(f"    Processing {n_ev:,} / {total_entries:,} events with mc_weight...")
 
     sum_weights = 0.0
+    t_start = time.time()
     for i in range(n_ev):
         chain.GetEntry(i)
 
-        w = extract_event_weight(chain, sample_name, cfg, weight_scale, truth_processor)
+        w = extract_event_weight(chain, sample_name, cfg, weight_scale, has_mc_weight, has_event_header, has_mctrack)
         sum_weights += w
+
+        if (i + 1) % 50000 == 0 or (i + 1) == n_ev:
+            elapsed = time.time() - t_start
+            rate = (i + 1) / elapsed if elapsed > 0 else 0
+            eta = (n_ev - (i + 1)) / rate if rate > 0 else 0
+            pct = (i + 1) / n_ev * 100.0
+            print(f"      [Progress] {i + 1:,} / {n_ev:,} ({pct:.1f}%) | {rate:,.0f} ev/s | ETA: {int(eta // 60)}m {int(eta % 60):02d}s", flush=True)
 
         # 1. Total and Per-Station SciFi Hits
         station_hits = [0] * 6  # 1-indexed for stations 1..5
@@ -363,7 +350,6 @@ def main():
     parser.add_argument("-n", "--max-events", type=int, default=30000, help="Max events per sample (default: 30000)")
     parser.add_argument("--lumi", "--L-lhc", dest="lumi_target", type=float, default=1.0, help="Target luminosity in fb^-1 (default: 1.0)")
     parser.add_argument("--L-mc", dest="lumi_mc", type=float, default=0.025, help="MC integrated luminosity in fb^-1 (default: 0.025 = 1/40 fb^-1)")
-    parser.add_argument("--z-range", dest="target_z_range", nargs=2, type=float, default=[260.0, 355.0], help="Target Z range in cm (default: 260.0 355.0)")
     parser.add_argument("-o", "--output", default=DEFAULT_OUTPUT_PATH, help="Output ROOT file path")
 
     args = parser.parse_args()
@@ -378,7 +364,6 @@ def main():
             name, cfg,
             max_events=args.max_events,
             weight_scale=weight_scale,
-            target_z_range=args.target_z_range,
         )
 
     # --- Canvas 1: SciFi Hit & Cluster Digitization ---
