@@ -1,531 +1,569 @@
 #!/usr/bin/env python3
+"""
+Digitization & Reconstruction Validation Suite for SND@LHC
+
+Compares detector response and event observables between:
+  1. Collision / Muon Beam Data (run 8329 / 6640)
+  2. Single Passing Muon MC (SingleMuMC / FLUKA)
+  3. Trident Signal MC (ThreeMuMC / MG5+Pythia8)
+
+Features:
+  - Exact SiPM channel position geometry cache using Scifi::GetSiPMPosition(detID, A, B)
+  - Thread-safe, lock-free C++ DigiValidationProcessor compiled in libtrident_analysis.so
+  - Accurate Monte Carlo event weighting (FLUKA generator weight & trident scaled weight)
+  - Comprehensive 1D histograms, TProfiles (attenuation length), and 2D correlation plots
+  - Publication-quality overlays and standalone 2D correlation plots
+"""
+
 import os
 import sys
+import math
+import glob
 import time
 import argparse
 import ROOT
 
-# Ensure sndMuTri package root is in sys.path
+# Force unbuffered / line-buffered stdout
+try:
+    sys.stdout.reconfigure(line_buffering=True)
+except Exception:
+    pass
+
+# Ensure repository root is in sys.path
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
-from snd import load_trident_libraries, add_progress_printer
-
-# Load compiled C++ analysis libraries
-load_trident_libraries(REPO_ROOT)
+from snd import load_trident_libraries
+import SndlhcGeo
 
 ROOT.gROOT.SetBatch(True)
 ROOT.gStyle.SetOptStat(0)
+ROOT.gStyle.SetPalette(ROOT.kBird)
 
-# Declare fast, thread-safe C++ processor for RDataFrame
-ROOT.gInterpreter.Declare("""
-#include "TClonesArray.h"
-#include "sndCluster.h"
-#include "sndScifiHit.h"
-#include "sndRecoTrack.h"
-#include "MuFilterHit.h"
-#include "ShipMCTrack.h"
-#include "TVector3.h"
-#include <vector>
-#include <unordered_map>
-#include <cmath>
+# Default dataset configurations
+DEFAULT_DATA_PATTERN = "/eos/user/i/idioniso/1_Data/Tracks/run_008329/sndsw_raw-1_1?_*.root"
+DEFAULT_DATA_GEO = "/eos/experiment/sndlhc/convertedData/physics/2023/geofile_sndlhc_TI18_V3_2023.root"
 
-namespace DigiRdf {
+DEFAULT_PMU_PATH = "/eos/user/i/idioniso/1_Data/Monte_Carlo/passing_muons/protons2023/sndLHC.Ntuple-TGeant4-160urad_100e6pp_FlukaEcut10_digCPP_Trks.root"
+DEFAULT_PMU_GEO = "/eos/user/i/idioniso/1_Data/Monte_Carlo/passing_muons/protons2023/geofile_full.Ntuple-TGeant4.root"
 
-struct EventSummary {
-    double n_scifi_hits{0.0};
-    double n_scifi_st1{0.0};
-    double n_mufi_hits{0.0};
-    double n_tracks{0.0};
-    std::vector<double> cluster_sizes;
-    std::vector<double> cluster_qdcs;
-    std::vector<double> cluster_weights;
-    std::vector<double> track_chi2;
-    std::vector<double> track_slope_xz;
-    std::vector<double> track_slope_yz;
-    std::vector<double> track_weights;
-    std::vector<double> clean_hit_qdc;
-    std::vector<double> clean_hit_dist;
-    std::vector<double> clean_hit_weights;
-    std::vector<double> station_numbers{1.0, 2.0, 3.0, 4.0, 5.0};
-    std::vector<double> station_hits{0.0, 0.0, 0.0, 0.0, 0.0};
-    std::vector<double> station_weights{1.0, 1.0, 1.0, 1.0, 1.0};
-};
-
-EventSummary process_event(
-    const TClonesArray* scifiHits,
-    const TClonesArray* clusters,
-    const TClonesArray* mufiHits,
-    const TClonesArray* tracks,
-    double event_weight = 1.0
-) {
-    EventSummary s;
-    s.station_weights = {event_weight, event_weight, event_weight, event_weight, event_weight};
-
-    // 1. SciFi Hits
-    std::unordered_map<int, double> hit_qdc_map;
-    if (scifiHits) {
-        int n_sf = scifiHits->GetEntries();
-        for (int i = 0; i < n_sf; ++i) {
-            auto* h = static_cast<sndScifiHit*>(scifiHits->At(i));
-            if (!h || !h->isValid()) continue;
-            s.n_scifi_hits += 1.0;
-            int st = h->GetStation();
-            if (st == 1) s.n_scifi_st1 += 1.0;
-            if (st >= 1 && st <= 5) s.station_hits[st - 1] += 1.0;
-            hit_qdc_map[h->GetDetectorID()] = h->GetSignal(0);
-        }
-    }
-
-    // 2. Clusters
-    if (clusters) {
-        int n_cl = clusters->GetEntries();
-        s.cluster_sizes.reserve(n_cl);
-        s.cluster_qdcs.reserve(n_cl);
-        s.cluster_weights.reserve(n_cl);
-        for (int i = 0; i < n_cl; ++i) {
-            auto* cl = static_cast<sndCluster*>(clusters->At(i));
-            if (!cl) continue;
-            s.cluster_sizes.push_back(static_cast<double>(cl->GetN()));
-            double qdc_sum = 0.0;
-            int first = cl->GetFirst();
-            int n = cl->GetN();
-            for (int ch = first; ch < first + n; ++ch) {
-                auto it = hit_qdc_map.find(ch);
-                if (it != hit_qdc_map.end()) qdc_sum += it->second;
-            }
-            s.cluster_qdcs.push_back(qdc_sum);
-            s.cluster_weights.push_back(event_weight);
-        }
-    }
-
-    // 3. MuFilter Hits
-    if (mufiHits) {
-        int n_mf = mufiHits->GetEntries();
-        for (int i = 0; i < n_mf; ++i) {
-            auto* h = static_cast<MuFilterHit*>(mufiHits->At(i));
-            if (h && h->isValid()) s.n_mufi_hits += 1.0;
-        }
-    }
-
-    // 4. Tracks
-    if (tracks) {
-        int n_tr = tracks->GetEntries();
-        s.n_tracks = static_cast<double>(n_tr);
-        for (int i = 0; i < n_tr; ++i) {
-            auto* trk = static_cast<sndRecoTrack*>(tracks->At(i));
-            if (!trk || !trk->getTrackFlag()) continue;
-            float c2 = trk->getChi2Ndf();
-            if (c2 >= 0.0f) {
-                s.track_chi2.push_back(static_cast<double>(c2));
-                s.track_slope_xz.push_back(static_cast<double>(trk->getSlopeXZ()));
-                s.track_slope_yz.push_back(static_cast<double>(trk->getSlopeYZ()));
-                s.track_weights.push_back(event_weight);
-            }
-        }
-
-        // Clean single track response
-        if (n_tr == 1 && scifiHits) {
-            auto* trk = static_cast<sndRecoTrack*>(tracks->At(0));
-            if (trk && trk->getTrackFlag() && trk->getChi2Ndf() >= 0.0f && trk->getChi2Ndf() < 2.0f) {
-                TVector3 start = trk->getStart();
-                TVector3 mom   = trk->getTrackMom();
-                double pz = (std::abs(mom.Z()) > 1e-10) ? mom.Z() : 1e-10;
-
-                int n_sf = scifiHits->GetEntries();
-                for (int i = 0; i < n_sf; ++i) {
-                    auto* h = static_cast<sndScifiHit*>(scifiHits->At(i));
-                    if (!h || !h->isValid()) continue;
-                    double qdc = h->GetSignal(0);
-                    s.clean_hit_qdc.push_back(qdc);
-                    s.clean_hit_weights.push_back(event_weight);
-
-                    int st = h->GetStation();
-                    if (st < 1) st = 1;
-                    if (st > 5) st = 5;
-                    double z_st = 300.0 + (st - 1) * 8.5;
-                    double t = (z_st - start.Z()) / pz;
-                    double x_pos = start.X() + t * mom.X();
-                    double y_pos = start.Y() + t * mom.Y();
-
-                    double dist = h->isVertical() ? std::abs(54.5 - y_pos) : std::abs(-47.5 - x_pos);
-                    s.clean_hit_dist.push_back(dist);
-                }
-            }
-        }
-    }
-
-    return s;
-}
-
-} // namespace DigiRdf
-""")
-
-import fnmatch
-
-# Configuration: Datasets and Geometries
-FILES = {
-    "Data": {
-        "path": "/eos/user/i/idioniso/1_Data/Tracks/run_008329/sndsw_raw-*_muonReco.root",
-        "alt_path": "/eos/user/i/idioniso/1_Data/Tracks/run_008329/sndsw_raw-1_1?_*.root",
-        "tree": "rawConv",
-        "avg_events_per_file": 27000,
-        "color": ROOT.kBlack,
-        "is_mc": False,
-    },
-    "SingleMuMC": {
-        "path": "/eos/user/i/idioniso/1_Data/Monte_Carlo/passing_muons/protons2023/sndLHC.Ntuple-TGeant4-160urad_100e6pp_FlukaEcut10_digCPP_Trks.root",
-        "tree": "cbmsim",
-        "avg_events_per_file": 1213000,
-        "color": ROOT.kBlue,
-        "is_mc": True,
-    },
-    "ThreeMuMC": {
-        "path": "/eos/user/i/idioniso/1_Data/Monte_Carlo/ThreeMuons/sndLHC.Ntuple-TGeant4_boost100LHC_-160urad_magfield_2022TCL6_muons_rock_2e8pr_filteredAtScoringPlane_digCPP-2??_trks.root",
-        "tree": "cbmsim",
-        "avg_events_per_file": 18600,
-        "color": ROOT.kRed,
-        "is_mc": True,
-    },
-}
-
-DEFAULT_OUTPUT_PATH = "/eos/user/i/idioniso/sndMuTri/out/digi_validation_comparison.root"
+DEFAULT_TRI_PATTERN = "/eos/user/i/idioniso/1_Data/Monte_Carlo/ThreeMuons/sndLHC.Ntuple-TGeant4_boost100LHC_-160urad_magfield_2022TCL6_muons_rock_2e8pr_filteredAtScoringPlane_digCPP-2??_trks.root"
+DEFAULT_TRI_GEO = "/eos/user/i/idioniso/1_Data/Monte_Carlo/ThreeMuons/geofile_full.Ntuple-TGeant4_boost100.0.root"
 
 
-def resolve_files_fast(pattern_or_path, max_events=-1, avg_events=25000):
-    """
-    High-speed file resolver avoiding libc glob() hangs over EOS FUSE.
-    Uses os.scandir to list directory entries in milliseconds.
-    If max_events > 0, caps the file list to only what is required to reach
-    max_events (plus safety margin), avoiding massive multi-file chain traversals.
-    """
-    if os.path.isfile(pattern_or_path):
-        return [pattern_or_path]
-
-    dir_name = os.path.dirname(pattern_or_path)
-    file_pat = os.path.basename(pattern_or_path)
-
-    if not os.path.isdir(dir_name):
+def resolve_files(pattern: str, max_files: int = 50) -> list:
+    """Resolve file paths matching a pattern with fast validation."""
+    if not pattern:
         return []
+    if "*" in pattern or "?" in pattern or "[" in pattern:
+        matched = sorted(glob.glob(pattern))
+    elif os.path.exists(pattern):
+        matched = [pattern]
+    else:
+        matched = []
 
-    matched = []
-    with os.scandir(dir_name) as it:
-        for entry in it:
-            if entry.is_file() and fnmatch.fnmatch(entry.name, file_pat):
-                matched.append(entry.path)
-
-    matched.sort()
-    if not matched:
-        return []
-
-    if max_events > 0:
-        files_needed = max(2, int(max_events / avg_events) + 3)
-        return matched[:files_needed]
-
-    return matched
+    valid = []
+    for p in matched:
+        try:
+            if os.path.getsize(p) > 1024:
+                valid.append(p)
+        except OSError:
+            pass
+        if len(valid) >= max_files:
+            break
+    return valid
 
 
-def build_tchain(cfg, max_events=-1):
-    """
-    Fast TChain builder using resolved exact paths.
-    Bypasses POSIX glob and prevents full-directory chain traversal over EOS.
-    """
-    avg_ev = cfg.get("avg_events_per_file", 25000)
-    files = resolve_files_fast(cfg["path"], max_events=max_events, avg_events=avg_ev)
-    if not files and "alt_path" in cfg:
-        files = resolve_files_fast(cfg["alt_path"], max_events=max_events, avg_events=avg_ev)
+def analyze_sample(sample_name, config, args):
+    """Process a single dataset using ROOT RDataFrame and DigiValidationProcessor."""
+    t0 = time.time()
+    print(f"\n{'='*75}")
+    print(f"[*] Processing Dataset: {sample_name}")
+    print(f"{'='*75}")
+
+    # Estimate required files based on max_events
+    avg_per_file = config.get("avg_events_per_file", 25000)
+    if args.max_events and args.max_events > 0:
+        needed_files = max(1, int(math.ceil(args.max_events / avg_per_file)) + 1)
+        max_f = min(config.get("max_files", 50), needed_files)
+    else:
+        max_f = config.get("max_files", 50)
+
+    files = resolve_files(config["path"], max_files=max_f)
+    if not files and "alt_path" in config:
+        files = resolve_files(config["alt_path"], max_files=max_f)
 
     if not files:
-        raise RuntimeError(f"No files found matching {cfg['path']}")
+        print(f"[-] ERROR: No input files found for {sample_name} at '{config['path']}'")
+        return None
 
-    tree_name = cfg.get("tree", "cbmsim")
+    print(f"[*] Selected {len(files)} file(s) for processing.")
+    print(f"[*] Loading geometry: {config['geo']}")
+    snd_geo = SndlhcGeo.GeoInterface(config["geo"])
+    scifi_det = snd_geo.modules["Scifi"]
+
+    print("[*] Initializing DigiValidationProcessor and caching SiPM channel positions...")
+    proc = ROOT.snd.trident.DigiValidationProcessor(scifi_det)
+    n_cached = proc.getCachedChannelCount()
+    print(f"[*] Pre-cached {n_cached:,} SciFi channel SiPM coordinates.")
+
+    tree_name = config["tree"]
     chain = ROOT.TChain(tree_name)
     for f in files:
         chain.Add(f)
 
-    return chain, tree_name, len(files), cfg["path"]
-
-
-def analyze_sample_rdf(sample_name, cfg, num_threads=8, max_events=-1, weight_scale=40.0):
-    print(f"\n=======================================================")
-    print(f"--> Initializing dataset for {sample_name}...")
-    print(f"=======================================================")
-
-    t0 = time.time()
-
-    # 1. Enable ROOT multi-threading
-    if num_threads > 1:
-        if not ROOT.IsImplicitMTEnabled():
-            ROOT.EnableImplicitMT(num_threads)
-    else:
-        if ROOT.IsImplicitMTEnabled():
-            ROOT.DisableImplicitMT()
-
-    # 2. Fast native TChain creation (bypasses slow POSIX glob on EOS)
-    chain, tree_name, n_files, used_path = build_tchain(cfg, max_events=max_events)
-    print(f"    Loaded tree '{tree_name}' from {n_files} file(s) matching '{used_path}'")
-
-    # 3. Create RDataFrame directly from TChain
     df = ROOT.RDataFrame(chain)
+    if args.max_events and args.max_events > 0:
+        df = df.Range(args.max_events)
+        print(f"[*] Processing limited to {args.max_events:,} events.")
 
-    # Range / Event filter
-    if max_events > 0:
-        df = df.Filter(f"rdfentry_ < {max_events}")
-        print(f"    Processing up to {max_events:,} events...")
-
-    # Attach thread-safe progress printer after filter
-    df, printer = add_progress_printer(df, total_events=max_events if max_events > 0 else 0, every_seconds=10.0, label=sample_name)
-
-    # 4. Check available branches safely
-    branch_names = set(b.GetName() for b in chain.GetListOfBranches())
-
-    # Define event weight
-    if not cfg.get("is_mc", False) or sample_name == "Data":
+    # -------------------------------------------------------------
+    # Monte Carlo Event Weighting
+    # -------------------------------------------------------------
+    if not config.get("is_mc", False):
+        # Real beam data: event weight = 1.0
         df = df.Define("weight", "1.0")
-    elif "mc_weight" in branch_names:
-        df = df.Define("weight", f"static_cast<double>(mc_weight) * {weight_scale}")
-    elif "MCEventHeader." in branch_names or "MCEventHeader" in branch_names:
-        header_name = "MCEventHeader." if "MCEventHeader." in branch_names else "MCEventHeader"
-        df = df.Define("weight", f"static_cast<double>({header_name}.GetWeight()) * {weight_scale}")
-    elif "MCTrack" in branch_names:
-        df = df.Define(
-            "weight",
-            f"(MCTrack.GetEntries() > 0 ? static_cast<double>(static_cast<ShipMCTrack*>(MCTrack.At(0))->GetWeight()) : 1.0) * {weight_scale}"
+        print("[*] Weight model: Unweighted Data (weight = 1.0)")
+    elif sample_name == "SingleMuMC":
+        # Single passing muons: primary FLUKA generator weight
+        # Exposure scaling: L_target * 8e5 / N_events or manual scale factor
+        scale_pmu = args.scale_pmu if args.scale_pmu else (args.lumi_target * 8e5 / 1213000.0)
+        truth_cfg = ROOT.snd.trident.PassingMuonTruthConfig()
+        pmu_proc = ROOT.snd.trident.PassingMuonTruthProcessor(truth_cfg)
+        df = (
+            df
+            .Define("truth", pmu_proc, ["MCTrack", "ScifiPoint", "MuFilterPoint"])
+            .Define("weight", f"truth.mc_weight * {scale_pmu}")
         )
+        print(f"[*] Weight model: FLUKA primary muon weight * scale ({scale_pmu:.4e})")
+    elif sample_name == "ThreeMuMC":
+        # Trident signal MC: scaled by target / simulated luminosity
+        weight_scale = args.lumi_target / args.lumi_mc_tri if args.lumi_mc_tri > 0 else 1.0
+        tri_cfg = ROOT.snd.trident.TridentTruthConfig()
+        tri_cfg.weightScale = weight_scale
+        tri_proc = ROOT.snd.trident.TridentTruthProcessor(tri_cfg)
+        df = (
+            df
+            .Define("truth", tri_proc, ["MCTrack", "ScifiPoint", "MuFilterPoint"])
+            .Define("weight", "truth.scaledWeight")
+        )
+        print(f"[*] Weight model: Trident truth weight (scale = {weight_scale:.4f})")
     else:
-        df = df.Define("weight", f"{weight_scale}")
+        df = df.Define("weight", "1.0")
 
-    # 5. Check branch presence and bind C++ processor
-    has_scifi = "Digi_ScifiHits" in branch_names
-    has_clusters = "Cluster_Scifi" in branch_names
-    has_mufi = ("Digi_MuFilterHits" in branch_names) or ("Digi_MuFilterHit" in branch_names)
-    has_tracks = "Reco_MuonTracks" in branch_names
+    # -------------------------------------------------------------
+    # Apply DigiValidationProcessor
+    # -------------------------------------------------------------
+    df = (
+        df
+        .Define("ev", proc, ["Digi_ScifiHits", "Cluster_Scifi", "Digi_MuFilterHits", "Reco_MuonTracks"])
+        .Define("n_scifi_hits", "ev.n_scifi_hits")
+        .Define("n_scifi_st1", "ev.n_scifi_st1")
+        .Define("scifi_sum_qdc", "ev.scifi_sum_qdc")
+        .Define("scifi_mean_qdc", "ev.scifi_mean_qdc")
+        .Define("n_clusters", "ev.n_scifi_clusters")
+        .Define("cluster_size", "ev.cluster_size")
+        .Define("cluster_qdc", "ev.cluster_qdc")
+        .Define("n_mufi_hits", "ev.n_mufi_hits")
+        .Define("n_mufi_us_hits", "ev.n_mufi_us_hits")
+        .Define("n_mufi_ds_hits", "ev.n_mufi_ds_hits")
+        .Define("mufi_sum_qdc", "ev.mufi_sum_qdc")
+        .Define("n_tracks", "ev.n_tracks")
+        .Define("track_chi2", "ev.track_chi2")
+        .Define("track_slope_xz", "ev.track_slope_xz")
+        .Define("track_slope_yz", "ev.track_slope_yz")
+        .Define("has_clean_track", "ev.has_clean_track")
+        .Define("track_chi2_clean", "ev.track_chi2_ndf_clean")
+        .Define("track_slope_xz_clean", "ev.track_slope_xz_clean")
+        .Define("track_slope_yz_clean", "ev.track_slope_yz_clean")
+        .Define("track_x_300", "ev.track_x_300")
+        .Define("track_y_300", "ev.track_y_300")
+        .Define("clean_hit_qdc", "ev.hit_qdc")
+        .Define("clean_hit_dist", "ev.hit_distance")
+        .Define("clean_hit_qdc_horiz", "ev.hit_qdc_horiz")
+        .Define("clean_hit_dist_horiz", "ev.hit_dist_horiz")
+        .Define("clean_hit_qdc_vert", "ev.hit_qdc_vert")
+        .Define("clean_hit_dist_vert", "ev.hit_dist_vert")
+        .Define("station_numbers", "ev.station_numbers")
+        .Define("station_hits", "ev.station_hits")
+        .Define("station_qdc", "ev.station_qdc")
+    )
 
-    sf_arg = "&Digi_ScifiHits" if has_scifi else "static_cast<const TClonesArray*>(nullptr)"
-    cl_arg = "&Cluster_Scifi" if has_clusters else "static_cast<const TClonesArray*>(nullptr)"
-    mf_branch_name = "Digi_MuFilterHits" if "Digi_MuFilterHits" in branch_names else "Digi_MuFilterHit"
-    mf_arg = f"&{mf_branch_name}" if has_mufi else "static_cast<const TClonesArray*>(nullptr)"
-    tr_arg = "&Reco_MuonTracks" if has_tracks else "static_cast<const TClonesArray*>(nullptr)"
+    df_clean = df.Filter("has_clean_track")
 
-    proc_call = f"DigiRdf::process_event({sf_arg}, {cl_arg}, {mf_arg}, {tr_arg}, weight)"
-    df = df.Define("ev", proc_call)
+    # -------------------------------------------------------------
+    # Book 1D Histograms & Profiles
+    # -------------------------------------------------------------
+    histograms = {}
 
-    # Flatten event struct members to first-class RDF columns
-    df = df.Define("clean_hit_qdc", "ev.clean_hit_qdc")
-    df = df.Define("clean_hit_weights", "ev.clean_hit_weights")
-    df = df.Define("clean_hit_dist", "ev.clean_hit_dist")
-    df = df.Define("cluster_qdcs", "ev.cluster_qdcs")
-    df = df.Define("cluster_sizes", "ev.cluster_sizes")
-    df = df.Define("cluster_weights", "ev.cluster_weights")
-    df = df.Define("n_scifi_st1", "ev.n_scifi_st1")
-    df = df.Define("n_scifi_hits", "ev.n_scifi_hits")
-    df = df.Define("n_mufi_hits", "ev.n_mufi_hits")
-    df = df.Define("n_tracks", "ev.n_tracks")
-    df = df.Define("track_chi2", "ev.track_chi2")
-    df = df.Define("track_slope_xz", "ev.track_slope_xz")
-    df = df.Define("track_slope_yz", "ev.track_slope_yz")
-    df = df.Define("track_weights", "ev.track_weights")
-    df = df.Define("station_numbers", "ev.station_numbers")
-    df = df.Define("station_hits", "ev.station_hits")
-    df = df.Define("station_weights", "ev.station_weights")
+    # Hit QDC along clean tracks
+    histograms["h_qdc_single_hit"] = df_clean.Histo1D(
+        (f"h_qdc_{sample_name}", f"{sample_name} Single Hit QDC;Hit QDC [a.u.];Normalized Entries", 150, -10.0, 140.0),
+        "clean_hit_qdc", "weight"
+    )
+    histograms["h_qdc_horiz"] = df_clean.Histo1D(
+        (f"h_qdc_h_{sample_name}", f"{sample_name} Horizontal Hit QDC;Hit QDC [a.u.];Normalized Entries", 150, -10.0, 140.0),
+        "clean_hit_qdc_horiz", "weight"
+    )
+    histograms["h_qdc_vert"] = df_clean.Histo1D(
+        (f"h_qdc_v_{sample_name}", f"{sample_name} Vertical Hit QDC;Hit QDC [a.u.];Normalized Entries", 150, -10.0, 140.0),
+        "clean_hit_qdc_vert", "weight"
+    )
 
-    # 6. Book Histograms and Profiles
-    models = {
-        "qdc_single_hit": ROOT.RDF.TH1DModel(f"qdc_single_{sample_name}", f"Single Hit QDC ({sample_name});QDC [a.u.];Normalized Entries", 150, -10, 140),
-        "cluster_qdc": ROOT.RDF.TH1DModel(f"cluster_qdc_{sample_name}", f"Total Cluster QDC ({sample_name});Cluster QDC [a.u.];Normalized Entries", 150, -10, 200),
-        "cluster_size": ROOT.RDF.TH1DModel(f"cls_size_{sample_name}", f"Cluster Size ({sample_name});# SiPM channels / cluster;Normalized Fraction", 12, 0.5, 12.5),
-        "nhits_st1": ROOT.RDF.TH1DModel(f"nhits_st1_{sample_name}", f"SciFi Hits in Station 1 ({sample_name});# Hits in Station 1;Normalized Entries", 40, -0.5, 39.5),
-        "nhits_total": ROOT.RDF.TH1DModel(f"nhits_tot_{sample_name}", f"Total SciFi Hits ({sample_name});# SciFi Hits;Normalized Entries", 100, -0.5, 99.5),
-        "qdc_vs_dist": ROOT.RDF.TProfile1DModel(f"qdc_dist_{sample_name}", f"QDC vs Distance to SiPM ({sample_name});Distance to SiPM [cm];<QDC>", 40, 0, 40),
-        "nhits_per_station": ROOT.RDF.TProfile1DModel(f"nhits_per_station_{sample_name}", f"SciFi Hit Profile by Station ({sample_name});SciFi Station Number;<Hits / Event>", 5, 0.5, 5.5),
-        "ntracks": ROOT.RDF.TH1DModel(f"ntracks_{sample_name}", f"Reconstructed Muon Tracks ({sample_name});# Reco Muon Tracks;Normalized Entries", 6, -0.5, 5.5),
-        "track_chi2_ndf": ROOT.RDF.TH1DModel(f"track_chi2_ndf_{sample_name}", f"Track Fit #chi^{{2}} / NDF ({sample_name});#chi^{{2}} / NDF;Normalized Entries", 50, 0.0, 10.0),
-        "track_slope_xz": ROOT.RDF.TH1DModel(f"track_slope_xz_{sample_name}", f"Track Slope dx/dz ({sample_name});Slope dx/dz;Normalized Entries", 100, -0.08, 0.08),
-        "track_slope_yz": ROOT.RDF.TH1DModel(f"track_slope_yz_{sample_name}", f"Track Slope dy/dz ({sample_name});Slope dy/dz;Normalized Entries", 100, -0.08, 0.08),
-        "nhits_mufilter": ROOT.RDF.TH1DModel(f"nhits_mufilter_{sample_name}", f"Total MuFilter Hits ({sample_name});# MuFilter Hits;Normalized Entries", 60, -0.5, 59.5),
-    }
+    # Clusters
+    histograms["h_cluster_qdc"] = df.Histo1D(
+        (f"h_cl_qdc_{sample_name}", f"{sample_name} Cluster Integrated QDC;Cluster QDC [a.u.];Normalized Entries", 105, -10.0, 200.0),
+        "cluster_qdc", "weight"
+    )
+    histograms["h_cluster_size"] = df.Histo1D(
+        (f"h_cl_sz_{sample_name}", f"{sample_name} Cluster Size;Cluster Size [channels];Normalized Entries", 12, 0.5, 12.5),
+        "cluster_size", "weight"
+    )
 
-    rdf_ptrs = {
-        "qdc_single_hit":    df.Histo1D(models["qdc_single_hit"], "clean_hit_qdc", "clean_hit_weights"),
-        "cluster_qdc":       df.Histo1D(models["cluster_qdc"], "cluster_qdcs", "cluster_weights"),
-        "cluster_size":      df.Histo1D(models["cluster_size"], "cluster_sizes", "cluster_weights"),
-        "nhits_st1":         df.Histo1D(models["nhits_st1"], "n_scifi_st1", "weight"),
-        "nhits_total":       df.Histo1D(models["nhits_total"], "n_scifi_hits", "weight"),
-        "qdc_vs_dist":       df.Profile1D(models["qdc_vs_dist"], "clean_hit_dist", "clean_hit_qdc", "clean_hit_weights"),
-        "nhits_per_station": df.Profile1D(models["nhits_per_station"], "station_numbers", "station_hits", "station_weights"),
-        "ntracks":           df.Histo1D(models["ntracks"], "n_tracks", "weight"),
-        "track_chi2_ndf":    df.Histo1D(models["track_chi2_ndf"], "track_chi2", "track_weights"),
-        "track_slope_xz":    df.Histo1D(models["track_slope_xz"], "track_slope_xz", "track_weights"),
-        "track_slope_yz":    df.Histo1D(models["track_slope_yz"], "track_slope_yz", "track_weights"),
-        "nhits_mufilter":    df.Histo1D(models["nhits_mufilter"], "n_mufi_hits", "weight"),
-    }
+    # SciFi Tracker Multiplicities
+    histograms["h_nhits_st1"] = df.Histo1D(
+        (f"h_st1_{sample_name}", f"{sample_name} Station 1 Hits;SciFi Station 1 Hits;Normalized Entries", 40, -0.5, 39.5),
+        "n_scifi_st1", "weight"
+    )
+    histograms["h_nhits_total"] = df.Histo1D(
+        (f"h_sf_tot_{sample_name}", f"{sample_name} Total SciFi Hits;Total SciFi Hits;Normalized Entries", 50, -0.5, 99.5),
+        "n_scifi_hits", "weight"
+    )
+    histograms["h_scifi_mean_qdc"] = df.Histo1D(
+        (f"h_sf_mqdc_{sample_name}", f"{sample_name} SciFi Mean QDC;Mean SciFi Hit QDC [a.u.];Normalized Entries", 50, 0.0, 100.0),
+        "scifi_mean_qdc", "weight"
+    )
 
-    sum_w_ptr = df.Sum("weight")
+    # MuFilter Multiplicities
+    histograms["h_nhits_mufi"] = df.Histo1D(
+        (f"h_mf_tot_{sample_name}", f"{sample_name} Total MuFilter Hits;Total MuFilter Hits;Normalized Entries", 60, -0.5, 59.5),
+        "n_mufi_hits", "weight"
+    )
+    histograms["h_nhits_us"] = df.Histo1D(
+        (f"h_mf_us_{sample_name}", f"{sample_name} US MuFilter Hits;US MuFilter Hits;Normalized Entries", 40, -0.5, 39.5),
+        "n_mufi_us_hits", "weight"
+    )
+    histograms["h_nhits_ds"] = df.Histo1D(
+        (f"h_mf_ds_{sample_name}", f"{sample_name} DS MuFilter Hits;DS MuFilter Hits;Normalized Entries", 40, -0.5, 39.5),
+        "n_mufi_ds_hits", "weight"
+    )
 
-    # Trigger single-pass multi-threaded computation
-    print(f"    Executing parallel event loop across {num_threads} threads...")
-    hists = {}
-    for key, ptr in rdf_ptrs.items():
-        h = ptr.GetValue().Clone()
-        h.SetDirectory(0)
-        hists[key] = h
+    # Tracking
+    histograms["h_ntracks"] = df.Histo1D(
+        (f"h_ntrk_{sample_name}", f"{sample_name} Reconstructed Tracks;Reconstructed Tracks;Normalized Entries", 6, -0.5, 5.5),
+        "n_tracks", "weight"
+    )
+    histograms["h_track_chi2_ndf"] = df.Histo1D(
+        (f"h_chi2_{sample_name}", f"{sample_name} Track #chi^{{2}}/NDF;Track #chi^{{2}}/NDF;Normalized Entries", 50, 0.0, 10.0),
+        "track_chi2", "weight"
+    )
+    histograms["h_track_slope_xz"] = df.Histo1D(
+        (f"h_slpxz_{sample_name}", f"{sample_name} Track Slope dx/dz;Track Slope dx/dz;Normalized Entries", 50, -0.08, 0.08),
+        "track_slope_xz", "weight"
+    )
+    histograms["h_track_slope_yz"] = df.Histo1D(
+        (f"h_slpyz_{sample_name}", f"{sample_name} Track Slope dy/dz;Track Slope dy/dz;Normalized Entries", 50, -0.08, 0.08),
+        "track_slope_yz", "weight"
+    )
 
-    elapsed = time.time() - t0
-    total_w = sum_w_ptr.GetValue()
-    print(f"    Completed {sample_name} in {elapsed:.1f}s. Total effective weight: {total_w:.3e}")
-    return hists
+    # TProfiles
+    histograms["p_nhits_per_station"] = df.Profile1D(
+        (f"p_sthits_{sample_name}", f"{sample_name} Hits / Station;SciFi Station;Mean Hits", 5, 0.5, 5.5),
+        "station_numbers", "station_hits", "weight"
+    )
+    histograms["p_qdc_per_station"] = df.Profile1D(
+        (f"p_stqdc_{sample_name}", f"{sample_name} QDC / Station;SciFi Station;Mean Integrated QDC [a.u.]", 5, 0.5, 5.5),
+        "station_numbers", "station_qdc", "weight"
+    )
+    histograms["p_qdc_vs_dist"] = df_clean.Profile1D(
+        (f"p_qdcdist_{sample_name}", f"{sample_name} #LTQDC#GT vs Dist to SiPM;Distance to SiPM [cm];#LTQDC#GT [a.u.]", 45, 0.0, 45.0),
+        "clean_hit_dist", "clean_hit_qdc", "weight"
+    )
+    histograms["p_qdc_dist_horiz"] = df_clean.Profile1D(
+        (f"p_qdcdist_h_{sample_name}", f"{sample_name} Horizontal #LTQDC#GT vs Dist;Distance to SiPM [cm];#LTQDC#GT [a.u.]", 45, 0.0, 45.0),
+        "clean_hit_dist_horiz", "clean_hit_qdc_horiz", "weight"
+    )
+    histograms["p_qdc_dist_vert"] = df_clean.Profile1D(
+        (f"p_qdcdist_v_{sample_name}", f"{sample_name} Vertical #LTQDC#GT vs Dist;Distance to SiPM [cm];#LTQDC#GT [a.u.]", 45, 0.0, 45.0),
+        "clean_hit_dist_vert", "clean_hit_qdc_vert", "weight"
+    )
+
+    # -------------------------------------------------------------
+    # Book 2D Histograms
+    # -------------------------------------------------------------
+    histograms["h2_qdc_vs_dist"] = df_clean.Histo2D(
+        (f"h2_qdcdist_{sample_name}", f"{sample_name}: Hit QDC vs Distance to SiPM;Distance to SiPM [cm];Hit QDC [a.u.];Entries", 45, 0.0, 45.0, 75, 0.0, 150.0),
+        "clean_hit_dist", "clean_hit_qdc", "weight"
+    )
+    histograms["h2_cls_qdc_vs_size"] = df.Histo2D(
+        (f"h2_clqdcsz_{sample_name}", f"{sample_name}: Cluster QDC vs Size;Cluster Size [channels];Cluster QDC [a.u.];Entries", 10, 0.5, 10.5, 50, 0.0, 200.0),
+        "cluster_size", "cluster_qdc", "weight"
+    )
+    histograms["h2_scifi_vs_mufi"] = df.Histo2D(
+        (f"h2_sf_mf_{sample_name}", f"{sample_name}: SciFi vs MuFilter Hits;Total SciFi Hits;Total MuFilter Hits;Entries", 50, 0.0, 100.0, 30, 0.0, 60.0),
+        "n_scifi_hits", "n_mufi_hits", "weight"
+    )
+    histograms["h2_qdc_vs_hits"] = df.Histo2D(
+        (f"h2_qdc_hits_{sample_name}", f"{sample_name}: SciFi Total QDC vs Hits;Total SciFi Hits;Total SciFi QDC [a.u.];Entries", 50, 0.0, 100.0, 50, 0.0, 2500.0),
+        "n_scifi_hits", "scifi_sum_qdc", "weight"
+    )
+    histograms["h2_track_slopes"] = df_clean.Histo2D(
+        (f"h2_slopes_{sample_name}", f"{sample_name}: Clean Track Slopes;Slope dx/dz;Slope dy/dz;Entries", 40, -0.06, 0.06, 40, -0.06, 0.06),
+        "track_slope_xz_clean", "track_slope_yz_clean", "weight"
+    )
+    histograms["h2_track_xy"] = df_clean.Histo2D(
+        (f"h2_xy300_{sample_name}", f"{sample_name}: Beam Spot at z = 300 cm;Track X [cm];Track Y [cm];Entries", 50, -50.0, 0.0, 50, 10.0, 60.0),
+        "track_x_300", "track_y_300", "weight"
+    )
+
+    # Book event counts
+    node_n_proc = df.Count()
+    node_n_clean = df_clean.Count()
+
+    # Materialize all results via single event loop
+    print(f"[*] Executing computation graph for {sample_name}...")
+    results = {k: v.GetValue() for k, v in histograms.items()}
+    n_processed = node_n_proc.GetValue()
+    n_clean_ev = node_n_clean.GetValue()
+    print(f"[+] Completed {n_processed:,} events ({n_clean_ev:,} with clean muon tracks) in {time.time()-t0:.2f} s")
+
+    results["color"] = config["color"]
+    results["n_events"] = n_processed
+    results["n_clean"] = n_clean_ev
+    return results
 
 
-def draw_pad(pad_obj, var, var_label, logy, norm, results, files_cfg):
-    pad_obj.cd()
-    leg = ROOT.TLegend(0.62, 0.65, 0.89, 0.89)
+def draw_pad_1d(pad, hist_dict, hist_key, is_profile=False, log_y=False):
+    """Draw overlaid 1D histograms or TProfiles across samples with normalization."""
+    pad.cd()
+    if log_y:
+        pad.SetLogy(1)
+    else:
+        pad.SetLogy(0)
+
+    leg = ROOT.TLegend(0.60, 0.68, 0.88, 0.88)
     leg.SetBorderSize(0)
     leg.SetFillStyle(0)
-    leg.SetTextFont(42)
     leg.SetTextSize(0.04)
 
-    is_profile = "dist" in var or "per_station" in var
-    opt = "E1" if is_profile else "HIST"
-    first = True
-    drawn_count = 0
+    drawn = []
+    max_val = 0.0
 
-    for name in ["Data", "SingleMuMC", "ThreeMuMC"]:
-        if name not in results or var not in results[name]:
+    for sample_name, res in hist_dict.items():
+        if not res or hist_key not in res:
             continue
-        h = results[name][var]
-        if h.GetEntries() == 0 or (norm and h.Integral() <= 0):
-            continue
-
-        h.SetLineColor(files_cfg[name]["color"])
+        h = res[hist_key].Clone(f"{res[hist_key].GetName()}_draw")
+        col = res["color"]
+        h.SetLineColor(col)
         h.SetLineWidth(2)
+
         if is_profile:
-            h.SetMarkerColor(files_cfg[name]["color"])
-            h.SetMarkerStyle(20)
+            h.SetMarkerColor(col)
+            h.SetMarkerStyle(20 if sample_name == "Data" else 24)
             h.SetMarkerSize(0.8)
+            cur_max = h.GetMaximum()
+        else:
+            integral = h.Integral()
+            if integral > 0:
+                h.Scale(1.0 / integral)
+            if sample_name == "Data":
+                h.SetMarkerColor(col)
+                h.SetMarkerStyle(20)
+                h.SetMarkerSize(0.7)
+            else:
+                h.SetFillColorAlpha(col, 0.15)
+            cur_max = h.GetMaximum()
 
-        if norm and not is_profile and h.Integral() > 0:
-            h.Scale(1.0 / h.Integral())
+        if cur_max > max_val:
+            max_val = cur_max
+        drawn.append((sample_name, h))
 
-        if logy:
-            h.SetMinimum(1e-4)
+    if not drawn:
+        return
 
-        draw_opt = opt if first else (opt + " SAME" if opt else "SAME")
-        h.Draw(draw_opt)
-        leg.AddEntry(h, name, "lep" if is_profile else "l")
-        first = False
-        drawn_count += 1
+    # Draw first histogram to establish axes
+    first_sample, first_hist = drawn[0]
+    if log_y:
+        first_hist.SetMaximum(max_val * 5.0)
+        first_hist.SetMinimum(1e-4)
+    else:
+        first_hist.SetMaximum(max_val * 1.35)
+        first_hist.SetMinimum(0.0)
 
-    if logy and drawn_count > 0:
-        pad_obj.SetLogy(1)
+    draw_opt = "E1" if (is_profile or first_sample == "Data") else "HIST"
+    first_hist.Draw(draw_opt)
+    leg_opt = "lep" if (is_profile or first_sample == "Data") else "lf"
+    leg.AddEntry(first_hist, first_sample, leg_opt)
 
-    if drawn_count > 0:
-        leg.Draw()
+    for sample_name, h in drawn[1:]:
+        d_opt = "E1 SAME" if (is_profile or sample_name == "Data") else "HIST SAME"
+        h.Draw(d_opt)
+        l_opt = "lep" if (is_profile or sample_name == "Data") else "lf"
+        leg.AddEntry(h, sample_name, l_opt)
 
-    return leg
+    leg.Draw()
+    pad.Update()
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="High-performance multi-threaded digitization validation using native ROOT RDataFrame.",
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    )
-    parser.add_argument("-j", "--threads", dest="num_threads", type=int, default=8, help="Number of worker threads")
-    parser.add_argument("-n", "--max-events", type=int, default=-1, help="Max events per sample (-1 = all entries)")
-    parser.add_argument("--lumi", "--L-lhc", dest="lumi_target", type=float, default=1.0, help="Target luminosity in fb^-1")
-    parser.add_argument("--L-mc", dest="lumi_mc", type=float, default=0.025, help="MC integrated luminosity in fb^-1")
-    parser.add_argument("-o", "--output", default=DEFAULT_OUTPUT_PATH, help="Output ROOT file path")
-
+    parser = argparse.ArgumentParser(description="Digitization & Reconstruction Validation for SND@LHC")
+    parser.add_argument("-id", "--input-data", default=DEFAULT_DATA_PATTERN, help="Collision/Data file pattern")
+    parser.add_argument("-ipmu", "--input-pmu", default=DEFAULT_PMU_PATH, help="Passing muon MC file")
+    parser.add_argument("-itri", "--input-tri", default=DEFAULT_TRI_PATTERN, help="ThreeMu MC file pattern")
+    parser.add_argument("--geo-data", default=DEFAULT_DATA_GEO, help="Geometry file for data")
+    parser.add_argument("--geo-pmu", default=DEFAULT_PMU_GEO, help="Geometry file for PMU MC")
+    parser.add_argument("--geo-tri", default=DEFAULT_TRI_GEO, help="Geometry file for ThreeMu MC")
+    parser.add_argument("-n", "--max-events", type=int, default=None, help="Max events per sample")
+    parser.add_argument("-j", "--num-threads", type=int, default=4, help="Number of RDF worker threads")
+    parser.add_argument("--lumi-target", type=float, default=28.0, help="Target integrated luminosity [fb^-1]")
+    parser.add_argument("--lumi-mc-tri", type=float, default=160.0, help="ThreeMu MC integrated luminosity [fb^-1]")
+    parser.add_argument("--scale-pmu", type=float, default=None, help="Manual PMU MC scale factor")
+    parser.add_argument("-o", "--output", default="out/digi_validation.root", help="Output ROOT file")
+    parser.add_argument("--out-dir", default="plots/digi_validation", help="Output directory for plots")
+    parser.add_argument("--no-data", action="store_true", help="Skip data sample")
+    parser.add_argument("--no-pmu", action="store_true", help="Skip passing muon MC")
+    parser.add_argument("--no-tri", action="store_true", help="Skip trident MC")
     args = parser.parse_args()
 
-    weight_scale = args.lumi_target / args.lumi_mc if args.lumi_mc > 0 else 1.0
-    print(f"Active Multi-Threading Threads: {args.num_threads}")
-    print(f"Weight scale (L_target / L_mc): {args.lumi_target:.3f} / {args.lumi_mc:.3f} = {weight_scale:.2f}")
+    # Load libraries and configure threads
+    load_trident_libraries(REPO_ROOT)
+    if args.num_threads > 1 and not args.max_events:
+        ROOT.EnableImplicitMT(args.num_threads)
+        print(f"[*] Enabled ROOT implicit multi-threading with {args.num_threads} threads.")
+    else:
+        ROOT.DisableImplicitMT()
+        if args.max_events:
+            print(f"[*] Running single-threaded for event Range({args.max_events}).")
 
-    # Process all datasets in parallel with RDataFrame
+    os.makedirs(os.path.dirname(os.path.abspath(args.output)), exist_ok=True)
+    os.makedirs(args.out_dir, exist_ok=True)
+
+    samples = {}
+    if not args.no_data:
+        samples["Data"] = {
+            "path": args.input_data,
+            "alt_path": "/eos/user/i/idioniso/1_Data/Tracks/run_008329/sndsw_raw-0_0_8329_muonReco.root",
+            "geo": args.geo_data,
+            "tree": "rawConv",
+            "color": ROOT.kBlack,
+            "is_mc": False,
+            "max_files": 40,
+            "avg_events_per_file": 27000,
+        }
+    if not args.no_pmu:
+        samples["SingleMuMC"] = {
+            "path": args.input_pmu,
+            "geo": args.geo_pmu,
+            "tree": "cbmsim",
+            "color": ROOT.kBlue,
+            "is_mc": True,
+            "max_files": 1,
+            "avg_events_per_file": 1213000,
+        }
+    if not args.no_tri:
+        samples["ThreeMuMC"] = {
+            "path": args.input_tri,
+            "geo": args.geo_tri,
+            "tree": "cbmsim",
+            "color": ROOT.kRed,
+            "is_mc": True,
+            "max_files": 40,
+            "avg_events_per_file": 18600,
+        }
+
     results = {}
-    for name, cfg in FILES.items():
-        results[name] = analyze_sample_rdf(
-            name, cfg,
-            num_threads=args.num_threads,
-            max_events=args.max_events,
-            weight_scale=weight_scale,
-        )
+    for name, cfg in samples.items():
+        res = analyze_sample(name, cfg, args)
+        if res:
+            results[name] = res
 
-    # --- Canvas 1: SciFi Hit & Cluster Digitization ---
-    c1 = ROOT.TCanvas("c_scifi_digi", "SciFi Hit and Cluster Digitization", 1500, 950)
-    ROOT.SetOwnership(c1, False)
+    if not results:
+        print("[-] No samples successfully processed. Exiting.")
+        return
+
+    # -------------------------------------------------------------
+    # Canvas 1: SciFi Digitization Distributions (3 x 2)
+    # -------------------------------------------------------------
+    print("\n[*] Generating Canvas 1: SciFi Digitization Observables...")
+    c1 = ROOT.TCanvas("c_scifi_digi", "SciFi Digitization Validation", 1600, 1000)
     c1.Divide(3, 2)
 
-    plots_c1 = [
-        ("qdc_single_hit", "Single Hit QDC", True, True),
-        ("cluster_qdc", "Total Cluster QDC", True, True),
-        ("cluster_size", "Cluster Size", True, True),
-        ("qdc_vs_dist", "QDC vs Distance to SiPM", False, False),
-        ("nhits_st1", "Hits in Station 1", True, True),
-        ("nhits_total", "Total SciFi Hits", True, True),
-    ]
+    draw_pad_1d(c1.cd(1), results, "h_qdc_single_hit", is_profile=False, log_y=True)
+    draw_pad_1d(c1.cd(2), results, "h_cluster_qdc", is_profile=False, log_y=True)
+    draw_pad_1d(c1.cd(3), results, "h_cluster_size", is_profile=False, log_y=True)
+    draw_pad_1d(c1.cd(4), results, "p_qdc_vs_dist", is_profile=True, log_y=False)
+    draw_pad_1d(c1.cd(5), results, "h_nhits_st1", is_profile=False, log_y=True)
+    draw_pad_1d(c1.cd(6), results, "h_nhits_total", is_profile=False, log_y=True)
 
-    legends_c1 = []
-    for pad_id, (var, label, logy, norm) in enumerate(plots_c1, start=1):
-        pad_obj = c1.cd(pad_id)
-        pad_obj.SetRightMargin(0.06)
-        pad_obj.SetLeftMargin(0.12)
-        leg = draw_pad(pad_obj, var, label, logy, norm, results, FILES)
-        legends_c1.append(leg)
+    c1.SaveAs(os.path.join(args.out_dir, "scifi_digitization_validation.png"))
+    c1.SaveAs(os.path.join(args.out_dir, "scifi_digitization_validation.pdf"))
 
-    c1.Update()
-
-    # --- Canvas 2: Tracking, Occupancy & MuFilter ---
-    c2 = ROOT.TCanvas("c_tracking_multiplicity", "Tracking and Detector Multiplicity", 1500, 950)
-    ROOT.SetOwnership(c2, False)
+    # -------------------------------------------------------------
+    # Canvas 2: Tracking & Detector Multiplicities (3 x 2)
+    # -------------------------------------------------------------
+    print("[*] Generating Canvas 2: Tracking & Detector Multiplicities...")
+    c2 = ROOT.TCanvas("c_tracking_multiplicity", "Tracking & Multiplicities", 1600, 1000)
     c2.Divide(3, 2)
 
-    plots_c2 = [
-        ("nhits_per_station", "Hit Profile by Station", False, False),
-        ("ntracks", "Reconstructed Tracks", True, True),
-        ("track_chi2_ndf", "Track Fit Chi2 / NDF", True, True),
-        ("track_slope_xz", "Track Slope dx/dz", True, True),
-        ("track_slope_yz", "Track Slope dy/dz", True, True),
-        ("nhits_mufilter", "Total MuFilter Hits", True, True),
-    ]
+    draw_pad_1d(c2.cd(1), results, "p_nhits_per_station", is_profile=True, log_y=False)
+    draw_pad_1d(c2.cd(2), results, "h_ntracks", is_profile=False, log_y=True)
+    draw_pad_1d(c2.cd(3), results, "h_track_chi2_ndf", is_profile=False, log_y=True)
+    draw_pad_1d(c2.cd(4), results, "h_track_slope_xz", is_profile=False, log_y=False)
+    draw_pad_1d(c2.cd(5), results, "h_track_slope_yz", is_profile=False, log_y=False)
+    draw_pad_1d(c2.cd(6), results, "h_nhits_mufi", is_profile=False, log_y=True)
 
-    legends_c2 = []
-    for pad_id, (var, label, logy, norm) in enumerate(plots_c2, start=1):
-        pad_obj = c2.cd(pad_id)
-        pad_obj.SetRightMargin(0.06)
-        pad_obj.SetLeftMargin(0.12)
-        leg = draw_pad(pad_obj, var, label, logy, norm, results, FILES)
-        legends_c2.append(leg)
+    c2.SaveAs(os.path.join(args.out_dir, "tracking_multiplicity_validation.png"))
+    c2.SaveAs(os.path.join(args.out_dir, "tracking_multiplicity_validation.pdf"))
 
-    c2.Update()
+    # -------------------------------------------------------------
+    # Canvas 3: 2D Correlation Matrix (N_samples x 4)
+    # -------------------------------------------------------------
+    print("[*] Generating 2D Correlation Plots...")
+    n_samp = len(results)
+    c3 = ROOT.TCanvas("c_2d_correlations", "2D Correlation Matrix", 450 * n_samp, 1600)
+    c3.Divide(n_samp, 4)
 
-    # Save output to ROOT file
-    out_dir = os.path.dirname(os.path.abspath(args.output))
-    os.makedirs(out_dir, exist_ok=True)
+    row_keys = ["h2_qdc_vs_dist", "h2_cls_qdc_vs_size", "h2_scifi_vs_mufi", "h2_track_slopes"]
+    for row_idx, key in enumerate(row_keys):
+        for col_idx, (sample_name, res) in enumerate(results.items()):
+            pad_num = row_idx * n_samp + col_idx + 1
+            pad = c3.cd(pad_num)
+            pad.SetRightMargin(0.14)
+            pad.SetLogz(1)
+            h2 = res[key]
+            h2.Draw("COLZ")
 
-    f_out = ROOT.TFile.Open(args.output, "RECREATE")
-    f_out.cd()
+    c3.SaveAs(os.path.join(args.out_dir, "2d_correlation_matrix.png"))
+    c3.SaveAs(os.path.join(args.out_dir, "2d_correlation_matrix.pdf"))
+
+    # Also save standalone high-resolution 2D figures
+    for sample_name, res in results.items():
+        for key in ["h2_qdc_vs_dist", "h2_cls_qdc_vs_size", "h2_scifi_vs_mufi", "h2_qdc_vs_hits", "h2_track_slopes", "h2_track_xy"]:
+            c_single = ROOT.TCanvas(f"c_{key}_{sample_name}", key, 800, 700)
+            c_single.SetRightMargin(0.14)
+            c_single.SetLogz(1)
+            res[key].Draw("COLZ")
+            c_single.SaveAs(os.path.join(args.out_dir, f"{key}_{sample_name}.png"))
+
+    # -------------------------------------------------------------
+    # Write Everything to ROOT Output File
+    # -------------------------------------------------------------
+    print(f"\n[*] Writing ROOT file: {args.output}")
+    out_file = ROOT.TFile(args.output, "RECREATE")
     c1.Write()
     c2.Write()
+    c3.Write()
 
-    # Store individual histograms by sample
-    for name in results:
-        sub_dir = f_out.mkdir(name)
-        sub_dir.cd()
-        for h_name, h in results[name].items():
-            h.Write()
-        f_out.cd()
+    for sample_name, res in results.items():
+        dir_sample = out_file.mkdir(sample_name)
+        dir_sample.cd()
+        for k, obj in res.items():
+            if isinstance(obj, (ROOT.TH1, ROOT.TH2, ROOT.TProfile)):
+                obj.Write()
 
-    f_out.Close()
-    print(f"\nCanvases and histograms successfully written to: {args.output}")
-
-    # Export PNG images
-    png_path_c1 = args.output.replace(".root", "_scifi_digi.png")
-    png_path_c2 = args.output.replace(".root", "_tracking_multiplicity.png")
-    c1.SaveAs(png_path_c1)
-    c2.SaveAs(png_path_c2)
-    print(f"Exported PNG plots to:\n  - {png_path_c1}\n  - {png_path_c2}")
+    out_file.Close()
+    print(f"[+] Done! All figures saved in '{args.out_dir}' and ROOT histograms in '{args.output}'.\n")
 
 
 if __name__ == "__main__":

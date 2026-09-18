@@ -6,6 +6,7 @@ set(ANALYSIS_HEADERS
   PreselectionProcessor.h
   MuonCalibrationProcessor.h
   PassingMuonTruthProcessor.h
+  DigiValidationProcessor.h
   DataManager.h
   ProgressPrinter.h
 )
@@ -15,6 +16,7 @@ set(ANALYSIS_SRCS
   PreselectionProcessor.cxx
   MuonCalibrationProcessor.cxx
   PassingMuonTruthProcessor.cxx
+  DigiValidationProcessor.cxx
   DataManager.cxx
   ProgressPrinter.cxx
 )
@@ -38,13 +40,13 @@ find_library(ANALYSIS_TOOLS_LIB snd_analysis_tools PATHS "${SNDSW_ROOT}/lib" NO_
 
 target_link_libraries(trident_analysis
   PUBLIC
-  ${ROOT_LIBRARIES}
-  ${SHIP_DATA_LIB}
-  ${SHIP_LHC_LIB}
-  ${ANALYSIS_TOOLS_LIB}
-)
-
-# Set library properties
-set_target_properties(trident_analysis PROPERTIES
-  LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
+    ROOT::Core
+    ROOT::Tree
+    ROOT::ROOTDataFrame
+    ROOT::RIO
+    ROOT::Hist
+    ROOT::Geom
+    ${SHIP_DATA_LIB}
+    ${SHIP_LHC_LIB}
+    ${ANALYSIS_TOOLS_LIB}
 )

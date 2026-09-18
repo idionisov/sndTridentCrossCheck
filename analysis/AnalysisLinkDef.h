@@ -31,6 +31,9 @@
 #pragma link C++ struct snd::trident::PassingMuonTruthConfig+;
 #pragma link C++ struct snd::trident::PassingMuonTruthInfo+;
 #pragma link C++ class snd::trident::PassingMuonTruthProcessor+;
+#pragma link C++ struct snd::trident::ChannelGeometry+;
+#pragma link C++ struct snd::trident::DigiValidationSummary+;
+#pragma link C++ class snd::trident::DigiValidationProcessor+;
 #pragma link C++ class snd::trident::ProgressPrinter+;
 
 #pragma link C++ namespace snd;
