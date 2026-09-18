@@ -9,10 +9,12 @@ Compares detector response and event observables between:
 
 Features:
   - Exact SiPM channel position geometry cache using Scifi::GetSiPMPosition(detID, A, B)
-  - Thread-safe, lock-free C++ DigiValidationProcessor compiled in libtrident_analysis.so
+  - Track-to-channel distance filtering using sndRecoTrack::getDistToChannel & getDoca
+  - Associated hits: SciFi and Veto close to SciFi track; US and DS close to DS track
+  - Dedicated distributions of track-to-channel / bar distances in a separate TDirectory
   - Accurate Monte Carlo event weighting (FLUKA generator weight & trident scaled weight)
-  - Comprehensive 1D histograms, TProfiles (attenuation length), and 2D correlation plots
-  - Publication-quality overlays and standalone 2D correlation plots
+  - Comprehensive 1D histograms, TProfiles, and 2D correlation plots
+  - Publication-quality overlays and standalone figures
 """
 
 import os
@@ -103,8 +105,15 @@ def analyze_sample(sample_name, config, args):
     snd_geo = SndlhcGeo.GeoInterface(config["geo"])
     scifi_det = snd_geo.modules["Scifi"]
 
-    print("[*] Initializing DigiValidationProcessor and caching SiPM channel positions...")
-    proc = ROOT.snd.trident.DigiValidationProcessor(scifi_det)
+    print("[*] Initializing DigiValidationProcessor with track-hit distance cuts...")
+    val_cfg = ROOT.snd.trident.DigiValidationConfig()
+    val_cfg.scifi_max_dist = args.scifi_max_dist
+    val_cfg.veto_max_dist  = args.veto_max_dist
+    val_cfg.us_max_dist    = args.us_max_dist
+    val_cfg.ds_max_dist    = args.ds_max_dist
+    print(f"[*] Configured cuts: SciFi <= {args.scifi_max_dist*10:.2f} mm | Veto <= {args.veto_max_dist:.1f} cm | US <= {args.us_max_dist:.1f} cm | DS <= {args.ds_max_dist*10:.2f} mm")
+
+    proc = ROOT.snd.trident.DigiValidationProcessor(scifi_det, val_cfg)
     n_cached = proc.getCachedChannelCount()
     print(f"[*] Pre-cached {n_cached:,} SciFi channel SiPM coordinates.")
 
@@ -122,12 +131,9 @@ def analyze_sample(sample_name, config, args):
     # Monte Carlo Event Weighting
     # -------------------------------------------------------------
     if not config.get("is_mc", False):
-        # Real beam data: event weight = 1.0
         df = df.Define("weight", "1.0")
         print("[*] Weight model: Unweighted Data (weight = 1.0)")
     elif sample_name == "SingleMuMC":
-        # Single passing muons: primary FLUKA generator weight
-        # Exposure scaling: L_target * 8e5 / N_events or manual scale factor
         scale_pmu = args.scale_pmu if args.scale_pmu else (args.lumi_target * 8e5 / 1213000.0)
         truth_cfg = ROOT.snd.trident.PassingMuonTruthConfig()
         pmu_proc = ROOT.snd.trident.PassingMuonTruthProcessor(truth_cfg)
@@ -138,7 +144,6 @@ def analyze_sample(sample_name, config, args):
         )
         print(f"[*] Weight model: FLUKA primary muon weight * scale ({scale_pmu:.4e})")
     elif sample_name == "ThreeMuMC":
-        # Trident signal MC: scaled by target / simulated luminosity
         weight_scale = args.lumi_target / args.lumi_mc_tri if args.lumi_mc_tri > 0 else 1.0
         tri_cfg = ROOT.snd.trident.TridentTruthConfig()
         tri_cfg.weightScale = weight_scale
@@ -159,6 +164,7 @@ def analyze_sample(sample_name, config, args):
         df
         .Define("ev", proc, ["Digi_ScifiHits", "Cluster_Scifi", "Digi_MuFilterHits", "Reco_MuonTracks"])
         .Define("n_scifi_hits", "ev.n_scifi_hits")
+        .Define("n_scifi_hits_all", "ev.n_scifi_hits_all")
         .Define("n_scifi_st1", "ev.n_scifi_st1")
         .Define("scifi_sum_qdc", "ev.scifi_sum_qdc")
         .Define("scifi_mean_qdc", "ev.scifi_mean_qdc")
@@ -166,10 +172,15 @@ def analyze_sample(sample_name, config, args):
         .Define("cluster_size", "ev.cluster_size")
         .Define("cluster_qdc", "ev.cluster_qdc")
         .Define("n_mufi_hits", "ev.n_mufi_hits")
+        .Define("n_mufi_hits_all", "ev.n_mufi_hits_all")
+        .Define("n_mufi_veto_hits", "ev.n_mufi_veto_hits")
         .Define("n_mufi_us_hits", "ev.n_mufi_us_hits")
         .Define("n_mufi_ds_hits", "ev.n_mufi_ds_hits")
         .Define("mufi_sum_qdc", "ev.mufi_sum_qdc")
         .Define("n_tracks", "ev.n_tracks")
+        .Define("has_scifi_track", "ev.has_scifi_track")
+        .Define("has_ds_track", "ev.has_ds_track")
+        .Define("has_both_tracks", "ev.has_both_tracks")
         .Define("track_chi2", "ev.track_chi2")
         .Define("track_slope_xz", "ev.track_slope_xz")
         .Define("track_slope_yz", "ev.track_slope_yz")
@@ -188,6 +199,16 @@ def analyze_sample(sample_name, config, args):
         .Define("station_numbers", "ev.station_numbers")
         .Define("station_hits", "ev.station_hits")
         .Define("station_qdc", "ev.station_qdc")
+        .Define("dist_scifi", "ev.dist_scifi")
+        .Define("dist_scifi_horiz", "ev.dist_scifi_horiz")
+        .Define("dist_scifi_vert", "ev.dist_scifi_vert")
+        .Define("doca_scifi", "ev.doca_scifi")
+        .Define("dist_veto", "ev.dist_veto")
+        .Define("doca_veto", "ev.doca_veto")
+        .Define("dist_us", "ev.dist_us")
+        .Define("doca_us", "ev.doca_us")
+        .Define("dist_ds", "ev.dist_ds")
+        .Define("doca_ds", "ev.doca_ds")
     )
 
     df_clean = df.Filter("has_clean_track")
@@ -197,7 +218,7 @@ def analyze_sample(sample_name, config, args):
     # -------------------------------------------------------------
     histograms = {}
 
-    # Hit QDC along clean tracks
+    # Hit QDC along clean tracks (only hits passing distance cut)
     histograms["h_qdc_single_hit"] = df_clean.Histo1D(
         (f"h_qdc_{sample_name}", f"{sample_name} Single Hit QDC;Hit QDC [a.u.];Normalized Entries", 150, -10.0, 140.0),
         "clean_hit_qdc", "weight"
@@ -211,7 +232,7 @@ def analyze_sample(sample_name, config, args):
         "clean_hit_qdc_vert", "weight"
     )
 
-    # Clusters
+    # Clusters (only track-associated)
     histograms["h_cluster_qdc"] = df.Histo1D(
         (f"h_cl_qdc_{sample_name}", f"{sample_name} Cluster Integrated QDC;Cluster QDC [a.u.];Normalized Entries", 105, -10.0, 200.0),
         "cluster_qdc", "weight"
@@ -221,35 +242,43 @@ def analyze_sample(sample_name, config, args):
         "cluster_size", "weight"
     )
 
-    # SciFi Tracker Multiplicities
+    # SciFi Tracker Multiplicities (track-associated hits)
     histograms["h_nhits_st1"] = df.Histo1D(
         (f"h_st1_{sample_name}", f"{sample_name} Station 1 Hits;SciFi Station 1 Hits;Normalized Entries", 40, -0.5, 39.5),
         "n_scifi_st1", "weight"
     )
     histograms["h_nhits_total"] = df.Histo1D(
-        (f"h_sf_tot_{sample_name}", f"{sample_name} Total SciFi Hits;Total SciFi Hits;Normalized Entries", 50, -0.5, 99.5),
+        (f"h_sf_tot_{sample_name}", f"{sample_name} Total SciFi Hits (track-associated);Track SciFi Hits;Normalized Entries", 50, -0.5, 99.5),
         "n_scifi_hits", "weight"
+    )
+    histograms["h_nhits_all_total"] = df.Histo1D(
+        (f"h_sf_all_tot_{sample_name}", f"{sample_name} Total Raw SciFi Hits;Raw SciFi Hits;Normalized Entries", 50, -0.5, 99.5),
+        "n_scifi_hits_all", "weight"
     )
     histograms["h_scifi_mean_qdc"] = df.Histo1D(
         (f"h_sf_mqdc_{sample_name}", f"{sample_name} SciFi Mean QDC;Mean SciFi Hit QDC [a.u.];Normalized Entries", 50, 0.0, 100.0),
         "scifi_mean_qdc", "weight"
     )
 
-    # MuFilter Multiplicities
+    # MuFilter Multiplicities (track-associated hits)
     histograms["h_nhits_mufi"] = df.Histo1D(
-        (f"h_mf_tot_{sample_name}", f"{sample_name} Total MuFilter Hits;Total MuFilter Hits;Normalized Entries", 60, -0.5, 59.5),
+        (f"h_mf_tot_{sample_name}", f"{sample_name} Total MuFilter Hits (track-associated);Track MuFilter Hits;Normalized Entries", 60, -0.5, 59.5),
         "n_mufi_hits", "weight"
     )
+    histograms["h_nhits_veto"] = df.Histo1D(
+        (f"h_mf_veto_{sample_name}", f"{sample_name} Veto MuFilter Hits (track-associated);Veto Hits;Normalized Entries", 20, -0.5, 19.5),
+        "n_mufi_veto_hits", "weight"
+    )
     histograms["h_nhits_us"] = df.Histo1D(
-        (f"h_mf_us_{sample_name}", f"{sample_name} US MuFilter Hits;US MuFilter Hits;Normalized Entries", 40, -0.5, 39.5),
+        (f"h_mf_us_{sample_name}", f"{sample_name} US MuFilter Hits (track-associated);US MuFilter Hits;Normalized Entries", 40, -0.5, 39.5),
         "n_mufi_us_hits", "weight"
     )
     histograms["h_nhits_ds"] = df.Histo1D(
-        (f"h_mf_ds_{sample_name}", f"{sample_name} DS MuFilter Hits;DS MuFilter Hits;Normalized Entries", 40, -0.5, 39.5),
+        (f"h_mf_ds_{sample_name}", f"{sample_name} DS MuFilter Hits (track-associated);DS MuFilter Hits;Normalized Entries", 40, -0.5, 39.5),
         "n_mufi_ds_hits", "weight"
     )
 
-    # Tracking
+    # Tracking Observables
     histograms["h_ntracks"] = df.Histo1D(
         (f"h_ntrk_{sample_name}", f"{sample_name} Reconstructed Tracks;Reconstructed Tracks;Normalized Entries", 6, -0.5, 5.5),
         "n_tracks", "weight"
@@ -267,7 +296,7 @@ def analyze_sample(sample_name, config, args):
         "track_slope_yz", "weight"
     )
 
-    # TProfiles
+    # TProfiles: Hit Multiplicity & QDC vs Station
     histograms["p_nhits_per_station"] = df.Profile1D(
         (f"p_sthits_{sample_name}", f"{sample_name} Hits / Station;SciFi Station;Mean Hits", 5, 0.5, 5.5),
         "station_numbers", "station_hits", "weight"
@@ -290,6 +319,65 @@ def analyze_sample(sample_name, config, args):
     )
 
     # -------------------------------------------------------------
+    # Track to Channel / Bar Distance Histograms
+    # -------------------------------------------------------------
+    # SciFi Track -> SciFi Channels
+    histograms["h_dist_scifi"] = df.Histo1D(
+        (f"h_dist_sf_{sample_name}", f"{sample_name} SciFi Track-Channel Distance;1D Distance to SciFi Track [cm];Normalized Entries", 100, 0.0, 1.0),
+        "dist_scifi", "weight"
+    )
+    histograms["h_dist_scifi_zoom"] = df.Histo1D(
+        (f"h_dist_sf_zoom_{sample_name}", f"{sample_name} SciFi Track-Channel Distance (Zoom);1D Distance to SciFi Track [cm];Normalized Entries", 100, 0.0, 0.2),
+        "dist_scifi", "weight"
+    )
+    histograms["h_dist_scifi_h"] = df.Histo1D(
+        (f"h_dist_sf_h_{sample_name}", f"{sample_name} SciFi Track-Channel Dist (Horiz);1D Distance to SciFi Track [cm];Normalized Entries", 100, 0.0, 0.2),
+        "dist_scifi_horiz", "weight"
+    )
+    histograms["h_dist_scifi_v"] = df.Histo1D(
+        (f"h_dist_sf_v_{sample_name}", f"{sample_name} SciFi Track-Channel Dist (Vert);1D Distance to SciFi Track [cm];Normalized Entries", 100, 0.0, 0.2),
+        "dist_scifi_vert", "weight"
+    )
+    histograms["h_doca_scifi"] = df.Histo1D(
+        (f"h_doca_sf_{sample_name}", f"{sample_name} SciFi Track-Channel 3D DOCA;DOCA to SciFi Track [cm];Normalized Entries", 100, 0.0, 1.0),
+        "doca_scifi", "weight"
+    )
+
+    # SciFi Track -> Veto Bars
+    histograms["h_dist_veto"] = df.Histo1D(
+        (f"h_dist_veto_{sample_name}", f"{sample_name} Veto Bar Distance to SciFi Track;1D Distance to SciFi Track [cm];Normalized Entries", 60, 0.0, 30.0),
+        "dist_veto", "weight"
+    )
+    histograms["h_doca_veto"] = df.Histo1D(
+        (f"h_doca_veto_{sample_name}", f"{sample_name} Veto Bar 3D DOCA to SciFi Track;DOCA to SciFi Track [cm];Normalized Entries", 60, 0.0, 30.0),
+        "doca_veto", "weight"
+    )
+
+    # DS Track -> US Bars
+    histograms["h_dist_us"] = df.Histo1D(
+        (f"h_dist_us_{sample_name}", f"{sample_name} US Bar Distance to DS Track;1D Distance to DS Track [cm];Normalized Entries", 60, 0.0, 30.0),
+        "dist_us", "weight"
+    )
+    histograms["h_doca_us"] = df.Histo1D(
+        (f"h_doca_us_{sample_name}", f"{sample_name} US Bar 3D DOCA to DS Track;DOCA to DS Track [cm];Normalized Entries", 60, 0.0, 30.0),
+        "doca_us", "weight"
+    )
+
+    # DS Track -> DS Bars
+    histograms["h_dist_ds"] = df.Histo1D(
+        (f"h_dist_ds_{sample_name}", f"{sample_name} DS Bar Distance to DS Track;1D Distance to DS Track [cm];Normalized Entries", 60, 0.0, 3.0),
+        "dist_ds", "weight"
+    )
+    histograms["h_dist_ds_zoom"] = df.Histo1D(
+        (f"h_dist_ds_zoom_{sample_name}", f"{sample_name} DS Bar Distance to DS Track (Zoom);1D Distance to DS Track [cm];Normalized Entries", 60, 0.0, 0.6),
+        "dist_ds", "weight"
+    )
+    histograms["h_doca_ds"] = df.Histo1D(
+        (f"h_doca_ds_{sample_name}", f"{sample_name} DS Bar 3D DOCA to DS Track;DOCA to DS Track [cm];Normalized Entries", 60, 0.0, 3.0),
+        "doca_ds", "weight"
+    )
+
+    # -------------------------------------------------------------
     # Book 2D Histograms
     # -------------------------------------------------------------
     histograms["h2_qdc_vs_dist"] = df_clean.Histo2D(
@@ -301,11 +389,11 @@ def analyze_sample(sample_name, config, args):
         "cluster_size", "cluster_qdc", "weight"
     )
     histograms["h2_scifi_vs_mufi"] = df.Histo2D(
-        (f"h2_sf_mf_{sample_name}", f"{sample_name}: SciFi vs MuFilter Hits;Total SciFi Hits;Total MuFilter Hits;Entries", 50, 0.0, 100.0, 30, 0.0, 60.0),
+        (f"h2_sf_mf_{sample_name}", f"{sample_name}: SciFi vs MuFilter Hits;Track SciFi Hits;Track MuFilter Hits;Entries", 50, 0.0, 100.0, 30, 0.0, 60.0),
         "n_scifi_hits", "n_mufi_hits", "weight"
     )
     histograms["h2_qdc_vs_hits"] = df.Histo2D(
-        (f"h2_qdc_hits_{sample_name}", f"{sample_name}: SciFi Total QDC vs Hits;Total SciFi Hits;Total SciFi QDC [a.u.];Entries", 50, 0.0, 100.0, 50, 0.0, 2500.0),
+        (f"h2_qdc_hits_{sample_name}", f"{sample_name}: SciFi Total QDC vs Hits;Track SciFi Hits;Track SciFi QDC [a.u.];Entries", 50, 0.0, 100.0, 50, 0.0, 2500.0),
         "n_scifi_hits", "scifi_sum_qdc", "weight"
     )
     histograms["h2_track_slopes"] = df_clean.Histo2D(
@@ -334,7 +422,7 @@ def analyze_sample(sample_name, config, args):
     return results
 
 
-def draw_pad_1d(pad, hist_dict, hist_key, is_profile=False, log_y=False):
+def draw_pad_1d(pad, hist_dict, hist_key, is_profile=False, log_y=False, cut_line=None, cut_label=None):
     """Draw overlaid 1D histograms or TProfiles across samples with normalization."""
     pad.cd()
     if log_y:
@@ -342,7 +430,7 @@ def draw_pad_1d(pad, hist_dict, hist_key, is_profile=False, log_y=False):
     else:
         pad.SetLogy(0)
 
-    leg = ROOT.TLegend(0.60, 0.68, 0.88, 0.88)
+    leg = ROOT.TLegend(0.58, 0.68, 0.88, 0.88)
     leg.SetBorderSize(0)
     leg.SetFillStyle(0)
     leg.SetTextSize(0.04)
@@ -350,60 +438,59 @@ def draw_pad_1d(pad, hist_dict, hist_key, is_profile=False, log_y=False):
     drawn = []
     max_val = 0.0
 
+    first = True
+    first_h = None
     for sample_name, res in hist_dict.items():
-        if not res or hist_key not in res:
+        if hist_key not in res:
             continue
-        h = res[hist_key].Clone(f"{res[hist_key].GetName()}_draw")
-        col = res["color"]
-        h.SetLineColor(col)
-        h.SetLineWidth(2)
+        orig = res[hist_key]
+        h = orig.Clone(f"{orig.GetName()}_draw_{hist_key}")
+        drawn.append(h)
 
-        if is_profile:
-            h.SetMarkerColor(col)
-            h.SetMarkerStyle(20 if sample_name == "Data" else 24)
-            h.SetMarkerSize(0.8)
-            cur_max = h.GetMaximum()
-        else:
+        if not is_profile:
             integral = h.Integral()
             if integral > 0:
                 h.Scale(1.0 / integral)
-            if sample_name == "Data":
-                h.SetMarkerColor(col)
-                h.SetMarkerStyle(20)
-                h.SetMarkerSize(0.7)
-            else:
-                h.SetFillColorAlpha(col, 0.15)
-            cur_max = h.GetMaximum()
 
-        if cur_max > max_val:
-            max_val = cur_max
-        drawn.append((sample_name, h))
+        h.SetLineColor(res["color"])
+        h.SetLineWidth(2)
+        h.SetMarkerColor(res["color"])
+        h.SetMarkerStyle(20)
+        h.SetMarkerSize(0.7)
 
-    if not drawn:
-        return
-
-    # Draw first histogram to establish axes
-    first_sample, first_hist = drawn[0]
-    if log_y:
-        first_hist.SetMaximum(max_val * 5.0)
-        first_hist.SetMinimum(1e-4)
-    else:
-        first_hist.SetMaximum(max_val * 1.35)
-        first_hist.SetMinimum(0.0)
-
-    draw_opt = "E1" if (is_profile or first_sample == "Data") else "HIST"
-    first_hist.Draw(draw_opt)
-    leg_opt = "lep" if (is_profile or first_sample == "Data") else "lf"
-    leg.AddEntry(first_hist, first_sample, leg_opt)
-
-    for sample_name, h in drawn[1:]:
-        d_opt = "E1 SAME" if (is_profile or sample_name == "Data") else "HIST SAME"
+        max_val = max(max_val, h.GetMaximum())
+        d_opt = "E1" if first else "E1 SAME"
         h.Draw(d_opt)
-        l_opt = "lep" if (is_profile or sample_name == "Data") else "lf"
+        if first:
+            first = False
+            first_h = h
+
+        l_opt = "lep" if (is_profile or sample_name == "Data") else "lep"
         leg.AddEntry(h, sample_name, l_opt)
+
+    if first_h:
+        if log_y:
+            first_h.SetMaximum(max_val * 10.0 if max_val > 0 else 1.0)
+            first_h.SetMinimum(1e-4)
+        else:
+            first_h.SetMaximum(max_val * 1.35 if max_val > 0 else 1.0)
+            first_h.SetMinimum(0.0)
+
+        if cut_line is not None:
+            y_top = first_h.GetMaximum() * 0.95
+            line = ROOT.TLine(cut_line, 0, cut_line, y_top)
+            line.SetLineColor(ROOT.kRed + 1)
+            line.SetLineStyle(2)
+            line.SetLineWidth(2)
+            line.Draw("SAME")
+            drawn.append(line)
+            lbl = cut_label if cut_label else f"Cut: {cut_line} cm"
+            leg.AddEntry(line, lbl, "l")
 
     leg.Draw()
     pad.Update()
+    pad._drawn = drawn
+    pad._leg = leg
 
 
 def main():
@@ -419,6 +506,10 @@ def main():
     parser.add_argument("--lumi-target", type=float, default=28.0, help="Target integrated luminosity [fb^-1]")
     parser.add_argument("--lumi-mc-tri", type=float, default=160.0, help="ThreeMu MC integrated luminosity [fb^-1]")
     parser.add_argument("--scale-pmu", type=float, default=None, help="Manual PMU MC scale factor")
+    parser.add_argument("--scifi-max-dist", type=float, default=0.1, help="Max distance between SciFi hit & SciFi track [cm] (default: 0.1 cm = 1 mm)")
+    parser.add_argument("--veto-max-dist", type=float, default=3.0, help="Max distance between Veto hit & SciFi track [cm] (default: 3.0 cm)")
+    parser.add_argument("--us-max-dist", type=float, default=3.0, help="Max distance between US hit & DS track [cm] (default: 3.0 cm)")
+    parser.add_argument("--ds-max-dist", type=float, default=0.3, help="Max distance between DS hit & DS track [cm] (default: 0.3 cm = 3 mm)")
     parser.add_argument("-o", "--output", default="out/digi_validation.root", help="Output ROOT file")
     parser.add_argument("--out-dir", default="plots/digi_validation", help="Output directory for plots")
     parser.add_argument("--no-data", action="store_true", help="Skip data sample")
@@ -517,25 +608,58 @@ def main():
     c2.SaveAs(os.path.join(args.out_dir, "tracking_multiplicity_validation.pdf"))
 
     # -------------------------------------------------------------
-    # Canvas 3: 2D Correlation Matrix (N_samples x 4)
+    # Canvas 3: Track to Activated Channel Distances (3 x 2)
+    # -------------------------------------------------------------
+    print("[*] Generating Canvas 3: Track-to-Channel Distance Distributions...")
+    c_dist = ROOT.TCanvas("c_track_distances", "Track to Channel Distances", 1600, 1000)
+    c_dist.Divide(3, 2)
+
+    draw_pad_1d(c_dist.cd(1), results, "h_dist_scifi_zoom", is_profile=False, log_y=True,
+                cut_line=args.scifi_max_dist, cut_label=f"Cut: {args.scifi_max_dist*10:.1f} mm")
+    draw_pad_1d(c_dist.cd(2), results, "h_dist_veto", is_profile=False, log_y=True,
+                cut_line=args.veto_max_dist, cut_label=f"Cut: {args.veto_max_dist:.1f} cm")
+    draw_pad_1d(c_dist.cd(3), results, "h_dist_us", is_profile=False, log_y=True,
+                cut_line=args.us_max_dist, cut_label=f"Cut: {args.us_max_dist:.1f} cm")
+    draw_pad_1d(c_dist.cd(4), results, "h_dist_ds_zoom", is_profile=False, log_y=True,
+                cut_line=args.ds_max_dist, cut_label=f"Cut: {args.ds_max_dist*10:.1f} mm")
+    draw_pad_1d(c_dist.cd(5), results, "h_doca_scifi", is_profile=False, log_y=True)
+    draw_pad_1d(c_dist.cd(6), results, "h_doca_ds", is_profile=False, log_y=True)
+
+    c_dist.SaveAs(os.path.join(args.out_dir, "track_channel_distances.png"))
+    c_dist.SaveAs(os.path.join(args.out_dir, "track_channel_distances.pdf"))
+
+    # Standalone distance figures
+    dist_single_configs = [
+        ("dist_scifi", "h_dist_scifi_zoom", args.scifi_max_dist, f"Cut: {args.scifi_max_dist*10:.1f} mm"),
+        ("dist_veto", "h_dist_veto", args.veto_max_dist, f"Cut: {args.veto_max_dist:.1f} cm"),
+        ("dist_us", "h_dist_us", args.us_max_dist, f"Cut: {args.us_max_dist:.1f} cm"),
+        ("dist_ds", "h_dist_ds_zoom", args.ds_max_dist, f"Cut: {args.ds_max_dist*10:.1f} mm"),
+    ]
+    for fig_name, key, cut, lbl in dist_single_configs:
+        c_single = ROOT.TCanvas(f"c_{fig_name}", fig_name, 800, 600)
+        draw_pad_1d(c_single, results, key, is_profile=False, log_y=True, cut_line=cut, cut_label=lbl)
+        c_single.SaveAs(os.path.join(args.out_dir, f"{fig_name}.png"))
+
+    # -------------------------------------------------------------
+    # Canvas 4: 2D Correlation Matrix (N_samples x 4)
     # -------------------------------------------------------------
     print("[*] Generating 2D Correlation Plots...")
     n_samp = len(results)
-    c3 = ROOT.TCanvas("c_2d_correlations", "2D Correlation Matrix", 450 * n_samp, 1600)
-    c3.Divide(n_samp, 4)
+    c4 = ROOT.TCanvas("c_2d_correlations", "2D Correlation Matrix", 450 * n_samp, 1600)
+    c4.Divide(n_samp, 4)
 
     row_keys = ["h2_qdc_vs_dist", "h2_cls_qdc_vs_size", "h2_scifi_vs_mufi", "h2_track_slopes"]
     for row_idx, key in enumerate(row_keys):
         for col_idx, (sample_name, res) in enumerate(results.items()):
             pad_num = row_idx * n_samp + col_idx + 1
-            pad = c3.cd(pad_num)
+            pad = c4.cd(pad_num)
             pad.SetRightMargin(0.14)
             pad.SetLogz(1)
             h2 = res[key]
             h2.Draw("COLZ")
 
-    c3.SaveAs(os.path.join(args.out_dir, "2d_correlation_matrix.png"))
-    c3.SaveAs(os.path.join(args.out_dir, "2d_correlation_matrix.pdf"))
+    c4.SaveAs(os.path.join(args.out_dir, "2d_correlation_matrix.png"))
+    c4.SaveAs(os.path.join(args.out_dir, "2d_correlation_matrix.pdf"))
 
     # Also save standalone high-resolution 2D figures
     for sample_name, res in results.items():
@@ -547,20 +671,40 @@ def main():
             c_single.SaveAs(os.path.join(args.out_dir, f"{key}_{sample_name}.png"))
 
     # -------------------------------------------------------------
-    # Write Everything to ROOT Output File
+    # Write Everything to ROOT Output File with dedicated TDirectory
     # -------------------------------------------------------------
     print(f"\n[*] Writing ROOT file: {args.output}")
     out_file = ROOT.TFile(args.output, "RECREATE")
     c1.Write()
     c2.Write()
-    c3.Write()
+    c_dist.Write()
+    c4.Write()
+
+    # Create dedicated top-level directory for Track-to-Channel Distances
+    dir_distances = out_file.mkdir("TrackHitDistances")
+
+    dist_keys = [
+        "h_dist_scifi", "h_dist_scifi_zoom", "h_dist_scifi_h", "h_dist_scifi_v", "h_doca_scifi",
+        "h_dist_veto", "h_doca_veto",
+        "h_dist_us", "h_doca_us",
+        "h_dist_ds", "h_dist_ds_zoom", "h_doca_ds"
+    ]
 
     for sample_name, res in results.items():
+        # Main sample directory
         dir_sample = out_file.mkdir(sample_name)
         dir_sample.cd()
         for k, obj in res.items():
             if isinstance(obj, (ROOT.TH1, ROOT.TH2, ROOT.TProfile)):
                 obj.Write()
+
+        # Write distance plots into dedicated TrackHitDistances/<sample_name>
+        dir_distances.cd()
+        dir_sample_dist = dir_distances.mkdir(sample_name)
+        dir_sample_dist.cd()
+        for k in dist_keys:
+            if k in res and isinstance(res[k], (ROOT.TH1, ROOT.TH2, ROOT.TProfile)):
+                res[k].Write()
 
     out_file.Close()
     print(f"[+] Done! All figures saved in '{args.out_dir}' and ROOT histograms in '{args.output}'.\n")

@@ -17,6 +17,16 @@
 
 namespace snd::trident {
 
+struct DigiValidationConfig {
+    double scifi_max_dist{0.1};   // Max distance for SciFi hits to SciFi track [cm] (1 mm = 0.1 cm)
+    double veto_max_dist{3.0};    // Max distance for Veto hits to SciFi track [cm] (3 cm)
+    double us_max_dist{3.0};      // Max distance for US hits to DS track [cm] (3 cm)
+    double ds_max_dist{0.3};      // Max distance for DS hits to DS track [cm] (3 mm = 0.3 cm)
+    int scifi_track_type{11};     // SciFi track type (11 = Hough SciFi)
+    int ds_track_type{13};        // DS track type (13 = Hough DS)
+    double chi2_max{20.0};        // Max chi2/ndf
+};
+
 struct ChannelGeometry {
     float xA{0.0f};
     float yA{0.0f};
@@ -32,8 +42,9 @@ struct ChannelGeometry {
 };
 
 struct DigiValidationSummary {
-    // Event-level scalar quantities
+    // Event-level scalar quantities (track-associated)
     double n_scifi_hits{0.0};
+    double n_scifi_hits_all{0.0};
     double n_scifi_st1{0.0};
     double n_scifi_st2{0.0};
     double n_scifi_st3{0.0};
@@ -46,12 +57,16 @@ struct DigiValidationSummary {
     double scifi_cluster_sum_qdc{0.0};
 
     double n_mufi_hits{0.0};
+    double n_mufi_hits_all{0.0};
     double n_mufi_veto_hits{0.0};
     double n_mufi_us_hits{0.0};
     double n_mufi_ds_hits{0.0};
     double mufi_sum_qdc{0.0};
 
     double n_tracks{0.0};
+    bool has_scifi_track{false};
+    bool has_ds_track{false};
+    bool has_both_tracks{false};
     bool has_clean_track{false};
     double track_chi2_ndf_clean{0.0};
     double track_slope_xz_clean{0.0};
@@ -59,9 +74,13 @@ struct DigiValidationSummary {
     double track_x_300{0.0};
     double track_y_300{0.0};
 
+    double ds_track_chi2_ndf{0.0};
+    double ds_track_slope_xz{0.0};
+    double ds_track_slope_yz{0.0};
+
     double event_weight{1.0};
 
-    // Vector observables for RDataFrame 1D & 2D projections
+    // Vector observables for SciFi hit QDC vs distance to SiPM (for hits passing cut)
     std::vector<double> hit_qdc;
     std::vector<double> hit_distance;
     std::vector<double> hit_station;
@@ -83,15 +102,33 @@ struct DigiValidationSummary {
     std::vector<double> station_numbers{1.0, 2.0, 3.0, 4.0, 5.0};
     std::vector<double> station_hits{0.0, 0.0, 0.0, 0.0, 0.0};
     std::vector<double> station_qdc{0.0, 0.0, 0.0, 0.0, 0.0};
+
+    // Track-to-channel distance distributions
+    std::vector<double> dist_scifi;
+    std::vector<double> dist_scifi_horiz;
+    std::vector<double> dist_scifi_vert;
+    std::vector<double> doca_scifi;
+
+    std::vector<double> dist_veto;
+    std::vector<double> doca_veto;
+
+    std::vector<double> dist_us;
+    std::vector<double> doca_us;
+
+    std::vector<double> dist_ds;
+    std::vector<double> doca_ds;
 };
 
 class DigiValidationProcessor {
 public:
-    DigiValidationProcessor(Scifi* scifi = nullptr);
+    DigiValidationProcessor(Scifi* scifi = nullptr, const DigiValidationConfig& config = DigiValidationConfig());
     ~DigiValidationProcessor() = default;
 
     void initCache(Scifi* scifi);
     size_t getCachedChannelCount() const { return fChannelMap.size(); }
+
+    void setConfig(const DigiValidationConfig& config) { fConfig = config; }
+    const DigiValidationConfig& getConfig() const { return fConfig; }
 
     DigiValidationSummary process(
         const TClonesArray* scifiHits,
@@ -112,6 +149,13 @@ public:
     }
 
 private:
+    void findBestTracks(
+        const TClonesArray* tracks,
+        sndRecoTrack*& bestScifiTrack,
+        sndRecoTrack*& bestDsTrack
+    ) const;
+
+    DigiValidationConfig fConfig;
     std::unordered_map<int, ChannelGeometry> fChannelMap;
     bool fHasGeometryCache{false};
 };
