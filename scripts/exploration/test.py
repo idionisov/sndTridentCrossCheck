@@ -9,7 +9,7 @@ Compares detector response and event observables between:
 
 Features:
   - Exact SiPM channel position geometry cache using Scifi::GetSiPMPosition(detID, A, B)
-  - Track-to-channel distance filtering using sndRecoTrack::getDistToChannel & getDoca
+  - Track-to-channel distance filtering using sndRecoTrack track parameters & channel geometry
   - Associated hits: SciFi and Veto close to SciFi track; US and DS close to DS track
   - Dedicated distributions of track-to-channel / bar distances in a separate TDirectory
   - Accurate Monte Carlo event weighting (FLUKA generator weight & trident scaled weight)
@@ -19,6 +19,14 @@ Features:
 
 import os
 import sys
+
+# Ensure grid / CA certificates are discoverable by XRootD
+if "X509_CERT_DIR" not in os.environ:
+    for cert_dir in ["/cvmfs/grid.cern.ch/etc/grid-security/certificates", "/etc/pki/tls/certs"]:
+        if os.path.isdir(cert_dir):
+            os.environ["X509_CERT_DIR"] = cert_dir
+            break
+
 import math
 import glob
 import time
@@ -104,6 +112,7 @@ def analyze_sample(sample_name, config, args):
     print(f"[*] Loading geometry: {config['geo']}")
     snd_geo = SndlhcGeo.GeoInterface(config["geo"])
     scifi_det = snd_geo.modules["Scifi"]
+    mufi_det  = snd_geo.modules["MuFilter"]
 
     print("[*] Initializing DigiValidationProcessor with track-hit distance cuts...")
     val_cfg = ROOT.snd.trident.DigiValidationConfig()
@@ -113,7 +122,7 @@ def analyze_sample(sample_name, config, args):
     val_cfg.ds_max_dist    = args.ds_max_dist
     print(f"[*] Configured cuts: SciFi <= {args.scifi_max_dist*10:.2f} mm | Veto <= {args.veto_max_dist:.1f} cm | US <= {args.us_max_dist:.1f} cm | DS <= {args.ds_max_dist*10:.2f} mm")
 
-    proc = ROOT.snd.trident.DigiValidationProcessor(scifi_det, val_cfg)
+    proc = ROOT.snd.trident.DigiValidationProcessor(scifi_det, mufi_det, val_cfg)
     n_cached = proc.getCachedChannelCount()
     print(f"[*] Pre-cached {n_cached:,} SciFi channel SiPM coordinates.")
 
@@ -629,7 +638,7 @@ def main():
     c_dist.SaveAs(os.path.join(args.out_dir, "track_channel_distances.pdf"))
 
     # Standalone distance figures
-    dist_single_configs = [
+    dist_single_configs = [\
         ("dist_scifi", "h_dist_scifi_zoom", args.scifi_max_dist, f"Cut: {args.scifi_max_dist*10:.1f} mm"),
         ("dist_veto", "h_dist_veto", args.veto_max_dist, f"Cut: {args.veto_max_dist:.1f} cm"),
         ("dist_us", "h_dist_us", args.us_max_dist, f"Cut: {args.us_max_dist:.1f} cm"),

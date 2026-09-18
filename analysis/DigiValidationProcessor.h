@@ -1,19 +1,16 @@
 #ifndef DIGI_VALIDATION_PROCESSOR_H
 #define DIGI_VALIDATION_PROCESSOR_H
 
-#include "TClonesArray.h"
-#include "sndCluster.h"
-#include "sndScifiHit.h"
-#include "sndRecoTrack.h"
-#include "MuFilterHit.h"
-#include "ShipMCTrack.h"
-#include "TVector3.h"
-#include "Scifi.h"
-
 #include <vector>
 #include <unordered_map>
-#include <cmath>
-#include <string>
+#include "TClonesArray.h"
+#include "TVector3.h"
+#include "Scifi.h"
+#include "MuFilter.h"
+#include "sndScifiHit.h"
+#include "MuFilterHit.h"
+#include "sndCluster.h"
+#include "sndRecoTrack.h"
 
 namespace snd::trident {
 
@@ -34,10 +31,9 @@ struct ChannelGeometry {
     float xB{0.0f};
     float yB{0.0f};
     float zB{0.0f};
-    float z_mid{0.0f};
     float sipm_x{0.0f};
     float sipm_y{0.0f};
-    float sipm_z{0.0f};
+    float z_mid{0.0f};
     bool is_vertical{false};
 };
 
@@ -54,6 +50,8 @@ struct DigiValidationSummary {
     double scifi_mean_qdc{0.0};
 
     double n_scifi_clusters{0.0};
+    std::vector<double> cluster_size;
+    std::vector<double> cluster_qdc;
     double scifi_cluster_sum_qdc{0.0};
 
     double n_mufi_hits{0.0};
@@ -92,13 +90,12 @@ struct DigiValidationSummary {
     std::vector<double> hit_qdc_vert;
     std::vector<double> hit_dist_vert;
 
-    std::vector<double> cluster_size;
-    std::vector<double> cluster_qdc;
-
+    // Multi-track observables
     std::vector<double> track_chi2;
     std::vector<double> track_slope_xz;
     std::vector<double> track_slope_yz;
 
+    // Multiplicity & QDC per station
     std::vector<double> station_numbers{1.0, 2.0, 3.0, 4.0, 5.0};
     std::vector<double> station_hits{0.0, 0.0, 0.0, 0.0, 0.0};
     std::vector<double> station_qdc{0.0, 0.0, 0.0, 0.0, 0.0};
@@ -121,14 +118,31 @@ struct DigiValidationSummary {
 
 class DigiValidationProcessor {
 public:
-    DigiValidationProcessor(Scifi* scifi = nullptr, const DigiValidationConfig& config = DigiValidationConfig());
+    DigiValidationProcessor(
+        Scifi* scifi = nullptr,
+        MuFilter* mufi = nullptr,
+        const DigiValidationConfig& config = DigiValidationConfig()
+    );
     ~DigiValidationProcessor() = default;
 
-    void initCache(Scifi* scifi);
+    DigiValidationProcessor(const DigiValidationProcessor&) = default;
+    DigiValidationProcessor& operator=(const DigiValidationProcessor&) = default;
+    DigiValidationProcessor(DigiValidationProcessor&&) = default;
+    DigiValidationProcessor& operator=(DigiValidationProcessor&&) = default;
+
+    void initCache(Scifi* scifi, MuFilter* mufi = nullptr);
     size_t getCachedChannelCount() const { return fChannelMap.size(); }
+    size_t getCachedMufiChannelCount() const { return fMufiChannelMap.size(); }
 
     void setConfig(const DigiValidationConfig& config) { fConfig = config; }
     const DigiValidationConfig& getConfig() const { return fConfig; }
+
+    float computeDistToChannel(sndRecoTrack* trk, int detID) const;
+    float computeDoca(sndRecoTrack* trk, int detID) const;
+    float computeDistToChannel(sndRecoTrack* trk, const sndScifiHit* hit) const;
+    float computeDistToChannel(sndRecoTrack* trk, const MuFilterHit* hit) const;
+    float computeDoca(sndRecoTrack* trk, const sndScifiHit* hit) const;
+    float computeDoca(sndRecoTrack* trk, const MuFilterHit* hit) const;
 
     DigiValidationSummary process(
         const TClonesArray* scifiHits,
@@ -155,8 +169,13 @@ private:
         sndRecoTrack*& bestDsTrack
     ) const;
 
+    bool getChannelGeometry(int detID, TVector3& left, TVector3& right, bool& isVertical) const;
+
     DigiValidationConfig fConfig;
-    std::unordered_map<int, ChannelGeometry> fChannelMap;
+    Scifi* fScifi{nullptr};
+    MuFilter* fMuFilter{nullptr};
+    mutable std::unordered_map<int, ChannelGeometry> fChannelMap;
+    mutable std::unordered_map<int, ChannelGeometry> fMufiChannelMap;
     bool fHasGeometryCache{false};
 };
 

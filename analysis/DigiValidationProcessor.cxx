@@ -1,63 +1,302 @@
 #include "DigiValidationProcessor.h"
+#include <cmath>
+#include <limits>
 #include <algorithm>
-#include <iostream>
+#include "TROOT.h"
+#include "TError.h"
 
 namespace snd::trident {
 
-DigiValidationProcessor::DigiValidationProcessor(Scifi* scifi, const DigiValidationConfig& config)
-    : fConfig(config) {
-    if (scifi) {
-        initCache(scifi);
+DigiValidationProcessor::DigiValidationProcessor(
+    Scifi* scifi,
+    MuFilter* mufi,
+    const DigiValidationConfig& config
+) : fConfig(config), fScifi(scifi), fMuFilter(mufi) {
+    if (scifi || mufi) {
+        initCache(scifi, mufi);
     }
 }
 
-void DigiValidationProcessor::initCache(Scifi* scifi) {
-    if (!scifi) return;
-    fChannelMap.clear();
-    fChannelMap.reserve(16000);
+void DigiValidationProcessor::initCache(Scifi* scifi, MuFilter* mufi) {
+    if (scifi) {
+        fScifi = scifi;
+    } else if (!fScifi && gROOT && gROOT->GetListOfGlobals()) {
+        fScifi = dynamic_cast<Scifi*>(gROOT->GetListOfGlobals()->FindObject("Scifi"));
+    }
 
-    TVector3 A, B;
-    for (int st = 1; st <= 5; ++st) {
-        for (int p = 0; p <= 1; ++p) {
-            int plane_offset = p * 100000;
-            for (int m = 0; m < 3; ++m) {
-                for (int r = 0; r < 4; ++r) {
-                    for (int c = 0; c < 128; ++c) {
-                        int det_id = st * 1000000 + plane_offset + m * 10000 + r * 1000 + c;
-                        try {
-                            scifi->GetSiPMPosition(det_id, A, B);
-                            ChannelGeometry cg;
-                            cg.xA = static_cast<float>(A.X());
-                            cg.yA = static_cast<float>(A.Y());
-                            cg.zA = static_cast<float>(A.Z());
-                            cg.xB = static_cast<float>(B.X());
-                            cg.yB = static_cast<float>(B.Y());
-                            cg.zB = static_cast<float>(B.Z());
-                            cg.z_mid = 0.5f * (cg.zA + cg.zB);
-                            cg.is_vertical = (p == 1);
+    if (mufi) {
+        fMuFilter = mufi;
+    } else if (!fMuFilter && gROOT && gROOT->GetListOfGlobals()) {
+        fMuFilter = dynamic_cast<MuFilter*>(gROOT->GetListOfGlobals()->FindObject("MuFilter"));
+    }
 
-                            // In SND@LHC SciFi:
-                            // Vertical fibers run along Y: readout SiPM is at B (top, y ~ 54 cm)
-                            // Horizontal fibers run along X: readout SiPM is at A (side, x ~ -46 cm)
-                            if (cg.is_vertical) {
-                                cg.sipm_x = cg.xB;
-                                cg.sipm_y = cg.yB;
-                                cg.sipm_z = cg.zB;
-                            } else {
-                                cg.sipm_x = cg.xA;
-                                cg.sipm_y = cg.yA;
-                                cg.sipm_z = cg.zA;
+    // Suppress TGeoNavigator warnings during full volume traversal
+    int prevErrorIgnore = gErrorIgnoreLevel;
+    gErrorIgnoreLevel = kFatal;
+
+    // 1. Cache SciFi channel geometries
+    if (fScifi) {
+        fChannelMap.clear();
+        fChannelMap.reserve(15360);
+
+        TVector3 left, right;
+        // Iterate over stations 1..5, planes 0..1 (horizontal=0, vertical=1)
+        for (int station = 1; station <= 5; ++station) {
+            for (int plane = 0; plane <= 1; ++plane) {
+                bool is_vert = (plane == 1);
+                // 4 mats per plane
+                for (int mat = 0; mat < 4; ++mat) {
+                    // 3 SiPMs per mat, 128 channels each
+                    for (int sipm = 0; sipm < 3; ++sipm) {
+                        for (int ch = 0; ch < 128; ++ch) {
+                            int channel_id = sipm * 128 + ch;
+                            int det_id = station * 1000000 + plane * 100000 + mat * 10000 + channel_id;
+
+                            try {
+                                left.SetXYZ(0, 0, 0); right.SetXYZ(0, 0, 0);
+                                fScifi->GetSiPMPosition(det_id, left, right);
+                                if (left.Mag() > 0 || right.Mag() > 0) {
+                                    ChannelGeometry cg;
+                                    cg.xA = static_cast<float>(left.X());
+                                    cg.yA = static_cast<float>(left.Y());
+                                    cg.zA = static_cast<float>(left.Z());
+                                    cg.xB = static_cast<float>(right.X());
+                                    cg.yB = static_cast<float>(right.Y());
+                                    cg.zB = static_cast<float>(right.Z());
+                                    cg.sipm_x = cg.xA;
+                                    cg.sipm_y = cg.yA;
+                                    cg.z_mid = 0.5f * (cg.zA + cg.zB);
+                                    cg.is_vertical = is_vert;
+
+                                    fChannelMap[det_id] = cg;
+                                }
+                            } catch (...) {
+                                continue;
                             }
-                            fChannelMap[det_id] = cg;
-                        } catch (...) {
-                            // Skip non-existent channels
                         }
                     }
                 }
             }
         }
     }
+
+    // 2. Cache MuFilter channel geometries
+    if (fMuFilter) {
+        fMufiChannelMap.clear();
+        fMufiChannelMap.reserve(600);
+        TVector3 left, right;
+
+        // Veto: up to 3 planes (0, 1, 2), up to 10 bars each (10000 + p*1000 + b)
+        for (int p = 0; p < 3; ++p) {
+            for (int b = 0; b < 10; ++b) {
+                int det_id = 10000 + p * 1000 + b;
+                try {
+                    left.SetXYZ(0, 0, 0); right.SetXYZ(0, 0, 0);
+                    fMuFilter->GetPosition(det_id, left, right);
+                    if (left.Mag() > 0 || right.Mag() > 0) {
+                        ChannelGeometry cg;
+                        cg.xA = static_cast<float>(left.X());
+                        cg.yA = static_cast<float>(left.Y());
+                        cg.zA = static_cast<float>(left.Z());
+                        cg.xB = static_cast<float>(right.X());
+                        cg.yB = static_cast<float>(right.Y());
+                        cg.zB = static_cast<float>(right.Z());
+                        cg.z_mid = 0.5f * (cg.zA + cg.zB);
+                        cg.is_vertical = (std::abs(right.Y() - left.Y()) > std::abs(right.X() - left.X()));
+                        fMufiChannelMap[det_id] = cg;
+                    }
+                } catch (...) {}
+            }
+        }
+
+        // US: 5 planes, up to 10 bars each (20000 + p*1000 + b)
+        for (int p = 0; p < 5; ++p) {
+            for (int b = 0; b < 10; ++b) {
+                int det_id = 20000 + p * 1000 + b;
+                try {
+                    left.SetXYZ(0, 0, 0); right.SetXYZ(0, 0, 0);
+                    fMuFilter->GetPosition(det_id, left, right);
+                    if (left.Mag() > 0 || right.Mag() > 0) {
+                        ChannelGeometry cg;
+                        cg.xA = static_cast<float>(left.X());
+                        cg.yA = static_cast<float>(left.Y());
+                        cg.zA = static_cast<float>(left.Z());
+                        cg.xB = static_cast<float>(right.X());
+                        cg.yB = static_cast<float>(right.Y());
+                        cg.zB = static_cast<float>(right.Z());
+                        cg.z_mid = 0.5f * (cg.zA + cg.zB);
+                        cg.is_vertical = (std::abs(right.Y() - left.Y()) > std::abs(right.X() - left.X()));
+                        fMufiChannelMap[det_id] = cg;
+                    }
+                } catch (...) {}
+            }
+        }
+
+        // DS: 4 planes, up to 60 bars each (30000 + p*1000 + b)
+        for (int p = 0; p < 4; ++p) {
+            for (int b = 0; b < 60; ++b) {
+                int det_id = 30000 + p * 1000 + b;
+                try {
+                    left.SetXYZ(0, 0, 0); right.SetXYZ(0, 0, 0);
+                    fMuFilter->GetPosition(det_id, left, right);
+                    if (left.Mag() > 0 || right.Mag() > 0) {
+                        ChannelGeometry cg;
+                        cg.xA = static_cast<float>(left.X());
+                        cg.yA = static_cast<float>(left.Y());
+                        cg.zA = static_cast<float>(left.Z());
+                        cg.xB = static_cast<float>(right.X());
+                        cg.yB = static_cast<float>(right.Y());
+                        cg.zB = static_cast<float>(right.Z());
+                        cg.z_mid = 0.5f * (cg.zA + cg.zB);
+                        cg.is_vertical = (std::abs(right.Y() - left.Y()) > std::abs(right.X() - left.X()));
+                        fMufiChannelMap[det_id] = cg;
+                    }
+                } catch (...) {}
+            }
+        }
+    }
+
+    gErrorIgnoreLevel = prevErrorIgnore;
     fHasGeometryCache = !fChannelMap.empty();
+}
+
+bool DigiValidationProcessor::getChannelGeometry(int detID, TVector3& left, TVector3& right, bool& isVertical) const {
+    if (detID >= 100000) {
+        // SciFi channel
+        auto it = fChannelMap.find(detID);
+        if (it != fChannelMap.end()) {
+            const auto& cg = it->second;
+            left.SetXYZ(cg.xA, cg.yA, cg.zA);
+            right.SetXYZ(cg.xB, cg.yB, cg.zB);
+            isVertical = cg.is_vertical;
+            return (left.Mag() > 0 || right.Mag() > 0);
+        }
+        if (fScifi) {
+            int prevErrorIgnore = gErrorIgnoreLevel;
+            gErrorIgnoreLevel = kFatal;
+            try {
+                left.SetXYZ(0, 0, 0); right.SetXYZ(0, 0, 0);
+                fScifi->GetSiPMPosition(detID, left, right);
+                gErrorIgnoreLevel = prevErrorIgnore;
+                if (left.Mag() > 0 || right.Mag() > 0) {
+                    ChannelGeometry cg;
+                    cg.xA = static_cast<float>(left.X());
+                    cg.yA = static_cast<float>(left.Y());
+                    cg.zA = static_cast<float>(left.Z());
+                    cg.xB = static_cast<float>(right.X());
+                    cg.yB = static_cast<float>(right.Y());
+                    cg.zB = static_cast<float>(right.Z());
+                    cg.sipm_x = cg.xA;
+                    cg.sipm_y = cg.yA;
+                    cg.z_mid = 0.5f * (cg.zA + cg.zB);
+                    cg.is_vertical = ((detID / 100000) % 10 == 1);
+                    fChannelMap[detID] = cg;
+                    isVertical = cg.is_vertical;
+                    return true;
+                }
+            } catch (...) {
+                gErrorIgnoreLevel = prevErrorIgnore;
+            }
+        }
+    } else {
+        // MuFilter channel
+        auto it = fMufiChannelMap.find(detID);
+        if (it != fMufiChannelMap.end()) {
+            const auto& cg = it->second;
+            left.SetXYZ(cg.xA, cg.yA, cg.zA);
+            right.SetXYZ(cg.xB, cg.yB, cg.zB);
+            isVertical = cg.is_vertical;
+            return (left.Mag() > 0 || right.Mag() > 0);
+        }
+        if (fMuFilter) {
+            int prevErrorIgnore = gErrorIgnoreLevel;
+            gErrorIgnoreLevel = kFatal;
+            try {
+                left.SetXYZ(0, 0, 0); right.SetXYZ(0, 0, 0);
+                fMuFilter->GetPosition(detID, left, right);
+                gErrorIgnoreLevel = prevErrorIgnore;
+                if (left.Mag() > 0 || right.Mag() > 0) {
+                    ChannelGeometry cg;
+                    cg.xA = static_cast<float>(left.X());
+                    cg.yA = static_cast<float>(left.Y());
+                    cg.zA = static_cast<float>(left.Z());
+                    cg.xB = static_cast<float>(right.X());
+                    cg.yB = static_cast<float>(right.Y());
+                    cg.zB = static_cast<float>(right.Z());
+                    cg.z_mid = 0.5f * (cg.zA + cg.zB);
+                    cg.is_vertical = (std::abs(right.Y() - left.Y()) > std::abs(right.X() - left.X()));
+                    fMufiChannelMap[detID] = cg;
+                    isVertical = cg.is_vertical;
+                    return true;
+                }
+            } catch (...) {
+                gErrorIgnoreLevel = prevErrorIgnore;
+            }
+        }
+    }
+    return false;
+}
+
+float DigiValidationProcessor::computeDistToChannel(sndRecoTrack* trk, int detID) const {
+    if (!trk) return std::numeric_limits<float>::quiet_NaN();
+
+    TVector3 left, right;
+    bool isVertical = false;
+    if (!getChannelGeometry(detID, left, right, isVertical)) {
+        return std::numeric_limits<float>::quiet_NaN();
+    }
+
+    float z_channel = 0.5f * (left.Z() + right.Z());
+    TVector3 start = trk->getStart();
+    TVector3 mom = trk->getTrackMom();
+    float pz = (std::abs(mom.Z()) > 1e-10f) ? static_cast<float>(mom.Z()) : 1e-10f;
+    float t = (z_channel - static_cast<float>(start.Z())) / pz;
+    float x_track = static_cast<float>(start.X()) + t * static_cast<float>(mom.X());
+    float y_track = static_cast<float>(start.Y()) + t * static_cast<float>(mom.Y());
+
+    if (isVertical) {
+        float x_channel = 0.5f * (static_cast<float>(left.X()) + static_cast<float>(right.X()));
+        return std::abs(x_track - x_channel);
+    } else {
+        float y_channel = 0.5f * (static_cast<float>(left.Y()) + static_cast<float>(right.Y()));
+        return std::abs(y_track - y_channel);
+    }
+}
+
+float DigiValidationProcessor::computeDoca(sndRecoTrack* trk, int detID) const {
+    if (!trk) return std::numeric_limits<float>::quiet_NaN();
+
+    TVector3 left, right;
+    bool isVertical = false;
+    if (!getChannelGeometry(detID, left, right, isVertical)) {
+        return std::numeric_limits<float>::quiet_NaN();
+    }
+
+    TVector3 pos = trk->getStart();
+    TVector3 mom = trk->getTrackMom();
+    TVector3 pq = left - pos;
+    TVector3 uCrossv = (right - left).Cross(mom);
+    double mag = uCrossv.Mag();
+    if (mag < 1e-10) return 999.0f;
+
+    double doca = pq.Dot(uCrossv) / mag;
+    return static_cast<float>(std::abs(doca));
+}
+
+float DigiValidationProcessor::computeDistToChannel(sndRecoTrack* trk, const sndScifiHit* hit) const {
+    return hit ? computeDistToChannel(trk, hit->GetDetectorID()) : std::numeric_limits<float>::quiet_NaN();
+}
+
+float DigiValidationProcessor::computeDistToChannel(sndRecoTrack* trk, const MuFilterHit* hit) const {
+    return hit ? computeDistToChannel(trk, hit->GetDetectorID()) : std::numeric_limits<float>::quiet_NaN();
+}
+
+float DigiValidationProcessor::computeDoca(sndRecoTrack* trk, const sndScifiHit* hit) const {
+    return hit ? computeDoca(trk, hit->GetDetectorID()) : std::numeric_limits<float>::quiet_NaN();
+}
+
+float DigiValidationProcessor::computeDoca(sndRecoTrack* trk, const MuFilterHit* hit) const {
+    return hit ? computeDoca(trk, hit->GetDetectorID()) : std::numeric_limits<float>::quiet_NaN();
 }
 
 void DigiValidationProcessor::findBestTracks(
@@ -186,10 +425,8 @@ DigiValidationSummary DigiValidationProcessor::process(
             float dist = 999.0f;
             float doca = 999.0f;
             if (scifiTrack) {
-                try {
-                    dist = scifiTrack->getDistToChannel(h);
-                    doca = scifiTrack->getDoca(h);
-                } catch (...) {}
+                dist = computeDistToChannel(scifiTrack, det_id);
+                doca = computeDoca(scifiTrack, det_id);
 
                 if (!std::isnan(dist) && !std::isinf(dist)) {
                     s.dist_scifi.push_back(static_cast<double>(dist));
@@ -306,6 +543,7 @@ DigiValidationSummary DigiValidationProcessor::process(
             if (!h || !h->isValid()) continue;
 
             int sys = h->GetSystem(); // 1=Veto, 2=US, 3=DS
+            int det_id = h->GetDetectorID();
             double hit_qdc = 0.0;
             std::map<Int_t, Float_t> sigs = h->GetAllSignals(true, true, false);
             for (const auto& kv : sigs) {
@@ -317,10 +555,8 @@ DigiValidationSummary DigiValidationProcessor::process(
                 float dist = 999.0f;
                 float doca = 999.0f;
                 if (scifiTrack) {
-                    try {
-                        dist = scifiTrack->getDistToChannel(h);
-                        doca = scifiTrack->getDoca(h);
-                    } catch (...) {}
+                    dist = computeDistToChannel(scifiTrack, det_id);
+                    doca = computeDoca(scifiTrack, det_id);
 
                     if (!std::isnan(dist) && !std::isinf(dist)) {
                         s.dist_veto.push_back(static_cast<double>(dist));
@@ -339,10 +575,8 @@ DigiValidationSummary DigiValidationProcessor::process(
                 float dist = 999.0f;
                 float doca = 999.0f;
                 if (dsTrack) {
-                    try {
-                        dist = dsTrack->getDistToChannel(h);
-                        doca = dsTrack->getDoca(h);
-                    } catch (...) {}
+                    dist = computeDistToChannel(dsTrack, det_id);
+                    doca = computeDoca(dsTrack, det_id);
 
                     if (!std::isnan(dist) && !std::isinf(dist)) {
                         s.dist_us.push_back(static_cast<double>(dist));
@@ -361,10 +595,8 @@ DigiValidationSummary DigiValidationProcessor::process(
                 float dist = 999.0f;
                 float doca = 999.0f;
                 if (dsTrack) {
-                    try {
-                        dist = dsTrack->getDistToChannel(h);
-                        doca = dsTrack->getDoca(h);
-                    } catch (...) {}
+                    dist = computeDistToChannel(dsTrack, det_id);
+                    doca = computeDoca(dsTrack, det_id);
 
                     if (!std::isnan(dist) && !std::isinf(dist)) {
                         s.dist_ds.push_back(static_cast<double>(dist));
