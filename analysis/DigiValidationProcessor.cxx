@@ -53,9 +53,10 @@ void DigiValidationProcessor::initCache(Scifi* scifi, MuFilter* mufi) {
                             int det_id = station * 1000000 + plane * 100000 + mat * 10000 + channel_id;
 
                             try {
-                                left.SetXYZ(0, 0, 0); right.SetXYZ(0, 0, 0);
+                                left.SetXYZ(-9999.0, -9999.0, -9999.0);
+                                right.SetXYZ(-9999.0, -9999.0, -9999.0);
                                 fScifi->GetSiPMPosition(det_id, left, right);
-                                if (left.Mag() > 0 || right.Mag() > 0) {
+                                if (left.X() != -9999.0) {
                                     ChannelGeometry cg;
                                     cg.xA = static_cast<float>(left.X());
                                     cg.yA = static_cast<float>(left.Y());
@@ -91,9 +92,10 @@ void DigiValidationProcessor::initCache(Scifi* scifi, MuFilter* mufi) {
             for (int b = 0; b < 10; ++b) {
                 int det_id = 10000 + p * 1000 + b;
                 try {
-                    left.SetXYZ(0, 0, 0); right.SetXYZ(0, 0, 0);
+                    left.SetXYZ(-9999.0, -9999.0, -9999.0);
+                    right.SetXYZ(-9999.0, -9999.0, -9999.0);
                     fMuFilter->GetPosition(det_id, left, right);
-                    if (left.Mag() > 0 || right.Mag() > 0) {
+                    if (left.X() != -9999.0) {
                         ChannelGeometry cg;
                         cg.xA = static_cast<float>(left.X());
                         cg.yA = static_cast<float>(left.Y());
@@ -109,14 +111,15 @@ void DigiValidationProcessor::initCache(Scifi* scifi, MuFilter* mufi) {
             }
         }
 
-        // US: 5 planes, up to 10 bars each (20000 + p*1000 + b)
+        // US: 5 planes (0..4), up to 10 bars each (20000 + p*1000 + b)
         for (int p = 0; p < 5; ++p) {
             for (int b = 0; b < 10; ++b) {
                 int det_id = 20000 + p * 1000 + b;
                 try {
-                    left.SetXYZ(0, 0, 0); right.SetXYZ(0, 0, 0);
+                    left.SetXYZ(-9999.0, -9999.0, -9999.0);
+                    right.SetXYZ(-9999.0, -9999.0, -9999.0);
                     fMuFilter->GetPosition(det_id, left, right);
-                    if (left.Mag() > 0 || right.Mag() > 0) {
+                    if (left.X() != -9999.0) {
                         ChannelGeometry cg;
                         cg.xA = static_cast<float>(left.X());
                         cg.yA = static_cast<float>(left.Y());
@@ -132,14 +135,15 @@ void DigiValidationProcessor::initCache(Scifi* scifi, MuFilter* mufi) {
             }
         }
 
-        // DS: 4 planes, up to 60 bars each (30000 + p*1000 + b)
+        // DS: 4 planes (0..3), up to 120 bars each (30000 + p*1000 + b)
         for (int p = 0; p < 4; ++p) {
-            for (int b = 0; b < 60; ++b) {
+            for (int b = 0; b < 120; ++b) {
                 int det_id = 30000 + p * 1000 + b;
                 try {
-                    left.SetXYZ(0, 0, 0); right.SetXYZ(0, 0, 0);
+                    left.SetXYZ(-9999.0, -9999.0, -9999.0);
+                    right.SetXYZ(-9999.0, -9999.0, -9999.0);
                     fMuFilter->GetPosition(det_id, left, right);
-                    if (left.Mag() > 0 || right.Mag() > 0) {
+                    if (left.X() != -9999.0) {
                         ChannelGeometry cg;
                         cg.xA = static_cast<float>(left.X());
                         cg.yA = static_cast<float>(left.Y());
@@ -162,79 +166,28 @@ void DigiValidationProcessor::initCache(Scifi* scifi, MuFilter* mufi) {
 
 bool DigiValidationProcessor::getChannelGeometry(int detID, TVector3& left, TVector3& right, bool& isVertical) const {
     if (detID >= 100000) {
-        // SciFi channel
+        // SciFi channel: strictly read from pre-cached geometry
         auto it = fChannelMap.find(detID);
         if (it != fChannelMap.end()) {
             const auto& cg = it->second;
             left.SetXYZ(cg.xA, cg.yA, cg.zA);
             right.SetXYZ(cg.xB, cg.yB, cg.zB);
             isVertical = cg.is_vertical;
-            return (left.Mag() > 0 || right.Mag() > 0);
+            return true;
         }
-        if (fScifi) {
-            int prevErrorIgnore = gErrorIgnoreLevel;
-            gErrorIgnoreLevel = kFatal;
-            try {
-                left.SetXYZ(0, 0, 0); right.SetXYZ(0, 0, 0);
-                fScifi->GetSiPMPosition(detID, left, right);
-                gErrorIgnoreLevel = prevErrorIgnore;
-                if (left.Mag() > 0 || right.Mag() > 0) {
-                    ChannelGeometry cg;
-                    cg.xA = static_cast<float>(left.X());
-                    cg.yA = static_cast<float>(left.Y());
-                    cg.zA = static_cast<float>(left.Z());
-                    cg.xB = static_cast<float>(right.X());
-                    cg.yB = static_cast<float>(right.Y());
-                    cg.zB = static_cast<float>(right.Z());
-                    cg.sipm_x = cg.xA;
-                    cg.sipm_y = cg.yA;
-                    cg.z_mid = 0.5f * (cg.zA + cg.zB);
-                    cg.is_vertical = ((detID / 100000) % 10 == 1);
-                    fChannelMap[detID] = cg;
-                    isVertical = cg.is_vertical;
-                    return true;
-                }
-            } catch (...) {
-                gErrorIgnoreLevel = prevErrorIgnore;
-            }
-        }
+        return false;
     } else {
-        // MuFilter channel
+        // MuFilter channel: strictly read from pre-cached geometry
         auto it = fMufiChannelMap.find(detID);
         if (it != fMufiChannelMap.end()) {
             const auto& cg = it->second;
             left.SetXYZ(cg.xA, cg.yA, cg.zA);
             right.SetXYZ(cg.xB, cg.yB, cg.zB);
             isVertical = cg.is_vertical;
-            return (left.Mag() > 0 || right.Mag() > 0);
+            return true;
         }
-        if (fMuFilter) {
-            int prevErrorIgnore = gErrorIgnoreLevel;
-            gErrorIgnoreLevel = kFatal;
-            try {
-                left.SetXYZ(0, 0, 0); right.SetXYZ(0, 0, 0);
-                fMuFilter->GetPosition(detID, left, right);
-                gErrorIgnoreLevel = prevErrorIgnore;
-                if (left.Mag() > 0 || right.Mag() > 0) {
-                    ChannelGeometry cg;
-                    cg.xA = static_cast<float>(left.X());
-                    cg.yA = static_cast<float>(left.Y());
-                    cg.zA = static_cast<float>(left.Z());
-                    cg.xB = static_cast<float>(right.X());
-                    cg.yB = static_cast<float>(right.Y());
-                    cg.zB = static_cast<float>(right.Z());
-                    cg.z_mid = 0.5f * (cg.zA + cg.zB);
-                    cg.is_vertical = (std::abs(right.Y() - left.Y()) > std::abs(right.X() - left.X()));
-                    fMufiChannelMap[detID] = cg;
-                    isVertical = cg.is_vertical;
-                    return true;
-                }
-            } catch (...) {
-                gErrorIgnoreLevel = prevErrorIgnore;
-            }
-        }
+        return false;
     }
-    return false;
 }
 
 float DigiValidationProcessor::computeDistToChannel(sndRecoTrack* trk, int detID) const {

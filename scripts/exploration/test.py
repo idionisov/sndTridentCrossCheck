@@ -124,7 +124,8 @@ def analyze_sample(sample_name, config, args):
 
     proc = ROOT.snd.trident.DigiValidationProcessor(scifi_det, mufi_det, val_cfg)
     n_cached = proc.getCachedChannelCount()
-    print(f"[*] Pre-cached {n_cached:,} SciFi channel SiPM coordinates.")
+    n_mufi_cached = proc.getCachedMufiChannelCount()
+    print(f"[*] Pre-cached {n_cached:,} SciFi channels and {n_mufi_cached:,} MuFilter bars.")
 
     tree_name = config["tree"]
     chain = ROOT.TChain(tree_name)
@@ -638,7 +639,7 @@ def main():
     c_dist.SaveAs(os.path.join(args.out_dir, "track_channel_distances.pdf"))
 
     # Standalone distance figures
-    dist_single_configs = [\
+    dist_single_configs = [
         ("dist_scifi", "h_dist_scifi_zoom", args.scifi_max_dist, f"Cut: {args.scifi_max_dist*10:.1f} mm"),
         ("dist_veto", "h_dist_veto", args.veto_max_dist, f"Cut: {args.veto_max_dist:.1f} cm"),
         ("dist_us", "h_dist_us", args.us_max_dist, f"Cut: {args.us_max_dist:.1f} cm"),

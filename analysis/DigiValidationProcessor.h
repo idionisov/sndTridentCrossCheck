@@ -174,8 +174,8 @@ private:
     DigiValidationConfig fConfig;
     Scifi* fScifi{nullptr};
     MuFilter* fMuFilter{nullptr};
-    mutable std::unordered_map<int, ChannelGeometry> fChannelMap;
-    mutable std::unordered_map<int, ChannelGeometry> fMufiChannelMap;
+    std::unordered_map<int, ChannelGeometry> fChannelMap;
+    std::unordered_map<int, ChannelGeometry> fMufiChannelMap;
     bool fHasGeometryCache{false};
 };
 
