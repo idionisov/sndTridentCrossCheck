@@ -145,7 +145,7 @@ def analyze_sample(sample_name, config, args):
         tri_proc = ROOT.snd.trident.TridentTruthProcessor(tri_cfg)
         df = (
             df
-            .Define("truth", tri_proc, ["MCTrack", "ScifiPoint", "MuFilterPoint"])
+            .Define("truth", tri_proc, ["MCTrack"])
             .Define("weight", "truth.scaledWeight")
         )
         print(f"[*] Weight model: Trident truth weight (scale = {weight_scale:.4f})")
