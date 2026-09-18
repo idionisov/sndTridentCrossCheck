@@ -293,7 +293,7 @@ def analyze_sample(sample_name, config, args):
     # Book 2D Histograms
     # -------------------------------------------------------------
     histograms["h2_qdc_vs_dist"] = df_clean.Histo2D(
-        (f"h2_qdcdist_{sample_name}", f"{sample_name}: Hit QDC vs Distance to SiPM;Distance to SiPM [cm];Hit QDC [a.u.];Entries", 45, 0.0, 45.0, 75, 0.0, 150.0),
+        (f"h2_qdcdist_{sample_name}", f"{sample_name}: Hit QDC vs Distance to SiPM;Distance to SiPM [cm];Hit QDC [a.u.];Entries", 180, 0.0, 45.0, 300, 0.0, 150.0),
         "clean_hit_dist", "clean_hit_qdc", "weight"
     )
     histograms["h2_cls_qdc_vs_size"] = df.Histo2D(
