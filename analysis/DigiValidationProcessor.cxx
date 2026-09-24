@@ -64,8 +64,8 @@ void DigiValidationProcessor::initCache(Scifi* scifi, MuFilter* mufi) {
                                     cg.xB = static_cast<float>(right.X());
                                     cg.yB = static_cast<float>(right.Y());
                                     cg.zB = static_cast<float>(right.Z());
-                                    cg.sipm_x = cg.xA;
-                                    cg.sipm_y = cg.yA;
+                                    cg.sipm_x = is_vert ? cg.xA : std::min(cg.xA, cg.xB);
+                                    cg.sipm_y = is_vert ? std::max(cg.yA, cg.yB) : cg.yA;
                                     cg.z_mid = 0.5f * (cg.zA + cg.zB);
                                     cg.is_vertical = is_vert;
 
@@ -436,7 +436,7 @@ DigiValidationSummary DigiValidationProcessor::process(
                         double x_pos = trk_start.X() + t * trk_mom.X();
                         double y_pos = trk_start.Y() + t * trk_mom.Y();
 
-                        dist_to_sipm = is_vert ? std::abs(54.5 - y_pos) : std::abs(-46.0 - x_pos);
+                        dist_to_sipm = is_vert ? std::abs(54.5 - y_pos) : std::abs(-47.5 - x_pos);
                     }
 
                     s.hit_qdc.push_back(qdc);
