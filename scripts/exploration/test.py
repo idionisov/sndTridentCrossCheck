@@ -588,6 +588,8 @@ def analyze_landau_vavilov(results, out_dir, out_file):
     fits each slice with two-component models to extract the pure MIP Most Probable Value (MPV),
     and models the optical attenuation length.
     """
+    # Ensure implicit multi-threading is disabled during fitting to avoid PyROOT GIL deadlocks with TBB
+    ROOT.DisableImplicitMT()
     print("\n[*] Performing Two-Component (Pedestal Noise + Landau MIP) Energy Loss & Attenuation Analysis...")
     dir_landau = out_file.mkdir("LandauVavilov")
 
@@ -978,6 +980,11 @@ def main():
     if not results:
         print("[-] No samples successfully processed. Exiting.")
         return
+
+    # Disable implicit multi-threading once event processing is complete.
+    # This drains TBB thread pool cleanup tasks and prevents PyROOT GIL deadlocks
+    # when ROOT's TH1::Fit attempts parallel evaluation via TBB.
+    ROOT.DisableImplicitMT()
 
     # -------------------------------------------------------------
     # Canvas 1: SciFi Digitization Distributions (3 x 2)
