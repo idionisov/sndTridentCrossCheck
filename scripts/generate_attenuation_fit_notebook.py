@@ -785,7 +785,7 @@ Key physical and methodological considerations:
 # -------------------------------------------------------------------------
 # Cell 22: Landau MPV Extraction & Slice Visualization Code
 # -------------------------------------------------------------------------
-cell22_landau_code = """# Slice 2D distribution along distance and extract Landau MPV
+cell22_landau_code = """# Slice 2D distribution along distance and extract MIP Landau MPV via two-component fit
 def extract_landau_mpv_profile(h2, step_cm=2.0, max_dist=38.0):
     x_centers, x_errs, mpvs, mpv_errs = [], [], [], []
     for x_lo in np.arange(0.0, max_dist, step_cm):
@@ -795,12 +795,21 @@ def extract_landau_mpv_profile(h2, step_cm=2.0, max_dist=38.0):
         py = h2.ProjectionY(f"py_mpv_{h2.GetName()}_{int(x_lo)}", b1, b2)
         if py.GetEntries() < 80:
             continue
-        fn = ROOT.TF1("fn_slice_landau", "landau", 0.0, 10.0)
-        fn.SetParameters(py.GetMaximum(), 1.1, 0.5)
+        # Two-component fit: Gaus (pedestal noise at 0) + Landau (MIP signal)
+        fn = ROOT.TF1("fn_slice_fit", "gaus(0) + landau(3)", 0.0, 8.0)
+        fn.FixParameter(1, 0.0)
+        fn.SetParameter(0, py.GetBinContent(1))
+        fn.SetParameter(2, 0.8)
+        fn.SetParLimits(2, 0.4, 1.2)
+        fn.SetParameter(3, py.GetMaximum() * 0.5)
+        fn.SetParameter(4, 2.3)
+        fn.SetParLimits(4, 1.2, 3.8)
+        fn.SetParameter(5, 0.6)
+        fn.SetParLimits(5, 0.3, 1.2)
         py.Fit(fn, "RQ0")
-        mpv = fn.GetParameter(1)
-        err = fn.GetParError(1)
-        if err > 0.15 or mpv <= 0 or mpv > 5.0:
+        mpv = fn.GetParameter(4)
+        err = fn.GetParError(4)
+        if err > 0.15 or mpv < 1.0 or mpv > 4.5:
             continue
         x_centers.append(0.5 * (x_lo + x_hi))
         x_errs.append(0.5 * step_cm)

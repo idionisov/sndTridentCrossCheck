@@ -391,15 +391,15 @@ def analyze_sample(sample_name, config, args):
     # Book 2D Histograms
     # -------------------------------------------------------------
     histograms["h2_qdc_vs_dist"] = df_clean.Histo2D(
-        (f"h2_qdcdist_{sample_name}", f"{sample_name}: Hit QDC vs Distance to SiPM;Distance to SiPM [cm];Hit QDC [a.u.];Entries", 180, 0.0, 45.0, 300, 0.0, 150.0),
+        (f"h2_qdcdist_{sample_name}", f"{sample_name}: Hit QDC vs Distance to SiPM;Distance to SiPM [cm];Hit QDC [a.u.];Entries", 180, 0.0, 45.0, 320, -10.0, 150.0),
         "clean_hit_dist", "clean_hit_qdc", "weight"
     )
     histograms["h2_qdc_vs_dist_h"] = df_clean.Histo2D(
-        (f"h2_qdcdist_h_{sample_name}", f"{sample_name}: Horizontal Hit QDC vs Distance;Distance to SiPM [cm];Hit QDC [a.u.];Entries", 180, 0.0, 45.0, 300, 0.0, 150.0),
+        (f"h2_qdcdist_h_{sample_name}", f"{sample_name}: Horizontal Hit QDC vs Distance;Distance to SiPM [cm];Hit QDC [a.u.];Entries", 180, 0.0, 45.0, 320, -10.0, 150.0),
         "clean_hit_dist_horiz", "clean_hit_qdc_horiz", "weight"
     )
     histograms["h2_qdc_vs_dist_v"] = df_clean.Histo2D(
-        (f"h2_qdcdist_v_{sample_name}", f"{sample_name}: Vertical Hit QDC vs Distance;Distance to SiPM [cm];Hit QDC [a.u.];Entries", 180, 0.0, 45.0, 300, 0.0, 150.0),
+        (f"h2_qdcdist_v_{sample_name}", f"{sample_name}: Vertical Hit QDC vs Distance;Distance to SiPM [cm];Hit QDC [a.u.];Entries", 180, 0.0, 45.0, 320, -10.0, 150.0),
         "clean_hit_dist_vert", "clean_hit_qdc_vert", "weight"
     )
     histograms["h2_cls_qdc_vs_size"] = df.Histo2D(
@@ -513,24 +513,24 @@ def draw_pad_1d(pad, hist_dict, hist_key, is_profile=False, log_y=False, cut_lin
 
 def analyze_landau_vavilov(results, out_dir, out_file):
     """
-    Fits Landau-Vavilov distributions to single hit and cluster QDC,
-    slices 2D QDC vs distance distributions into distance bins,
-    fits each slice with a Landau function to extract the Most Probable Value (MPV),
-    and models the MPV optical attenuation length.
+    Fits two-component (Gaussian pedestal noise + Landau MIP) distributions to single hit QDC,
+    fits Landau-Vavilov to cluster QDC, slices 2D QDC vs distance distributions into distance bins,
+    fits each slice with two-component models to extract the pure MIP Most Probable Value (MPV),
+    and models the optical attenuation length.
     """
-    print("\n[*] Performing Landau-Vavilov Energy Loss & MPV Attenuation Analysis...")
+    print("\n[*] Performing Two-Component (Pedestal Noise + Landau MIP) Energy Loss & Attenuation Analysis...")
     dir_landau = out_file.mkdir("LandauVavilov")
 
     c_landau = ROOT.TCanvas("c_landau_vavilov", "Landau-Vavilov Energy Loss & MPV Attenuation", 1600, 1200)
     c_landau.Divide(2, 2)
 
-    # Pad 1: Single Hit QDC Landau Fits
+    # Pad 1: Single Hit QDC Two-Component (Gaus Noise + Landau MIP) Fit
     p1 = c_landau.cd(1)
     p1.SetLogy(0)
-    leg1 = ROOT.TLegend(0.46, 0.65, 0.88, 0.88)
+    leg1 = ROOT.TLegend(0.40, 0.58, 0.88, 0.88)
     leg1.SetBorderSize(0)
     leg1.SetFillStyle(0)
-    leg1.SetTextSize(0.032)
+    leg1.SetTextSize(0.027)
 
     drawn1 = []
     first = True
@@ -538,35 +538,59 @@ def analyze_landau_vavilov(results, out_dir, out_file):
         if "h_qdc_single_hit" not in res:
             continue
         h = res["h_qdc_single_hit"].Clone(f"h_qdc_fit_{sample_name}")
-        h.GetXaxis().SetRangeUser(-2.0, 15.0)
+        h.Scale(1.0 / max(1.0, h.Integral()))
+        h.GetXaxis().SetRangeUser(-3.0, 15.0)
+        h.GetYaxis().SetTitle("Normalized Entries")
         h.SetLineColor(res["color"])
         h.SetMarkerColor(res["color"])
         h.SetMarkerStyle(20)
         h.SetMarkerSize(0.6)
 
-        # Fit Landau
-        f_landau = ROOT.TF1(f"f_landau_hit_{sample_name}", "landau", 0.0, 12.0)
-        f_landau.SetParameters(h.GetMaximum(), 1.0, 0.5)
-        f_landau.SetLineColor(res["color"])
-        f_landau.SetLineWidth(2)
-        h.Fit(f_landau, "RQS0")
+        # Fit Gaus(0) + Landau(3):
+        f_tot = ROOT.TF1(f"f_tot_{sample_name}", "gaus(0) + landau(3)", -3.0, 12.0)
+        f_tot.SetParameters(h.GetMaximum() * 0.7, 0.0, 0.9, h.GetMaximum() * 0.5, 2.2, 0.6)
+        f_tot.SetParLimits(1, -0.4, 0.4)
+        f_tot.SetParLimits(2, 0.4, 1.4)
+        f_tot.SetParLimits(4, 1.2, 4.0)
+        f_tot.SetParLimits(5, 0.3, 1.5)
+        f_tot.SetLineColor(res["color"])
+        f_tot.SetLineWidth(2)
+        h.Fit(f_tot, "RQS0")
+
+        f_noise = ROOT.TF1(f"f_noise_{sample_name}", "gaus", -3.0, 12.0)
+        f_noise.SetParameters(f_tot.GetParameter(0), f_tot.GetParameter(1), f_tot.GetParameter(2))
+        f_noise.SetLineColor(ROOT.kRed + 1)
+        f_noise.SetLineStyle(2)
+        f_noise.SetLineWidth(2)
+
+        f_mip = ROOT.TF1(f"f_mip_{sample_name}", "landau", -3.0, 12.0)
+        f_mip.SetParameters(f_tot.GetParameter(3), f_tot.GetParameter(4), f_tot.GetParameter(5))
+        f_mip.SetLineColor(ROOT.kBlue + 1)
+        f_mip.SetLineStyle(2)
+        f_mip.SetLineWidth(2)
 
         d_opt = "E1" if first else "E1 SAME"
         h.Draw(d_opt)
-        f_landau.Draw("SAME")
+        f_tot.Draw("SAME")
+        f_noise.Draw("SAME")
+        f_mip.Draw("SAME")
         first = False
-        drawn1.extend([h, f_landau])
+        drawn1.extend([h, f_tot, f_noise, f_mip])
 
-        mpv = f_landau.GetParameter(1)
-        sigma = f_landau.GetParameter(2)
-        leg1.AddEntry(f_landau, f"{sample_name}: MPV={mpv:.2f}, #sigma={sigma:.2f}", "l")
-        res["f_landau_hit"] = f_landau
+        mpv = f_tot.GetParameter(4)
+        sigma = f_tot.GetParameter(5)
+        noise_sig = f_tot.GetParameter(2)
+        leg1.AddEntry(f_tot, f"{sample_name}: Total Fit (Noise+MIP)", "l")
+        leg1.AddEntry(f_noise, f"Pedestal Noise (#sigma={noise_sig:.2f})", "l")
+        leg1.AddEntry(f_mip, f"MIP Landau (MPV={mpv:.2f}, #sigma={sigma:.2f})", "l")
+        res["f_landau_hit"] = f_mip
+        res["f_tot_hit"] = f_tot
 
     leg1.Draw()
     p1.Update()
     p1._drawn = drawn1
 
-    # Pad 2: Cluster QDC Landau Fits
+    # Pad 2: Cluster QDC Landau Fits (Area-normalized)
     p2 = c_landau.cd(2)
     p2.SetLogy(0)
     leg2 = ROOT.TLegend(0.46, 0.65, 0.88, 0.88)
@@ -580,7 +604,9 @@ def analyze_landau_vavilov(results, out_dir, out_file):
         if "h_cluster_qdc" not in res:
             continue
         h = res["h_cluster_qdc"].Clone(f"h_cl_fit_{sample_name}")
+        h.Scale(1.0 / max(1.0, h.Integral()))
         h.GetXaxis().SetRangeUser(0.0, 25.0)
+        h.GetYaxis().SetTitle("Normalized Entries")
         h.SetLineColor(res["color"])
         h.SetMarkerColor(res["color"])
         h.SetMarkerStyle(20)
@@ -608,7 +634,7 @@ def analyze_landau_vavilov(results, out_dir, out_file):
     p2.Update()
     p2._drawn = drawn2
 
-    # Pad 3: Multi-Slice Landau Peak Shift (Data or first sample)
+    # Pad 3: Multi-Slice Landau Peak Shift (Two-component fit overlay)
     p3 = c_landau.cd(3)
     p3.SetLogy(0)
     leg3 = ROOT.TLegend(0.42, 0.62, 0.88, 0.88)
@@ -639,25 +665,38 @@ def analyze_landau_vavilov(results, out_dir, out_file):
         py.SetLineWidth(2)
         py.SetTitle(f"{target_sample}: QDC Slices along Fiber Length;Hit QDC [a.u.];Normalized Entries")
 
-        fn = ROOT.TF1(f"fn_sl_{int(x_lo)}", "landau", 0.0, 8.0)
-        fn.SetParameters(py.GetMaximum(), 1.2, 0.5)
+        fn = ROOT.TF1(f"fn_sl_{int(x_lo)}", "gaus(0) + landau(3)", 0.0, 8.0)
+        fn.FixParameter(1, 0.0)
+        fn.SetParameter(0, py.GetBinContent(1))
+        fn.SetParameter(2, 0.8)
+        fn.SetParLimits(2, 0.4, 1.2)
+        fn.SetParameter(3, py.GetMaximum() * 0.5)
+        fn.SetParameter(4, 2.3)
+        fn.SetParLimits(4, 1.2, 3.8)
+        fn.SetParameter(5, 0.6)
+        fn.SetParLimits(5, 0.3, 1.2)
         fn.SetLineColor(col)
-        fn.SetLineStyle(2)
         py.Fit(fn, "RQS0")
+
+        fn_mip_sl = ROOT.TF1(f"fn_mip_sl_{int(x_lo)}", "landau", 0.0, 8.0)
+        fn_mip_sl.SetParameters(fn.GetParameter(3), fn.GetParameter(4), fn.GetParameter(5))
+        fn_mip_sl.SetLineColor(col)
+        fn_mip_sl.SetLineStyle(2)
+        fn_mip_sl.SetLineWidth(2)
 
         d_opt = "HIST" if first else "HIST SAME"
         py.Draw(d_opt)
-        fn.Draw("SAME")
+        fn_mip_sl.Draw("SAME")
         first = False
-        drawn3.extend([py, fn])
-        mpv = fn.GetParameter(1)
-        leg3.AddEntry(py, f"d #in [{x_lo:.0f}, {x_hi:.0f}] cm (MPV={mpv:.2f})", "l")
+        drawn3.extend([py, fn, fn_mip_sl])
+        mpv = fn.GetParameter(4)
+        leg3.AddEntry(py, f"d #in [{x_lo:.0f}, {x_hi:.0f}] cm (MIP MPV={mpv:.2f})", "l")
 
     leg3.Draw()
     p3.Update()
     p3._drawn = drawn3
 
-    # Pad 4: MPV vs Distance & Attenuation Fit
+    # Pad 4: MIP MPV vs Distance & Attenuation Fit
     p4 = c_landau.cd(4)
     p4.SetLogy(0)
     leg4 = ROOT.TLegend(0.42, 0.65, 0.88, 0.88)
@@ -673,7 +712,7 @@ def analyze_landau_vavilov(results, out_dir, out_file):
         h2 = res["h2_qdc_vs_dist"]
         gr = ROOT.TGraphErrors()
         gr.SetName(f"g_mpv_vs_dist_{sample_name}")
-        gr.SetTitle("Landau MPV vs Distance to SiPM;Distance along Fiber [cm];Landau MPV [a.u.]")
+        gr.SetTitle("MIP Landau MPV vs Distance to SiPM;Distance along Fiber [cm];Landau MPV [a.u.]")
         gr.SetMarkerColor(res["color"])
         gr.SetLineColor(res["color"])
         gr.SetMarkerStyle(21)
@@ -688,12 +727,20 @@ def analyze_landau_vavilov(results, out_dir, out_file):
             py = h2.ProjectionY(f"py_{sample_name}_{int(x_low)}_{int(x_high)}", b1, b2)
             if py.GetEntries() < 80:
                 continue
-            fn = ROOT.TF1(f"fn_l_{sample_name}_{int(x_low)}", "landau", 0.0, 10.0)
-            fn.SetParameters(py.GetMaximum(), 1.1, 0.5)
+            fn = ROOT.TF1(f"fn_l_{sample_name}_{int(x_low)}", "gaus(0) + landau(3)", 0.0, 8.0)
+            fn.FixParameter(1, 0.0)
+            fn.SetParameter(0, py.GetBinContent(1))
+            fn.SetParameter(2, 0.8)
+            fn.SetParLimits(2, 0.4, 1.2)
+            fn.SetParameter(3, py.GetMaximum() * 0.5)
+            fn.SetParameter(4, 2.3)
+            fn.SetParLimits(4, 1.2, 3.8)
+            fn.SetParameter(5, 0.6)
+            fn.SetParLimits(5, 0.3, 1.2)
             py.Fit(fn, "RQ0")
-            mpv = fn.GetParameter(1)
-            err = fn.GetParError(1)
-            if err > 0.1 or mpv <= 0 or mpv > 5.0:
+            mpv = fn.GetParameter(4)
+            err = fn.GetParError(4)
+            if err > 0.15 or mpv < 1.0 or mpv > 4.5:
                 continue
             gr.SetPoint(idx, 0.5 * (x_low + x_high), mpv)
             gr.SetPointError(idx, 0.5 * step, err)
@@ -701,7 +748,7 @@ def analyze_landau_vavilov(results, out_dir, out_file):
 
         if gr.GetN() > 3:
             f_att = ROOT.TF1(f"f_mpv_att_{sample_name}", "[0]*exp(-x/[1])", 4.0, 36.0)
-            f_att.SetParameters(1.3, 180.0)
+            f_att.SetParameters(2.5, 350.0)
             f_att.SetLineColor(res["color"])
             f_att.SetLineWidth(2)
             f_att.SetParNames("A_0", "lambda_att")
@@ -715,7 +762,7 @@ def analyze_landau_vavilov(results, out_dir, out_file):
         d_opt = "AP" if first else "P SAME"
         gr.Draw(d_opt)
         if first:
-            gr.GetYaxis().SetRangeUser(0.6, 1.8)
+            gr.GetYaxis().SetRangeUser(1.0, 3.5)
             gr.GetXaxis().SetRangeUser(0.0, 42.0)
             first = False
         if "f_expo_mpv" in res:
@@ -738,6 +785,8 @@ def analyze_landau_vavilov(results, out_dir, out_file):
     for sample_name, res in results.items():
         if "f_landau_hit" in res:
             res["f_landau_hit"].Write()
+        if "f_tot_hit" in res:
+            res["f_tot_hit"].Write()
         if "f_landau_cl" in res:
             res["f_landau_cl"].Write()
         if "g_mpv_vs_dist" in res:
