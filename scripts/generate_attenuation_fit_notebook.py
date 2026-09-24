@@ -144,9 +144,9 @@ def get_obj(f, names):
             return obj
     return None
 
-# Extract TProfile
-p_data = get_obj(f_data, ["Data/p_qdcdist_Data", "p_qdcdist_Data", "Histograms/Profiles/prof_qdc_vs_distance"])
-p_mc   = get_obj(f_mc,   ["SingleMuMC/p_qdcdist_SingleMuMC", "p_qdcdist_SingleMuMC", "Histograms/Profiles/prof_qdc_vs_distance"])
+# Extract TProfile (prioritize track-matched cluster profile, fall back to hit profile)
+p_data = get_obj(f_data, ["Data/p_cl_qdcdist_Data", "p_cl_qdcdist_Data", "Data/p_qdcdist_Data", "p_qdcdist_Data", "Histograms/Profiles/prof_qdc_vs_distance"])
+p_mc   = get_obj(f_mc,   ["SingleMuMC/p_cl_qdcdist_SingleMuMC", "p_cl_qdcdist_SingleMuMC", "SingleMuMC/p_qdcdist_SingleMuMC", "p_qdcdist_SingleMuMC", "Histograms/Profiles/prof_qdc_vs_distance"])
 if not p_mc:
     p_mc = p_data
 
@@ -160,9 +160,9 @@ print(f"  x range: [{edges_data[0]:.1f}, {edges_data[-1]:.1f}] cm | y range: [{n
 print(f"MC Profile:   {p_mc.GetName()} | Total Entries: {p_mc.GetEntries():,.0f} | Bins: {len(x_mc)}")
 print(f"  x range: [{edges_mc[0]:.1f}, {edges_mc[-1]:.1f}] cm | y range: [{np.min(y_mc):.4f}, {np.max(y_mc):.4f}] QDC")
 
-# Extract 2D Hit Distributions for underlying scatter visualization
-h2_data = get_obj(f_data, ["Data/h2_qdcdist_Data", "h2_qdcdist_Data", "Histograms/2D/h2_hit_qdc_vs_distance"])
-h2_mc   = get_obj(f_mc,   ["SingleMuMC/h2_qdcdist_SingleMuMC", "h2_qdcdist_SingleMuMC", "Histograms/2D/h2_hit_qdc_vs_distance"])
+# Extract 2D Hit/Cluster Distributions for underlying scatter visualization
+h2_data = get_obj(f_data, ["Data/h2_cl_qdcdist_Data", "h2_cl_qdcdist_Data", "Data/h2_qdcdist_Data", "h2_qdcdist_Data", "Histograms/2D/h2_hit_qdc_vs_distance"])
+h2_mc   = get_obj(f_mc,   ["SingleMuMC/h2_cl_qdcdist_SingleMuMC", "h2_cl_qdcdist_SingleMuMC", "SingleMuMC/h2_qdcdist_SingleMuMC", "h2_qdcdist_SingleMuMC", "Histograms/2D/h2_hit_qdc_vs_distance"])
 if not h2_mc:
     h2_mc = h2_data
 

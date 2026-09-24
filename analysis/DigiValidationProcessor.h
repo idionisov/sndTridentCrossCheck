@@ -16,6 +16,7 @@ namespace snd::trident {
 
 struct DigiValidationConfig {
     double scifi_max_dist{0.1};   // Max distance for SciFi hits to SciFi track [cm] (1 mm = 0.1 cm)
+    double cluster_max_dist{0.1}; // Max distance for SciFi clusters to SciFi track [cm] (1 mm = 0.1 cm)
     double veto_max_dist{3.0};    // Max distance for Veto hits to SciFi track [cm] (3 cm)
     double us_max_dist{3.0};      // Max distance for US hits to DS track [cm] (3 cm)
     double ds_max_dist{0.3};      // Max distance for DS hits to DS track [cm] (3 mm = 0.3 cm)
@@ -52,6 +53,14 @@ struct DigiValidationSummary {
     double n_scifi_clusters{0.0};
     std::vector<double> cluster_size;
     std::vector<double> cluster_qdc;
+    std::vector<double> cluster_distance;
+    std::vector<double> cluster_dist_to_track;
+    std::vector<double> cluster_station;
+    std::vector<double> cluster_is_vertical;
+    std::vector<double> cluster_qdc_horiz;
+    std::vector<double> cluster_dist_horiz;
+    std::vector<double> cluster_qdc_vert;
+    std::vector<double> cluster_dist_vert;
     double scifi_cluster_sum_qdc{0.0};
 
     double n_mufi_hits{0.0};

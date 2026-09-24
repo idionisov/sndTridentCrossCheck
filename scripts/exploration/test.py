@@ -51,6 +51,44 @@ ROOT.gROOT.SetBatch(True)
 ROOT.gStyle.SetOptStat(0)
 ROOT.gStyle.SetPalette(ROOT.kBird)
 
+# Declare numerical Landau convolved with Gaussian function in ROOT
+ROOT.gInterpreter.Declare("""
+#include "TMath.h"
+#include "TF1.h"
+
+Double_t langaufun(Double_t *x, Double_t *par) {
+   // Fit parameters:
+   // par[0] = Landau scale parameter (width)
+   // par[1] = Most Probable (MP, location) of Landau
+   // par[2] = Total area (normalization constant)
+   // par[3] = Gaussian sigma (resolution broadening)
+
+   if (par[0] <= 0.0 || par[3] <= 0.0) return 0.0;
+   Double_t invsq2pi = 0.3989422804014;
+   Double_t mpshift  = -0.22278298;
+
+   Double_t np = 80.0;
+   Double_t sc =  5.0;
+
+   Double_t xx, fland, sum = 0.0;
+   Double_t xlow = x[0] - sc * par[3];
+   Double_t xupp = x[0] + sc * par[3];
+   Double_t step = (xupp - xlow) / np;
+
+   for(Double_t i = 1.0; i <= np/2; i++) {
+      xx = xlow + (i - 0.5) * step;
+      fland = TMath::Landau(xx, par[1] - mpshift * par[0], par[0]) / par[0];
+      sum += fland * TMath::Gaus(x[0], xx, par[3]);
+
+      xx = xupp - (i - 0.5) * step;
+      fland = TMath::Landau(xx, par[1] - mpshift * par[0], par[0]) / par[0];
+      sum += fland * TMath::Gaus(x[0], xx, par[3]);
+   }
+
+   return (par[2] * step * sum * invsq2pi / par[3]);
+}
+""")
+
 # Default dataset configurations
 DEFAULT_DATA_PATTERN = "/eos/user/i/idioniso/1_Data/Tracks/run_008329/sndsw_raw-1_1?_*.root"
 DEFAULT_DATA_GEO = "/eos/experiment/sndlhc/convertedData/physics/2023/geofile_sndlhc_TI18_V3_2023.root"
@@ -109,18 +147,22 @@ def analyze_sample(sample_name, config, args):
         return None
 
     print(f"[*] Selected {len(files)} file(s) for processing.")
-    print(f"[*] Loading geometry: {config['geo']}")
-    snd_geo = SndlhcGeo.GeoInterface(config["geo"])
+    geo_file = config["geo"]
+    if not os.path.exists(geo_file) and "alt_geo" in config and os.path.exists(config["alt_geo"]):
+        geo_file = config["alt_geo"]
+    print(f"[*] Loading geometry: {geo_file}")
+    snd_geo = SndlhcGeo.GeoInterface(geo_file)
     scifi_det = snd_geo.modules["Scifi"]
     mufi_det  = snd_geo.modules["MuFilter"]
 
     print("[*] Initializing DigiValidationProcessor with track-hit distance cuts...")
     val_cfg = ROOT.snd.trident.DigiValidationConfig()
     val_cfg.scifi_max_dist = args.scifi_max_dist
+    val_cfg.cluster_max_dist = args.cluster_max_dist
     val_cfg.veto_max_dist  = args.veto_max_dist
     val_cfg.us_max_dist    = args.us_max_dist
     val_cfg.ds_max_dist    = args.ds_max_dist
-    print(f"[*] Configured cuts: SciFi <= {args.scifi_max_dist*10:.2f} mm | Veto <= {args.veto_max_dist:.1f} cm | US <= {args.us_max_dist:.1f} cm | DS <= {args.ds_max_dist*10:.2f} mm")
+    print(f"[*] Configured cuts: SciFi Hit <= {args.scifi_max_dist*10:.2f} mm | SciFi Cluster <= {args.cluster_max_dist*10:.2f} mm | Veto <= {args.veto_max_dist:.1f} cm | US <= {args.us_max_dist:.1f} cm | DS <= {args.ds_max_dist*10:.2f} mm")
 
     proc = ROOT.snd.trident.DigiValidationProcessor(scifi_det, mufi_det, val_cfg)
     n_cached = proc.getCachedChannelCount()
@@ -206,6 +248,14 @@ def analyze_sample(sample_name, config, args):
         .Define("clean_hit_dist_horiz", "ev.hit_dist_horiz")
         .Define("clean_hit_qdc_vert", "ev.hit_qdc_vert")
         .Define("clean_hit_dist_vert", "ev.hit_dist_vert")
+        .Define("cluster_distance", "ev.cluster_distance")
+        .Define("cluster_dist_to_track", "ev.cluster_dist_to_track")
+        .Define("cluster_station", "ev.cluster_station")
+        .Define("cluster_is_vertical", "ev.cluster_is_vertical")
+        .Define("cluster_qdc_horiz", "ev.cluster_qdc_horiz")
+        .Define("cluster_dist_horiz", "ev.cluster_dist_horiz")
+        .Define("cluster_qdc_vert", "ev.cluster_qdc_vert")
+        .Define("cluster_dist_vert", "ev.cluster_dist_vert")
         .Define("station_numbers", "ev.station_numbers")
         .Define("station_hits", "ev.station_hits")
         .Define("station_qdc", "ev.station_qdc")
@@ -242,14 +292,18 @@ def analyze_sample(sample_name, config, args):
         "clean_hit_qdc_vert", "weight"
     )
 
-    # Clusters (only track-associated)
+    # Clusters (only track-associated within tolerable distance)
     histograms["h_cluster_qdc"] = df.Histo1D(
-        (f"h_cl_qdc_{sample_name}", f"{sample_name} Cluster Integrated QDC;Cluster QDC [a.u.];Normalized Entries", 105, -10.0, 200.0),
+        (f"h_cl_qdc_{sample_name}", f"{sample_name} Cluster Integrated QDC;Cluster QDC [a.u.];Normalized Entries", 100, 0.0, 25.0),
         "cluster_qdc", "weight"
     )
     histograms["h_cluster_size"] = df.Histo1D(
         (f"h_cl_sz_{sample_name}", f"{sample_name} Cluster Size;Cluster Size [channels];Normalized Entries", 12, 0.5, 12.5),
         "cluster_size", "weight"
+    )
+    histograms["h_cluster_dist_to_track"] = df.Histo1D(
+        (f"h_cl_dist_trk_{sample_name}", f"{sample_name} SciFi Cluster Distance to SciFi Track;Residual Distance [cm];Normalized Entries", 100, 0.0, 0.1),
+        "cluster_dist_to_track", "weight"
     )
 
     # SciFi Tracker Multiplicities (track-associated hits)
@@ -402,8 +456,24 @@ def analyze_sample(sample_name, config, args):
         (f"h2_qdcdist_v_{sample_name}", f"{sample_name}: Vertical Hit QDC vs Distance;Distance to SiPM [cm];Hit QDC [a.u.];Entries", 180, 0.0, 45.0, 320, -10.0, 150.0),
         "clean_hit_dist_vert", "clean_hit_qdc_vert", "weight"
     )
+    histograms["h2_cl_qdc_vs_dist"] = df.Histo2D(
+        (f"h2_cl_qdcdist_{sample_name}", f"{sample_name}: Cluster QDC vs SiPM Distance;Distance to SiPM [cm];Cluster QDC [a.u.];Entries", 40, 0.0, 40.0, 100, 0.0, 25.0),
+        "cluster_distance", "cluster_qdc", "weight"
+    )
+    histograms["h2_cl_qdc_vs_dist_h"] = df.Histo2D(
+        (f"h2_cl_qdcdist_h_{sample_name}", f"{sample_name}: Horizontal Cluster QDC vs Distance;Distance to SiPM [cm];Cluster QDC [a.u.];Entries", 40, 0.0, 40.0, 100, 0.0, 25.0),
+        "cluster_dist_horiz", "cluster_qdc_horiz", "weight"
+    )
+    histograms["h2_cl_qdc_vs_dist_v"] = df.Histo2D(
+        (f"h2_cl_qdcdist_v_{sample_name}", f"{sample_name}: Vertical Cluster QDC vs Distance;Distance to SiPM [cm];Cluster QDC [a.u.];Entries", 40, 0.0, 40.0, 100, 0.0, 25.0),
+        "cluster_dist_vert", "cluster_qdc_vert", "weight"
+    )
+    histograms["p_cl_qdc_vs_dist"] = df.Profile1D(
+        (f"p_cl_qdcdist_{sample_name}", f"{sample_name}: Cluster Mean QDC vs SiPM Distance;Distance to SiPM [cm];Cluster Mean QDC [a.u.]", 40, 0.0, 40.0),
+        "cluster_distance", "cluster_qdc", "weight"
+    )
     histograms["h2_cls_qdc_vs_size"] = df.Histo2D(
-        (f"h2_clqdcsz_{sample_name}", f"{sample_name}: Cluster QDC vs Size;Cluster Size [channels];Cluster QDC [a.u.];Entries", 10, 0.5, 10.5, 50, 0.0, 200.0),
+        (f"h2_clqdcsz_{sample_name}", f"{sample_name}: Cluster QDC vs Size;Cluster Size [channels];Cluster QDC [a.u.];Entries", 10, 0.5, 10.5, 50, 0.0, 25.0),
         "cluster_size", "cluster_qdc", "weight"
     )
     histograms["h2_scifi_vs_mufi"] = df.Histo2D(
@@ -590,13 +660,13 @@ def analyze_landau_vavilov(results, out_dir, out_file):
     p1.Update()
     p1._drawn = drawn1
 
-    # Pad 2: Cluster QDC Landau Fits (Area-normalized)
+    # Pad 2: Cluster QDC LanGaus Fits (Area-normalized)
     p2 = c_landau.cd(2)
     p2.SetLogy(0)
-    leg2 = ROOT.TLegend(0.46, 0.65, 0.88, 0.88)
+    leg2 = ROOT.TLegend(0.38, 0.65, 0.88, 0.88)
     leg2.SetBorderSize(0)
     leg2.SetFillStyle(0)
-    leg2.SetTextSize(0.032)
+    leg2.SetTextSize(0.027)
 
     drawn2 = []
     first = True
@@ -612,9 +682,14 @@ def analyze_landau_vavilov(results, out_dir, out_file):
         h.SetMarkerStyle(20)
         h.SetMarkerSize(0.6)
 
-        # Fit Landau
-        f_cl = ROOT.TF1(f"f_landau_cl_{sample_name}", "landau", 0.5, 20.0)
-        f_cl.SetParameters(h.GetMaximum(), 2.0, 0.8)
+        x_peak = h.GetXaxis().GetBinCenter(h.GetMaximumBin())
+        f_cl = ROOT.TF1(f"f_langau_cl_{sample_name}", ROOT.langaufun, 0.4, 7.5, 4)
+        f_cl.SetParNames("Width_L", "MPV_L", "Area", "Sigma_G")
+        f_cl.SetParameters(0.4, max(0.4, x_peak), 0.25, 0.6)
+        f_cl.SetParLimits(0, 0.05, 1.5)
+        f_cl.SetParLimits(1, 0.3, 3.5)
+        f_cl.SetParLimits(2, 0.01, 2.0)
+        f_cl.SetParLimits(3, 0.05, 1.8)
         f_cl.SetLineColor(res["color"])
         f_cl.SetLineWidth(2)
         h.Fit(f_cl, "RQS0")
@@ -625,130 +700,137 @@ def analyze_landau_vavilov(results, out_dir, out_file):
         first = False
         drawn2.extend([h, f_cl])
 
-        mpv = f_cl.GetParameter(1)
-        sigma = f_cl.GetParameter(2)
-        leg2.AddEntry(f_cl, f"{sample_name}: MPV={mpv:.2f}, #sigma={sigma:.2f}", "l")
-        res["f_landau_cl"] = f_cl
+        peak_pos = f_cl.GetMaximumX(0.4, 4.0)
+        wl = f_cl.GetParameter(0)
+        wg = f_cl.GetParameter(3)
+        leg2.AddEntry(f_cl, f"{sample_name}: Peak={peak_pos:.2f}, #sigma_{{L}}={wl:.2f}, #sigma_{{G}}={wg:.2f}", "l")
+        res["f_langau_cl"] = f_cl
+        res["f_landau_cl"] = f_cl  # alias
+        res["h_cl_fit"] = h
 
     leg2.Draw()
     p2.Update()
     p2._drawn = drawn2
 
-    # Pad 3: Multi-Slice Landau Peak Shift (Two-component fit overlay)
+    # Pad 3: Multi-Slice Cluster LanGaus Peak Shift
     p3 = c_landau.cd(3)
     p3.SetLogy(0)
-    leg3 = ROOT.TLegend(0.42, 0.62, 0.88, 0.88)
+    leg3 = ROOT.TLegend(0.40, 0.60, 0.88, 0.88)
     leg3.SetBorderSize(0)
     leg3.SetFillStyle(0)
-    leg3.SetTextSize(0.030)
+    leg3.SetTextSize(0.027)
 
     drawn3 = []
     target_sample = "Data" if "Data" in results else list(results.keys())[0]
-    h2_target = results[target_sample]["h2_qdc_vs_dist"]
+    h2_target = results[target_sample].get("h2_cl_qdc_vs_dist", None)
     slice_specs = [
-        (2.0, 4.0, ROOT.kBlue + 1),
-        (12.0, 14.0, ROOT.kTeal + 2),
-        (22.0, 24.0, ROOT.kOrange + 7),
-        (32.0, 34.0, ROOT.kRed + 1),
+        (2.0, 6.0, ROOT.kBlue + 1),
+        (12.0, 16.0, ROOT.kTeal + 2),
+        (22.0, 26.0, ROOT.kOrange + 7),
+        (32.0, 36.0, ROOT.kRed + 1),
     ]
 
-    first = True
-    for x_lo, x_hi, col in slice_specs:
-        b1 = h2_target.GetXaxis().FindBin(x_lo + 0.01)
-        b2 = h2_target.GetXaxis().FindBin(x_hi - 0.01)
-        py = h2_target.ProjectionY(f"py_slice_{int(x_lo)}_{int(x_hi)}", b1, b2)
-        if py.GetEntries() < 50:
-            continue
-        py.Scale(1.0 / max(1.0, py.Integral()))
-        py.GetXaxis().SetRangeUser(0.0, 10.0)
-        py.SetLineColor(col)
-        py.SetLineWidth(2)
-        py.SetTitle(f"{target_sample}: QDC Slices along Fiber Length;Hit QDC [a.u.];Normalized Entries")
+    res_target = results[target_sample]
+    res_target["slice_histos"] = []
+    res_target["slice_fits"] = []
 
-        fn = ROOT.TF1(f"fn_sl_{int(x_lo)}", "gaus(0) + landau(3)", 0.0, 8.0)
-        fn.FixParameter(1, 0.0)
-        fn.SetParameter(0, py.GetBinContent(1))
-        fn.SetParameter(2, 0.8)
-        fn.SetParLimits(2, 0.4, 1.2)
-        fn.SetParameter(3, py.GetMaximum() * 0.5)
-        fn.SetParameter(4, 2.3)
-        fn.SetParLimits(4, 1.2, 3.8)
-        fn.SetParameter(5, 0.6)
-        fn.SetParLimits(5, 0.3, 1.2)
-        fn.SetLineColor(col)
-        py.Fit(fn, "RQS0")
+    if h2_target:
+        first = True
+        for x_lo, x_hi, col in slice_specs:
+            b1 = h2_target.GetXaxis().FindBin(x_lo + 0.01)
+            b2 = h2_target.GetXaxis().FindBin(x_hi - 0.01)
+            py = h2_target.ProjectionY(f"py_cl_slice_{int(x_lo)}_{int(x_hi)}", b1, b2)
+            if py.Integral() < 10.0:
+                continue
+            py.Scale(1.0 / max(1.0, py.Integral()))
+            py.GetXaxis().SetRangeUser(0.0, 12.0)
+            py.SetLineColor(col)
+            py.SetLineWidth(2)
+            py.SetTitle(f"{target_sample}: Cluster QDC Slices along Fiber Length;Cluster QDC [a.u.];Normalized Entries")
 
-        fn_mip_sl = ROOT.TF1(f"fn_mip_sl_{int(x_lo)}", "landau", 0.0, 8.0)
-        fn_mip_sl.SetParameters(fn.GetParameter(3), fn.GetParameter(4), fn.GetParameter(5))
-        fn_mip_sl.SetLineColor(col)
-        fn_mip_sl.SetLineStyle(2)
-        fn_mip_sl.SetLineWidth(2)
+            x_peak = py.GetXaxis().GetBinCenter(py.GetMaximumBin())
+            fn = ROOT.TF1(f"fn_cl_sl_{int(x_lo)}_{int(x_hi)}", ROOT.langaufun, 0.4, 7.5, 4)
+            fn.SetParNames("Width_L", "MPV_L", "Area", "Sigma_G")
+            fn.SetParameters(0.4, max(0.4, x_peak * 0.8), 0.25, 0.6)
+            fn.SetParLimits(0, 0.05, 1.5)
+            fn.SetParLimits(1, 0.3, 3.5)
+            fn.SetParLimits(2, 0.01, 2.0)
+            fn.SetParLimits(3, 0.1, 1.5)
+            fn.SetLineColor(col)
+            fn.SetLineStyle(1)
+            fn.SetLineWidth(2)
+            py.Fit(fn, "RQS0")
 
-        d_opt = "HIST" if first else "HIST SAME"
-        py.Draw(d_opt)
-        fn_mip_sl.Draw("SAME")
-        first = False
-        drawn3.extend([py, fn, fn_mip_sl])
-        mpv = fn.GetParameter(4)
-        leg3.AddEntry(py, f"d #in [{x_lo:.0f}, {x_hi:.0f}] cm (MIP MPV={mpv:.2f})", "l")
+            d_opt = "HIST" if first else "HIST SAME"
+            py.Draw(d_opt)
+            fn.Draw("SAME")
+            first = False
+            drawn3.extend([py, fn])
+            res_target["slice_histos"].append(py)
+            res_target["slice_fits"].append(fn)
 
-    leg3.Draw()
-    p3.Update()
-    p3._drawn = drawn3
+            peak_pos = fn.GetMaximumX(0.4, 4.0)
+            leg3.AddEntry(py, f"d #in [{x_lo:.0f}, {x_hi:.0f}] cm (Peak={peak_pos:.2f})", "l")
 
-    # Pad 4: MIP MPV vs Distance & Attenuation Fit
+        leg3.Draw()
+        p3.Update()
+        p3._drawn = drawn3
+
+    # Pad 4: Cluster Peak vs Distance & Attenuation Fit
     p4 = c_landau.cd(4)
     p4.SetLogy(0)
     leg4 = ROOT.TLegend(0.42, 0.65, 0.88, 0.88)
     leg4.SetBorderSize(0)
     leg4.SetFillStyle(0)
-    leg4.SetTextSize(0.032)
+    leg4.SetTextSize(0.030)
 
     drawn4 = []
     first = True
     for sample_name, res in results.items():
-        if "h2_qdc_vs_dist" not in res:
+        if "h2_cl_qdc_vs_dist" not in res:
             continue
-        h2 = res["h2_qdc_vs_dist"]
+        h2 = res["h2_cl_qdc_vs_dist"]
         gr = ROOT.TGraphErrors()
-        gr.SetName(f"g_mpv_vs_dist_{sample_name}")
-        gr.SetTitle("MIP Landau MPV vs Distance to SiPM;Distance along Fiber [cm];Landau MPV [a.u.]")
+        gr.SetName(f"g_cl_peak_vs_dist_{sample_name}")
+        gr.SetTitle("Cluster Peak vs Distance to SiPM;Distance along Fiber [cm];Cluster Peak QDC [a.u.]")
         gr.SetMarkerColor(res["color"])
         gr.SetLineColor(res["color"])
         gr.SetMarkerStyle(21)
         gr.SetMarkerSize(0.7)
 
         idx = 0
-        step = 2.0
-        for x_low in range(0, 38, int(step)):
+        step = 4.0
+        for x_low in range(0, 36, int(step)):
             x_high = x_low + step
             b1 = h2.GetXaxis().FindBin(x_low + 0.01)
             b2 = h2.GetXaxis().FindBin(x_high - 0.01)
-            py = h2.ProjectionY(f"py_{sample_name}_{int(x_low)}_{int(x_high)}", b1, b2)
-            if py.GetEntries() < 80:
+            py = h2.ProjectionY(f"py_cl_{sample_name}_{int(x_low)}_{int(x_high)}", b1, b2)
+            if py.Integral() < 10.0:
                 continue
-            fn = ROOT.TF1(f"fn_l_{sample_name}_{int(x_low)}", "gaus(0) + landau(3)", 0.0, 8.0)
-            fn.FixParameter(1, 0.0)
-            fn.SetParameter(0, py.GetBinContent(1))
-            fn.SetParameter(2, 0.8)
-            fn.SetParLimits(2, 0.4, 1.2)
-            fn.SetParameter(3, py.GetMaximum() * 0.5)
-            fn.SetParameter(4, 2.3)
-            fn.SetParLimits(4, 1.2, 3.8)
-            fn.SetParameter(5, 0.6)
-            fn.SetParLimits(5, 0.3, 1.2)
-            py.Fit(fn, "RQ0")
-            mpv = fn.GetParameter(4)
-            err = fn.GetParError(4)
-            if err > 0.15 or mpv < 1.0 or mpv > 4.5:
+            py.Scale(1.0 / max(1.0, py.Integral()))
+            x_peak = py.GetXaxis().GetBinCenter(py.GetMaximumBin())
+
+            fn = ROOT.TF1(f"fn_cl_{sample_name}_{int(x_low)}", ROOT.langaufun, 0.4, 7.5, 4)
+            fn.SetParameters(0.4, max(0.4, x_peak * 0.8), 0.25, 0.6)
+            fn.SetParLimits(0, 0.05, 1.5)
+            fn.SetParLimits(1, 0.3, 3.5)
+            fn.SetParLimits(2, 0.01, 2.0)
+            fn.SetParLimits(3, 0.1, 1.5)
+            py.Fit(fn, "RQS0")
+
+            peak_val = fn.GetMaximumX(0.4, 4.0)
+            err = fn.GetParError(1)
+            if err > 0.50 or peak_val < 0.4 or peak_val > 5.0:
                 continue
-            gr.SetPoint(idx, 0.5 * (x_low + x_high), mpv)
+            gr.SetPoint(idx, 0.5 * (x_low + x_high), peak_val)
             gr.SetPointError(idx, 0.5 * step, err)
             idx += 1
 
         if gr.GetN() > 3:
-            f_att = ROOT.TF1(f"f_mpv_att_{sample_name}", "[0]*exp(-x/[1])", 4.0, 36.0)
-            f_att.SetParameters(2.5, 350.0)
+            f_att = ROOT.TF1(f"f_cl_att_{sample_name}", "[0]*exp(-x/[1])", 2.0, 36.0)
+            f_att.SetParameters(2.2, 80.0)
+            f_att.SetParLimits(0, 0.5, 5.0)
+            f_att.SetParLimits(1, 20.0, 500.0)
             f_att.SetLineColor(res["color"])
             f_att.SetLineWidth(2)
             f_att.SetParNames("A_0", "lambda_att")
@@ -757,19 +839,21 @@ def analyze_landau_vavilov(results, out_dir, out_file):
             l_att = f_att.GetParameter(1)
             l_err = f_att.GetParError(1)
             leg4.AddEntry(gr, f"{sample_name} (#lambda={l_att:.1f}#pm{l_err:.1f} cm)", "lep")
-            res["f_expo_mpv"] = f_att
+            res["f_expo_att"] = f_att
+            res["f_expo_mpv"] = f_att  # alias
 
         d_opt = "AP" if first else "P SAME"
         gr.Draw(d_opt)
         if first:
-            gr.GetYaxis().SetRangeUser(1.0, 3.5)
+            gr.GetYaxis().SetRangeUser(0.5, 3.5)
             gr.GetXaxis().SetRangeUser(0.0, 42.0)
             first = False
-        if "f_expo_mpv" in res:
-            res["f_expo_mpv"].Draw("SAME")
+        if "f_expo_att" in res:
+            res["f_expo_att"].Draw("SAME")
 
         drawn4.append(gr)
-        res["g_mpv_vs_dist"] = gr
+        res["g_peak_vs_dist"] = gr
+        res["g_mpv_vs_dist"] = gr  # alias
 
     leg4.Draw()
     p4.Update()
@@ -787,12 +871,26 @@ def analyze_landau_vavilov(results, out_dir, out_file):
             res["f_landau_hit"].Write()
         if "f_tot_hit" in res:
             res["f_tot_hit"].Write()
-        if "f_landau_cl" in res:
-            res["f_landau_cl"].Write()
-        if "g_mpv_vs_dist" in res:
-            res["g_mpv_vs_dist"].Write()
-        if "f_expo_mpv" in res:
-            res["f_expo_mpv"].Write()
+        if "h_cl_fit" in res:
+            res["h_cl_fit"].Write()
+        if "f_langau_cl" in res:
+            res["f_langau_cl"].Write()
+            f_cl_alias = res["f_langau_cl"].Clone(f"f_landau_cl_{sample_name}")
+            f_cl_alias.Write()
+        if "slice_histos" in res:
+            for sh in res["slice_histos"]:
+                sh.Write()
+        if "slice_fits" in res:
+            for sf in res["slice_fits"]:
+                sf.Write()
+        if "g_peak_vs_dist" in res:
+            res["g_peak_vs_dist"].Write()
+            gr_alias = res["g_peak_vs_dist"].Clone(f"g_cl_mpv_vs_dist_{sample_name}")
+            gr_alias.Write()
+        if "f_expo_att" in res:
+            res["f_expo_att"].Write()
+            f_att_alias = res["f_expo_att"].Clone(f"f_cl_mpv_att_{sample_name}")
+            f_att_alias.Write()
 
 
 def main():
@@ -809,6 +907,7 @@ def main():
     parser.add_argument("--lumi-mc-tri", type=float, default=160.0, help="ThreeMu MC integrated luminosity [fb^-1]")
     parser.add_argument("--scale-pmu", type=float, default=None, help="Manual PMU MC scale factor")
     parser.add_argument("--scifi-max-dist", type=float, default=0.1, help="Max distance between SciFi hit & SciFi track [cm] (default: 0.1 cm = 1 mm)")
+    parser.add_argument("--cluster-max-dist", type=float, default=0.1, help="Max distance between SciFi cluster & SciFi track [cm] (default: 0.1 cm = 1 mm)")
     parser.add_argument("--veto-max-dist", type=float, default=3.0, help="Max distance between Veto hit & SciFi track [cm] (default: 3.0 cm)")
     parser.add_argument("--us-max-dist", type=float, default=3.0, help="Max distance between US hit & DS track [cm] (default: 3.0 cm)")
     parser.add_argument("--ds-max-dist", type=float, default=0.3, help="Max distance between DS hit & DS track [cm] (default: 0.3 cm = 3 mm)")
@@ -836,8 +935,9 @@ def main():
     if not args.no_data:
         samples["Data"] = {
             "path": args.input_data,
-            "alt_path": "/eos/user/i/idioniso/1_Data/Tracks/run_008329/sndsw_raw-0_0_8329_muonReco.root",
+            "alt_path": "data/run8329/sndsw_raw-1_1?_8329_muonReco.root",
             "geo": args.geo_data,
+            "alt_geo": "data/geofile_sndlhc_TI18_V3_2023.root",
             "tree": "rawConv",
             "color": ROOT.kBlack,
             "is_mc": False,
@@ -847,7 +947,9 @@ def main():
     if not args.no_pmu:
         samples["SingleMuMC"] = {
             "path": args.input_pmu,
+            "alt_path": "data/pmu/sndLHC.Ntuple-TGeant4-160urad_100e6pp_FlukaEcut10_digCPP_Trks.root",
             "geo": args.geo_pmu,
+            "alt_geo": "data/geofile_pmu.root",
             "tree": "cbmsim",
             "color": ROOT.kBlue,
             "is_mc": True,
@@ -857,7 +959,9 @@ def main():
     if not args.no_tri:
         samples["ThreeMuMC"] = {
             "path": args.input_tri,
+            "alt_path": "data/3mu/trimuon_digCPP-2??_hough_*.root",
             "geo": args.geo_tri,
+            "alt_geo": "data/geofile_full.Ntuple-TGeant4_boost100.0.root",
             "tree": "cbmsim",
             "color": ROOT.kRed,
             "is_mc": True,
@@ -933,6 +1037,7 @@ def main():
     # Standalone distance figures
     dist_single_configs = [
         ("dist_scifi", "h_dist_scifi_zoom", args.scifi_max_dist, f"Cut: {args.scifi_max_dist*10:.1f} mm"),
+        ("dist_cluster", "h_cluster_dist_to_track", args.cluster_max_dist, f"Cut: {args.cluster_max_dist*10:.1f} mm"),
         ("dist_veto", "h_dist_veto", args.veto_max_dist, f"Cut: {args.veto_max_dist:.1f} cm"),
         ("dist_us", "h_dist_us", args.us_max_dist, f"Cut: {args.us_max_dist:.1f} cm"),
         ("dist_ds", "h_dist_ds_zoom", args.ds_max_dist, f"Cut: {args.ds_max_dist*10:.1f} mm"),
@@ -965,7 +1070,7 @@ def main():
 
     # Also save standalone high-resolution 2D figures
     for sample_name, res in results.items():
-        for key in ["h2_qdc_vs_dist", "h2_qdc_vs_dist_h", "h2_qdc_vs_dist_v", "h2_cls_qdc_vs_size", "h2_scifi_vs_mufi", "h2_qdc_vs_hits", "h2_track_slopes", "h2_track_xy"]:
+        for key in ["h2_qdc_vs_dist", "h2_qdc_vs_dist_h", "h2_qdc_vs_dist_v", "h2_cl_qdc_vs_dist", "h2_cl_qdc_vs_dist_h", "h2_cl_qdc_vs_dist_v", "h2_cls_qdc_vs_size", "h2_scifi_vs_mufi", "h2_qdc_vs_hits", "h2_track_slopes", "h2_track_xy"]:
             c_single = ROOT.TCanvas(f"c_{key}_{sample_name}", key, 800, 700)
             c_single.SetRightMargin(0.14)
             c_single.SetLogz(1)
@@ -990,6 +1095,7 @@ def main():
 
     dist_keys = [
         "h_dist_scifi", "h_dist_scifi_zoom", "h_dist_scifi_h", "h_dist_scifi_v", "h_doca_scifi",
+        "h_cluster_dist_to_track",
         "h_dist_veto", "h_doca_veto",
         "h_dist_us", "h_doca_us",
         "h_dist_ds", "h_dist_ds_zoom", "h_doca_ds"

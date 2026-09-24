@@ -328,6 +328,9 @@ DigiValidationSummary DigiValidationProcessor::process(
     s.has_ds_track    = (dsTrack != nullptr);
     s.has_both_tracks = (scifiTrack != nullptr && dsTrack != nullptr);
 
+    TVector3 trk_start, trk_mom;
+    double trk_pz = 1.0;
+
     if (scifiTrack) {
         float c2 = scifiTrack->getChi2Ndf();
         if (c2 >= 0.0f && c2 < fConfig.chi2_max) {
@@ -336,12 +339,16 @@ DigiValidationSummary DigiValidationProcessor::process(
             s.track_slope_xz_clean = scifiTrack->getSlopeXZ();
             s.track_slope_yz_clean = scifiTrack->getSlopeYZ();
 
-            TVector3 start = scifiTrack->getStart();
-            TVector3 mom   = scifiTrack->getTrackMom();
-            double pz = (std::abs(mom.Z()) > 1e-10) ? mom.Z() : 1e-10;
-            double t300 = (300.0 - start.Z()) / pz;
-            s.track_x_300 = start.X() + t300 * mom.X();
-            s.track_y_300 = start.Y() + t300 * mom.Y();
+            trk_start = scifiTrack->getStart();
+            trk_mom   = scifiTrack->getTrackMom();
+            trk_pz    = (std::abs(trk_mom.Z()) > 1e-10) ? trk_mom.Z() : 1e-10;
+            double t300 = (300.0 - trk_start.Z()) / trk_pz;
+            s.track_x_300 = trk_start.X() + t300 * trk_mom.X();
+            s.track_y_300 = trk_start.Y() + t300 * trk_mom.Y();
+        } else {
+            trk_start = scifiTrack->getStart();
+            trk_mom   = scifiTrack->getTrackMom();
+            trk_pz    = (std::abs(trk_mom.Z()) > 1e-10) ? trk_mom.Z() : 1e-10;
         }
     }
     if (dsTrack) {
@@ -352,18 +359,13 @@ DigiValidationSummary DigiValidationProcessor::process(
 
     // 2. SciFi Hits: Distance from SciFi track & Selection cut
     std::unordered_map<int, double> hit_qdc_map;
+    std::unordered_map<int, double> all_hit_qdc_map;
+
     if (scifiHits) {
         int n_sf = scifiHits->GetEntries();
         s.n_scifi_hits_all = static_cast<double>(n_sf);
         hit_qdc_map.reserve(n_sf);
-
-        TVector3 trk_start, trk_mom;
-        double trk_pz = 1.0;
-        if (scifiTrack) {
-            trk_start = scifiTrack->getStart();
-            trk_mom   = scifiTrack->getTrackMom();
-            trk_pz    = (std::abs(trk_mom.Z()) > 1e-10) ? trk_mom.Z() : 1e-10;
-        }
+        all_hit_qdc_map.reserve(n_sf);
 
         for (int i = 0; i < n_sf; ++i) {
             auto* h = static_cast<sndScifiHit*>(scifiHits->At(i));
@@ -373,6 +375,7 @@ DigiValidationSummary DigiValidationProcessor::process(
             int det_id = h->GetDetectorID();
             int st = h->GetStation();
             bool is_vert = h->isVertical();
+            all_hit_qdc_map[det_id] = qdc;
 
             // Measure distance from SciFi track to activated channel
             float dist = 999.0f;
@@ -459,28 +462,71 @@ DigiValidationSummary DigiValidationProcessor::process(
         }
     }
 
-    // 3. Clusters: only constructed from track-associated hits
+    // 3. Clusters: only constructed from track-associated hits within tolerable distance
     if (clusters) {
         int n_cl = clusters->GetEntries();
         for (int i = 0; i < n_cl; ++i) {
             auto* cl = static_cast<sndCluster*>(clusters->At(i));
             if (!cl) continue;
-            int n_ch = 0;
-            double qdc_sum = 0.0;
+
+            TVector3 left, right;
+            cl->GetPosition(left, right);
             int first = cl->GetFirst();
             int orig_n = cl->GetN();
+            bool is_vert = (int(first / 100000) % 10 == 1);
+            int station = int(first / 1000000);
 
+            double dist_to_trk = 999.0;
+            double dist_to_sipm = -1.0;
+
+            if (scifiTrack) {
+                double z_cl = 0.5 * (left.Z() + right.Z());
+                double t_par = (z_cl - trk_start.Z()) / trk_pz;
+                double x_trk = trk_start.X() + t_par * trk_mom.X();
+                double y_trk = trk_start.Y() + t_par * trk_mom.Y();
+
+                dist_to_trk = is_vert ? std::abs(left.X() - x_trk) : std::abs(left.Y() - y_trk);
+
+                auto it_geo = fChannelMap.find(first);
+                if (it_geo != fChannelMap.end()) {
+                    const auto& cg = it_geo->second;
+                    dist_to_sipm = is_vert ? std::abs(cg.sipm_y - y_trk) : std::abs(cg.sipm_x - x_trk);
+                } else {
+                    dist_to_sipm = is_vert ? std::abs(54.5 - y_trk) : std::abs(-47.5 - x_trk);
+                }
+            }
+
+            // Cut on tolerable distance from SciFi track
+            if (scifiTrack && dist_to_trk > fConfig.cluster_max_dist) {
+                continue;
+            }
+
+            int n_ch = 0;
+            double qdc_sum = 0.0;
             for (int ch = first; ch < first + orig_n; ++ch) {
-                auto it = hit_qdc_map.find(ch);
-                if (it != hit_qdc_map.end()) {
+                auto it = all_hit_qdc_map.find(ch);
+                if (it != all_hit_qdc_map.end()) {
                     qdc_sum += it->second;
                     n_ch++;
                 }
             }
-            if (n_ch > 0) {
+
+            if (n_ch > 0 && qdc_sum > 0.0) {
                 s.n_scifi_clusters += 1.0;
                 s.cluster_size.push_back(static_cast<double>(n_ch));
                 s.cluster_qdc.push_back(qdc_sum);
+                s.cluster_distance.push_back(dist_to_sipm);
+                s.cluster_dist_to_track.push_back(dist_to_trk);
+                s.cluster_station.push_back(static_cast<double>(station));
+                s.cluster_is_vertical.push_back(is_vert ? 1.0 : 0.0);
+
+                if (is_vert) {
+                    s.cluster_qdc_vert.push_back(qdc_sum);
+                    s.cluster_dist_vert.push_back(dist_to_sipm);
+                } else {
+                    s.cluster_qdc_horiz.push_back(qdc_sum);
+                    s.cluster_dist_horiz.push_back(dist_to_sipm);
+                }
                 s.scifi_cluster_sum_qdc += qdc_sum;
             }
         }
