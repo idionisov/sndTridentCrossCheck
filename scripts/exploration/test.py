@@ -394,6 +394,14 @@ def analyze_sample(sample_name, config, args):
         (f"h2_qdcdist_{sample_name}", f"{sample_name}: Hit QDC vs Distance to SiPM;Distance to SiPM [cm];Hit QDC [a.u.];Entries", 180, 0.0, 45.0, 300, 0.0, 150.0),
         "clean_hit_dist", "clean_hit_qdc", "weight"
     )
+    histograms["h2_qdc_vs_dist_h"] = df_clean.Histo2D(
+        (f"h2_qdcdist_h_{sample_name}", f"{sample_name}: Horizontal Hit QDC vs Distance;Distance to SiPM [cm];Hit QDC [a.u.];Entries", 180, 0.0, 45.0, 300, 0.0, 150.0),
+        "clean_hit_dist_horiz", "clean_hit_qdc_horiz", "weight"
+    )
+    histograms["h2_qdc_vs_dist_v"] = df_clean.Histo2D(
+        (f"h2_qdcdist_v_{sample_name}", f"{sample_name}: Vertical Hit QDC vs Distance;Distance to SiPM [cm];Hit QDC [a.u.];Entries", 180, 0.0, 45.0, 300, 0.0, 150.0),
+        "clean_hit_dist_vert", "clean_hit_qdc_vert", "weight"
+    )
     histograms["h2_cls_qdc_vs_size"] = df.Histo2D(
         (f"h2_clqdcsz_{sample_name}", f"{sample_name}: Cluster QDC vs Size;Cluster Size [channels];Cluster QDC [a.u.];Entries", 10, 0.5, 10.5, 50, 0.0, 200.0),
         "cluster_size", "cluster_qdc", "weight"
@@ -501,6 +509,241 @@ def draw_pad_1d(pad, hist_dict, hist_key, is_profile=False, log_y=False, cut_lin
     pad.Update()
     pad._drawn = drawn
     pad._leg = leg
+
+
+def analyze_landau_vavilov(results, out_dir, out_file):
+    """
+    Fits Landau-Vavilov distributions to single hit and cluster QDC,
+    slices 2D QDC vs distance distributions into distance bins,
+    fits each slice with a Landau function to extract the Most Probable Value (MPV),
+    and models the MPV optical attenuation length.
+    """
+    print("\n[*] Performing Landau-Vavilov Energy Loss & MPV Attenuation Analysis...")
+    dir_landau = out_file.mkdir("LandauVavilov")
+
+    c_landau = ROOT.TCanvas("c_landau_vavilov", "Landau-Vavilov Energy Loss & MPV Attenuation", 1600, 1200)
+    c_landau.Divide(2, 2)
+
+    # Pad 1: Single Hit QDC Landau Fits
+    p1 = c_landau.cd(1)
+    p1.SetLogy(0)
+    leg1 = ROOT.TLegend(0.46, 0.65, 0.88, 0.88)
+    leg1.SetBorderSize(0)
+    leg1.SetFillStyle(0)
+    leg1.SetTextSize(0.032)
+
+    drawn1 = []
+    first = True
+    for sample_name, res in results.items():
+        if "h_qdc_single_hit" not in res:
+            continue
+        h = res["h_qdc_single_hit"].Clone(f"h_qdc_fit_{sample_name}")
+        h.GetXaxis().SetRangeUser(-2.0, 15.0)
+        h.SetLineColor(res["color"])
+        h.SetMarkerColor(res["color"])
+        h.SetMarkerStyle(20)
+        h.SetMarkerSize(0.6)
+
+        # Fit Landau
+        f_landau = ROOT.TF1(f"f_landau_hit_{sample_name}", "landau", 0.0, 12.0)
+        f_landau.SetParameters(h.GetMaximum(), 1.0, 0.5)
+        f_landau.SetLineColor(res["color"])
+        f_landau.SetLineWidth(2)
+        h.Fit(f_landau, "RQS0")
+
+        d_opt = "E1" if first else "E1 SAME"
+        h.Draw(d_opt)
+        f_landau.Draw("SAME")
+        first = False
+        drawn1.extend([h, f_landau])
+
+        mpv = f_landau.GetParameter(1)
+        sigma = f_landau.GetParameter(2)
+        leg1.AddEntry(f_landau, f"{sample_name}: MPV={mpv:.2f}, #sigma={sigma:.2f}", "l")
+        res["f_landau_hit"] = f_landau
+
+    leg1.Draw()
+    p1.Update()
+    p1._drawn = drawn1
+
+    # Pad 2: Cluster QDC Landau Fits
+    p2 = c_landau.cd(2)
+    p2.SetLogy(0)
+    leg2 = ROOT.TLegend(0.46, 0.65, 0.88, 0.88)
+    leg2.SetBorderSize(0)
+    leg2.SetFillStyle(0)
+    leg2.SetTextSize(0.032)
+
+    drawn2 = []
+    first = True
+    for sample_name, res in results.items():
+        if "h_cluster_qdc" not in res:
+            continue
+        h = res["h_cluster_qdc"].Clone(f"h_cl_fit_{sample_name}")
+        h.GetXaxis().SetRangeUser(0.0, 25.0)
+        h.SetLineColor(res["color"])
+        h.SetMarkerColor(res["color"])
+        h.SetMarkerStyle(20)
+        h.SetMarkerSize(0.6)
+
+        # Fit Landau
+        f_cl = ROOT.TF1(f"f_landau_cl_{sample_name}", "landau", 0.5, 20.0)
+        f_cl.SetParameters(h.GetMaximum(), 2.0, 0.8)
+        f_cl.SetLineColor(res["color"])
+        f_cl.SetLineWidth(2)
+        h.Fit(f_cl, "RQS0")
+
+        d_opt = "E1" if first else "E1 SAME"
+        h.Draw(d_opt)
+        f_cl.Draw("SAME")
+        first = False
+        drawn2.extend([h, f_cl])
+
+        mpv = f_cl.GetParameter(1)
+        sigma = f_cl.GetParameter(2)
+        leg2.AddEntry(f_cl, f"{sample_name}: MPV={mpv:.2f}, #sigma={sigma:.2f}", "l")
+        res["f_landau_cl"] = f_cl
+
+    leg2.Draw()
+    p2.Update()
+    p2._drawn = drawn2
+
+    # Pad 3: Multi-Slice Landau Peak Shift (Data or first sample)
+    p3 = c_landau.cd(3)
+    p3.SetLogy(0)
+    leg3 = ROOT.TLegend(0.42, 0.62, 0.88, 0.88)
+    leg3.SetBorderSize(0)
+    leg3.SetFillStyle(0)
+    leg3.SetTextSize(0.030)
+
+    drawn3 = []
+    target_sample = "Data" if "Data" in results else list(results.keys())[0]
+    h2_target = results[target_sample]["h2_qdc_vs_dist"]
+    slice_specs = [
+        (2.0, 4.0, ROOT.kBlue + 1),
+        (12.0, 14.0, ROOT.kTeal + 2),
+        (22.0, 24.0, ROOT.kOrange + 7),
+        (32.0, 34.0, ROOT.kRed + 1),
+    ]
+
+    first = True
+    for x_lo, x_hi, col in slice_specs:
+        b1 = h2_target.GetXaxis().FindBin(x_lo + 0.01)
+        b2 = h2_target.GetXaxis().FindBin(x_hi - 0.01)
+        py = h2_target.ProjectionY(f"py_slice_{int(x_lo)}_{int(x_hi)}", b1, b2)
+        if py.GetEntries() < 50:
+            continue
+        py.Scale(1.0 / max(1.0, py.Integral()))
+        py.GetXaxis().SetRangeUser(0.0, 10.0)
+        py.SetLineColor(col)
+        py.SetLineWidth(2)
+        py.SetTitle(f"{target_sample}: QDC Slices along Fiber Length;Hit QDC [a.u.];Normalized Entries")
+
+        fn = ROOT.TF1(f"fn_sl_{int(x_lo)}", "landau", 0.0, 8.0)
+        fn.SetParameters(py.GetMaximum(), 1.2, 0.5)
+        fn.SetLineColor(col)
+        fn.SetLineStyle(2)
+        py.Fit(fn, "RQS0")
+
+        d_opt = "HIST" if first else "HIST SAME"
+        py.Draw(d_opt)
+        fn.Draw("SAME")
+        first = False
+        drawn3.extend([py, fn])
+        mpv = fn.GetParameter(1)
+        leg3.AddEntry(py, f"d #in [{x_lo:.0f}, {x_hi:.0f}] cm (MPV={mpv:.2f})", "l")
+
+    leg3.Draw()
+    p3.Update()
+    p3._drawn = drawn3
+
+    # Pad 4: MPV vs Distance & Attenuation Fit
+    p4 = c_landau.cd(4)
+    p4.SetLogy(0)
+    leg4 = ROOT.TLegend(0.42, 0.65, 0.88, 0.88)
+    leg4.SetBorderSize(0)
+    leg4.SetFillStyle(0)
+    leg4.SetTextSize(0.032)
+
+    drawn4 = []
+    first = True
+    for sample_name, res in results.items():
+        if "h2_qdc_vs_dist" not in res:
+            continue
+        h2 = res["h2_qdc_vs_dist"]
+        gr = ROOT.TGraphErrors()
+        gr.SetName(f"g_mpv_vs_dist_{sample_name}")
+        gr.SetTitle("Landau MPV vs Distance to SiPM;Distance along Fiber [cm];Landau MPV [a.u.]")
+        gr.SetMarkerColor(res["color"])
+        gr.SetLineColor(res["color"])
+        gr.SetMarkerStyle(21)
+        gr.SetMarkerSize(0.7)
+
+        idx = 0
+        step = 2.0
+        for x_low in range(0, 38, int(step)):
+            x_high = x_low + step
+            b1 = h2.GetXaxis().FindBin(x_low + 0.01)
+            b2 = h2.GetXaxis().FindBin(x_high - 0.01)
+            py = h2.ProjectionY(f"py_{sample_name}_{int(x_low)}_{int(x_high)}", b1, b2)
+            if py.GetEntries() < 80:
+                continue
+            fn = ROOT.TF1(f"fn_l_{sample_name}_{int(x_low)}", "landau", 0.0, 10.0)
+            fn.SetParameters(py.GetMaximum(), 1.1, 0.5)
+            py.Fit(fn, "RQ0")
+            mpv = fn.GetParameter(1)
+            err = fn.GetParError(1)
+            if err > 0.1 or mpv <= 0 or mpv > 5.0:
+                continue
+            gr.SetPoint(idx, 0.5 * (x_low + x_high), mpv)
+            gr.SetPointError(idx, 0.5 * step, err)
+            idx += 1
+
+        if gr.GetN() > 3:
+            f_att = ROOT.TF1(f"f_mpv_att_{sample_name}", "[0]*exp(-x/[1])", 4.0, 36.0)
+            f_att.SetParameters(1.3, 180.0)
+            f_att.SetLineColor(res["color"])
+            f_att.SetLineWidth(2)
+            f_att.SetParNames("A_0", "lambda_att")
+            gr.Fit(f_att, "RQS0")
+            drawn4.append(f_att)
+            l_att = f_att.GetParameter(1)
+            l_err = f_att.GetParError(1)
+            leg4.AddEntry(gr, f"{sample_name} (#lambda={l_att:.1f}#pm{l_err:.1f} cm)", "lep")
+            res["f_expo_mpv"] = f_att
+
+        d_opt = "AP" if first else "P SAME"
+        gr.Draw(d_opt)
+        if first:
+            gr.GetYaxis().SetRangeUser(0.6, 1.8)
+            gr.GetXaxis().SetRangeUser(0.0, 42.0)
+            first = False
+        if "f_expo_mpv" in res:
+            res["f_expo_mpv"].Draw("SAME")
+
+        drawn4.append(gr)
+        res["g_mpv_vs_dist"] = gr
+
+    leg4.Draw()
+    p4.Update()
+    p4._drawn = drawn4
+
+    # Save canvas to disk
+    c_landau.SaveAs(os.path.join(out_dir, "landau_vavilov_energy_loss.png"))
+    c_landau.SaveAs(os.path.join(out_dir, "landau_vavilov_energy_loss.pdf"))
+
+    # Write to ROOT file in LandauVavilov directory
+    dir_landau.cd()
+    c_landau.Write()
+    for sample_name, res in results.items():
+        if "f_landau_hit" in res:
+            res["f_landau_hit"].Write()
+        if "f_landau_cl" in res:
+            res["f_landau_cl"].Write()
+        if "g_mpv_vs_dist" in res:
+            res["g_mpv_vs_dist"].Write()
+        if "f_expo_mpv" in res:
+            res["f_expo_mpv"].Write()
 
 
 def main():
@@ -673,7 +916,7 @@ def main():
 
     # Also save standalone high-resolution 2D figures
     for sample_name, res in results.items():
-        for key in ["h2_qdc_vs_dist", "h2_cls_qdc_vs_size", "h2_scifi_vs_mufi", "h2_qdc_vs_hits", "h2_track_slopes", "h2_track_xy"]:
+        for key in ["h2_qdc_vs_dist", "h2_qdc_vs_dist_h", "h2_qdc_vs_dist_v", "h2_cls_qdc_vs_size", "h2_scifi_vs_mufi", "h2_qdc_vs_hits", "h2_track_slopes", "h2_track_xy"]:
             c_single = ROOT.TCanvas(f"c_{key}_{sample_name}", key, 800, 700)
             c_single.SetRightMargin(0.14)
             c_single.SetLogz(1)
@@ -689,6 +932,9 @@ def main():
     c2.Write()
     c_dist.Write()
     c4.Write()
+
+    # Landau-Vavilov Energy Loss & MPV Attenuation
+    analyze_landau_vavilov(results, args.out_dir, out_file)
 
     # Create dedicated top-level directory for Track-to-Channel Distances
     dir_distances = out_file.mkdir("TrackHitDistances")

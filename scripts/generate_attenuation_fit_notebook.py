@@ -117,19 +117,38 @@ We use `ddfUtils.root.to_numpy` to unpack the `TProfile` histogram:
 # -------------------------------------------------------------------------
 # Cell 4: Data Loading Code
 # -------------------------------------------------------------------------
-cell4_code = """# File paths
-DATA_ROOT = "/eos/user/i/idioniso/sndMuTri/out/singleMuons.root"
-MC_ROOT   = "/eos/user/i/idioniso/sndMuTri/out/singleMuons_3mu.root"
+cell4_code = """# File paths: prioritize local out/test.root if present, otherwise fall back to EOS paths
+possible_files = ["out/test.root", "../out/test.root", "/afs/cern.ch/work/i/idioniso/sndMuTri/out/test.root"]
+test_root = None
+for pf in possible_files:
+    if os.path.exists(pf):
+        test_root = pf
+        break
 
-assert os.path.exists(DATA_ROOT), f"Data ROOT file not found: {DATA_ROOT}"
-assert os.path.exists(MC_ROOT),   f"MC ROOT file not found: {MC_ROOT}"
+if test_root:
+    print(f"[*] Loading datasets from local file: {test_root}")
+    DATA_ROOT = test_root
+    MC_ROOT   = test_root
+else:
+    DATA_ROOT = "/eos/user/i/idioniso/sndMuTri/out/singleMuons.root"
+    MC_ROOT   = "/eos/user/i/idioniso/sndMuTri/out/singleMuons_3mu.root"
+    print(f"[*] Loading datasets from EOS: {DATA_ROOT} and {MC_ROOT}")
 
 f_data = ROOT.TFile.Open(DATA_ROOT)
 f_mc   = ROOT.TFile.Open(MC_ROOT)
 
-# Extract TProfile: prof_qdc_vs_distance
-p_data = f_data.Get("Histograms/Profiles/prof_qdc_vs_distance")
-p_mc   = f_mc.Get("Histograms/Profiles/prof_qdc_vs_distance")
+def get_obj(f, names):
+    for n in names:
+        obj = f.Get(n)
+        if obj:
+            return obj
+    return None
+
+# Extract TProfile
+p_data = get_obj(f_data, ["Data/p_qdcdist_Data", "p_qdcdist_Data", "Histograms/Profiles/prof_qdc_vs_distance"])
+p_mc   = get_obj(f_mc,   ["SingleMuMC/p_qdcdist_SingleMuMC", "p_qdcdist_SingleMuMC", "Histograms/Profiles/prof_qdc_vs_distance"])
+if not p_mc:
+    p_mc = p_data
 
 # Extract using ddfUtils.root.to_numpy
 x_data, y_data, edges_data, ex_data, ey_data = dr.to_numpy(p_data)
@@ -142,8 +161,10 @@ print(f"MC Profile:   {p_mc.GetName()} | Total Entries: {p_mc.GetEntries():,.0f}
 print(f"  x range: [{edges_mc[0]:.1f}, {edges_mc[-1]:.1f}] cm | y range: [{np.min(y_mc):.4f}, {np.max(y_mc):.4f}] QDC")
 
 # Extract 2D Hit Distributions for underlying scatter visualization
-h2_data = f_data.Get("Histograms/2D/h2_hit_qdc_vs_distance")
-h2_mc   = f_mc.Get("Histograms/2D/h2_hit_qdc_vs_distance")
+h2_data = get_obj(f_data, ["Data/h2_qdcdist_Data", "h2_qdcdist_Data", "Histograms/2D/h2_hit_qdc_vs_distance"])
+h2_mc   = get_obj(f_mc,   ["SingleMuMC/h2_qdcdist_SingleMuMC", "h2_qdcdist_SingleMuMC", "Histograms/2D/h2_hit_qdc_vs_distance"])
+if not h2_mc:
+    h2_mc = h2_data
 
 x2_d, y2_d, vals2_d, edges_x2_d, edges_y2_d, _, _, _ = dr.to_numpy(h2_data)
 x2_m, y2_m, vals2_m, edges_x2_m, edges_y2_m, _, _, _ = dr.to_numpy(h2_mc)
@@ -738,6 +759,171 @@ cell21_md = """### 11. Conclusions & Recommendations for Monte Carlo Calibration
    - For analyses relying on single-exponential assumptions or uniform MIP thresholding, restrict track hits to the fiducial region $x \\in [5, 35]\\ \\text{cm}$ to avoid unmodeled boundary systematics.
 """
 
+
+# -------------------------------------------------------------------------
+# Cell 21: Landau-Vavilov MPV Theory & Markdown
+# -------------------------------------------------------------------------
+cell21_landau_md = """### 11. Landau-Vavilov Energy Loss & Most Probable Value (MPV) Extraction
+
+#### Scientific Rationale: Mean QDC vs Most Probable Value (MPV)
+When high-energy muons traverse thin ($250\\ \\mu\\text{m}$) scintillating fibers, ionizing collisions produce energy loss following a **Landau-Vavilov distribution** rather than a symmetric Gaussian.
+
+Key physical and methodological considerations:
+1. **Sensitivity of the Arithmetic Mean $\\langle Q(x) \\rangle$**:
+   - The Landau distribution has an intrinsic, heavy high-energy tail caused by rare, hard close-encounter collisions (emitting $\\delta$-rays).
+   - The arithmetic mean computed by `TProfile` is disproportionately skewed by these rare tail events.
+   - In realistic detectors, SiPM non-linear saturation clips high-charge events in the tail, which artificially pulls the mean *downwards*. Conversely, zero-suppression thresholds clip low charges, pulling the mean *upwards*.
+2. **Robustness of the Most Probable Value (MPV)**:
+   - The **Most Probable Value (MPV)** is the peak of the Landau energy loss distribution.
+   - It represents the typical energy deposited by a minimum ionizing particle (MIP) in the fiber.
+   - The MPV is **insensitive to delta-ray tails and non-linear SiPM saturation**, making it the gold standard in tracker and calorimeter calibration across HEP experiments.
+3. **Extraction Methodology**:
+   - We slice the 2D distribution `h2_hit_qdc_vs_distance` (or `h2_qdcdist_Data`) along $x$ into distance bins $\\Delta x = 2\\ \\text{cm}$.
+   - Each distance slice is fit with ROOT\'s `TMath::Landau` to determine $\\text{MPV}(x)$ and its uncertainty $\\sigma_{\\text{MPV}}(x)$.
+"""
+
+# -------------------------------------------------------------------------
+# Cell 22: Landau MPV Extraction & Slice Visualization Code
+# -------------------------------------------------------------------------
+cell22_landau_code = """# Slice 2D distribution along distance and extract Landau MPV
+def extract_landau_mpv_profile(h2, step_cm=2.0, max_dist=38.0):
+    x_centers, x_errs, mpvs, mpv_errs = [], [], [], []
+    for x_lo in np.arange(0.0, max_dist, step_cm):
+        x_hi = x_lo + step_cm
+        b1 = h2.GetXaxis().FindBin(x_lo + 0.01)
+        b2 = h2.GetXaxis().FindBin(x_hi - 0.01)
+        py = h2.ProjectionY(f"py_mpv_{h2.GetName()}_{int(x_lo)}", b1, b2)
+        if py.GetEntries() < 80:
+            continue
+        fn = ROOT.TF1("fn_slice_landau", "landau", 0.0, 10.0)
+        fn.SetParameters(py.GetMaximum(), 1.1, 0.5)
+        py.Fit(fn, "RQ0")
+        mpv = fn.GetParameter(1)
+        err = fn.GetParError(1)
+        if err > 0.15 or mpv <= 0 or mpv > 5.0:
+            continue
+        x_centers.append(0.5 * (x_lo + x_hi))
+        x_errs.append(0.5 * step_cm)
+        mpvs.append(mpv)
+        mpv_errs.append(err)
+    return np.array(x_centers), np.array(mpvs), np.array(x_errs), np.array(mpv_errs)
+
+x_mpv_data, y_mpv_data, ex_mpv_data, ey_mpv_data = extract_landau_mpv_profile(h2_data)
+x_mpv_mc,   y_mpv_mc,   ex_mpv_mc,   ey_mpv_mc   = extract_landau_mpv_profile(h2_mc)
+
+print(f"Extracted Landau MPV profile for Data: {len(x_mpv_data)} bins, x in [{x_mpv_data[0]:.1f}, {x_mpv_data[-1]:.1f}] cm")
+print(f"Extracted Landau MPV profile for MC:   {len(x_mpv_mc)} bins, x in [{x_mpv_mc[0]:.1f}, {x_mpv_mc[-1]:.1f}] cm")
+
+# Visualizing representative distance slices and their Landau fits
+fig, axes = plt.subplots(1, 4, figsize=(18, 4), sharey=True)
+slice_ranges = [(2.0, 4.0), (12.0, 14.0), (22.0, 24.0), (32.0, 34.0)]
+
+for ax, (x_lo, x_hi) in zip(axes, slice_ranges):
+    b1 = h2_data.GetXaxis().FindBin(x_lo + 0.01)
+    b2 = h2_data.GetXaxis().FindBin(x_hi - 0.01)
+    py = h2_data.ProjectionY(f"py_vis_{int(x_lo)}", b1, b2)
+    py.Scale(1.0 / max(1.0, py.Integral()))
+    
+    nb = py.GetNbinsX()
+    x_bins = np.array([py.GetBinCenter(i) for i in range(1, nb + 1)])
+    y_bins = np.array([py.GetBinContent(i) for i in range(1, nb + 1)])
+    
+    fn = ROOT.TF1("fn_vis", "landau", 0.0, 10.0)
+    fn.SetParameters(np.max(y_bins), 1.1, 0.5)
+    py.Fit(fn, "RQ0")
+    mpv_val = fn.GetParameter(1)
+    
+    x_dense = np.linspace(0.0, 10.0, 300)
+    y_dense = np.array([fn.Eval(xv) for xv in x_dense])
+    
+    ax.step(x_bins, y_bins, where="mid", color="black", label="Data Slice")
+    ax.plot(x_dense, y_dense, color="crimson", lw=2, label=f"Landau Fit (MPV={mpv_val:.2f})")
+    ax.set_xlim(0, 8)
+    ax.set_xlabel("Hit QDC [a.u.]", fontsize=11)
+    ax.set_title(f"Distance: {x_lo:.0f} - {x_hi:.0f} cm", fontsize=12)
+    ax.legend(loc="upper right", frameon=False, fontsize=9)
+    ax.grid(alpha=0.3)
+
+axes[0].set_ylabel("Normalized Entries", fontsize=12)
+plt.suptitle("Landau-Vavilov Energy Loss Fits across Fiber Distance Bins", fontsize=14, y=1.02)
+plt.show()
+"""
+
+# -------------------------------------------------------------------------
+# Cell 23: Landau MPV Multi-Model Fitting Markdown
+# -------------------------------------------------------------------------
+cell23_mpv_fit_md = """### 12. Fitting Attenuation Models to Landau Most Probable Value (MPV)
+We fit candidate optical attenuation models to the extracted Landau $\\text{MPV}(x)$ points:
+1. Single Exponential ($x \\in [4, 36]\\ \\text{cm}$)
+2. Double Exponential ($x \\in [0, 38]\\ \\text{cm}$)
+3. Reflected Exponential ($x \\in [0, 38]\\ \\text{cm}$)
+"""
+
+# -------------------------------------------------------------------------
+# Cell 24: Landau MPV Multi-Model Fitting Code
+# -------------------------------------------------------------------------
+cell24_mpv_fit_code = """# iminuit fits on Landau MPV
+mpv_fits_data = {}
+
+# 1. Single Exponential on Bulk [4, 36] cm
+mask_bulk_mpv = (x_mpv_data >= 4.0) & (x_mpv_data <= 36.0)
+c_mpv_exp = LeastSquares(x_mpv_data[mask_bulk_mpv], y_mpv_data[mask_bulk_mpv], ey_mpv_data[mask_bulk_mpv], single_exp)
+m_mpv_exp = Minuit(c_mpv_exp, A=1.3, lam=150.0)
+m_mpv_exp.limits["A"] = (0.5, 3.0)
+m_mpv_exp.limits["lam"] = (30.0, 500.0)
+m_mpv_exp.migrad()
+m_mpv_exp.hesse()
+mpv_fits_data["Single Exponential (Bulk)"] = FitResult("Single Exponential (Bulk)", single_exp, m_mpv_exp, 
+                                                      x_mpv_data[mask_bulk_mpv], y_mpv_data[mask_bulk_mpv], ey_mpv_data[mask_bulk_mpv])
+
+# 2. Double Exponential on Full [0, 38] cm
+c_mpv_dblexp = LeastSquares(x_mpv_data, y_mpv_data, ey_mpv_data, double_exp)
+m_mpv_dblexp = Minuit(c_mpv_dblexp, A_short=0.3, lam_short=2.0, A_long=1.2, lam_long=160.0)
+m_mpv_dblexp.limits["lam_short"] = (0.1, 10.0)
+m_mpv_dblexp.limits["lam_long"]  = (30.0, 500.0)
+m_mpv_dblexp.migrad()
+m_mpv_dblexp.hesse()
+mpv_fits_data["Double Exponential (Full)"] = FitResult("Double Exponential (Full)", double_exp, m_mpv_dblexp,
+                                                       x_mpv_data, y_mpv_data, ey_mpv_data)
+
+# 3. Reflected Exponential on Full [0, 38] cm
+c_mpv_refl = LeastSquares(x_mpv_data, y_mpv_data, ey_mpv_data, lambda x, A, lam, R: reflected_exp(x, A, lam, R, L=39.0))
+m_mpv_refl = Minuit(c_mpv_refl, A=1.2, lam=160.0, R=0.1)
+m_mpv_refl.limits["R"] = (0.0, 0.5)
+m_mpv_refl.limits["lam"] = (30.0, 500.0)
+m_mpv_refl.migrad()
+m_mpv_refl.hesse()
+mpv_fits_data["Reflected Exponential (Full)"] = FitResult("Reflected Exponential (Full)", 
+                                                         lambda x, A, lam, R: reflected_exp(x, A, lam, R, L=39.0),
+                                                         m_mpv_refl, x_mpv_data, y_mpv_data, ey_mpv_data)
+
+df_mpv = pd.DataFrame([fit.summary_dict() for fit in mpv_fits_data.values()])
+print("=== Landau MPV Attenuation Fit Results ===")
+print(df_mpv.to_string(index=False))
+
+# Overlay plot: Mean Profile vs Landau MPV
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.errorbar(x_data, y_data, yerr=ey_data, fmt="o", color="gray", alpha=0.6, label="Mean QDC Profile <Q(x)>")
+ax.errorbar(x_mpv_data, y_mpv_data, yerr=ey_mpv_data, fmt="s", color="navy", markersize=6, label="Landau MPV(x)")
+
+# Plot Bulk Single Exp fit on MPV
+x_plot = np.linspace(0, 38, 200)
+fit_bulk = mpv_fits_data["Single Exponential (Bulk)"]
+A_val = fit_bulk.m.values["A"]
+lam_val = fit_bulk.m.values["lam"]
+lam_err = fit_bulk.m.errors["lam"]
+ax.plot(x_plot, single_exp(x_plot, A_val, lam_val), color="crimson", lw=2.5,
+        label=f"MPV Bulk Single Exp (\\lambda = {lam_val:.1f} \\pm {lam_err:.1f} cm)")
+
+ax.set_xlabel("Distance to SiPM [cm]", fontsize=13)
+ax.set_ylabel("Signal Observable [a.u.]", fontsize=13)
+ax.set_title("SciFi Attenuation: Landau Most Probable Value vs Arithmetic Mean", fontsize=14, pad=12)
+ax.grid(alpha=0.3)
+ax.legend(frameon=True, fontsize=11)
+plt.tight_layout()
+plt.show()
+"""
+
 # Assemble notebook
 cells = [
     nbf.v4.new_markdown_cell(cell1_md),
@@ -760,6 +946,10 @@ cells = [
     nbf.v4.new_code_cell(cell18_code),
     nbf.v4.new_markdown_cell(cell19_md),
     nbf.v4.new_code_cell(cell20_code),
+    nbf.v4.new_markdown_cell(cell21_landau_md),
+    nbf.v4.new_code_cell(cell22_landau_code),
+    nbf.v4.new_markdown_cell(cell23_mpv_fit_md),
+    nbf.v4.new_code_cell(cell24_mpv_fit_code),
     nbf.v4.new_markdown_cell(cell21_md),
 ]
 
