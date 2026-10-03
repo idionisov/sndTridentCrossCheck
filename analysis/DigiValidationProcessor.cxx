@@ -503,10 +503,12 @@ DigiValidationSummary DigiValidationProcessor::process(
 
             int n_ch = 0;
             double qdc_sum = 0.0;
+            std::vector<double> cl_hit_qdcs;
             for (int ch = first; ch < first + orig_n; ++ch) {
                 auto it = all_hit_qdc_map.find(ch);
                 if (it != all_hit_qdc_map.end()) {
                     qdc_sum += it->second;
+                    cl_hit_qdcs.push_back(it->second);
                     n_ch++;
                 }
             }
@@ -515,6 +517,16 @@ DigiValidationSummary DigiValidationProcessor::process(
                 s.n_scifi_clusters += 1.0;
                 s.cluster_size.push_back(static_cast<double>(n_ch));
                 s.cluster_qdc.push_back(qdc_sum);
+
+                // Find seed hit (max QDC) and neighbor hits
+                auto max_it = std::max_element(cl_hit_qdcs.begin(), cl_hit_qdcs.end());
+                double seed_qdc = *max_it;
+                s.cluster_seed_qdc.push_back(seed_qdc);
+                for (size_t idx = 0; idx < cl_hit_qdcs.size(); ++idx) {
+                    if (cl_hit_qdcs.begin() + idx != max_it) {
+                        s.cluster_neighbor_qdc.push_back(cl_hit_qdcs[idx]);
+                    }
+                }
                 s.cluster_distance.push_back(dist_to_sipm);
                 s.cluster_dist_to_track.push_back(dist_to_trk);
                 s.cluster_station.push_back(static_cast<double>(station));

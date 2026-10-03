@@ -53,6 +53,8 @@ struct DigiValidationSummary {
     double n_scifi_clusters{0.0};
     std::vector<double> cluster_size;
     std::vector<double> cluster_qdc;
+    std::vector<double> cluster_seed_qdc;
+    std::vector<double> cluster_neighbor_qdc;
     std::vector<double> cluster_distance;
     std::vector<double> cluster_dist_to_track;
     std::vector<double> cluster_station;
